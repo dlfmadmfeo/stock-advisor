@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma (sqlite local db)
+/prisma/*.db
+/prisma/*.db-journal
