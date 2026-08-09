@@ -33,7 +33,10 @@ import {
 } from "lucide-react";
 import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
 import { passesScreener, screenerChecks, screenerScore } from "@/lib/screener";
-import { SCREENER_PASS_THRESHOLD, SCREENER_TOTAL_RULES } from "@/lib/screener-config";
+import {
+  SCREENER_PASS_THRESHOLD,
+  SCREENER_TOTAL_RULES,
+} from "@/lib/screener-config";
 import { mergeLive, useLiveStock, useLiveStocks } from "@/lib/live-stock";
 import { usePagedStocks } from "@/lib/use-paged-stocks";
 import {
@@ -187,10 +190,10 @@ export function NotificationsScreen() {
               <RefreshUniverseButton />
             </div>
             <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-              이동평균·거래량·52주 고저·RSI {SCREENER_TOTAL_RULES}개 공개
-              지표 중 {SCREENER_PASS_THRESHOLD}개 이상 충족한 종목이에요.
-              최근 기준으로 비중이 높아진 종목을 우선적으로 보여주고, 종목을
-              누르면 어떤 조건을 왜 충족했는지 그대로 볼 수 있어요.
+              이동평균·거래량·52주 고저·RSI {SCREENER_TOTAL_RULES}개 공개 지표
+              중 {SCREENER_PASS_THRESHOLD}개 이상 충족한 종목이에요. 최근
+              기준으로 비중이 높아진 종목을 우선적으로 보여주고, 종목을 누르면
+              어떤 조건을 왜 충족했는지 그대로 볼 수 있어요.
             </p>
             <PagedStockList
               emptyText="조건을 충족하는 종목이 없어요."
@@ -654,7 +657,7 @@ function PortfolioSummary() {
         href="/category"
       >
         <Sparkles className="h-4 w-4" />
-        업종별로 스크리너 보기
+        업종별 스크리너 보기
       </Link>
     </section>
   );
@@ -1032,7 +1035,8 @@ function StockRow({ stock }: { stock: Stock }) {
                 : "bg-[#f2f4f6] text-[#8b95a1]"
             }`}
           >
-            스크리너 {score}/{SCREENER_TOTAL_RULES}{pass ? " 통과" : ""}
+            스크리너 {score}/{SCREENER_TOTAL_RULES}
+            {pass ? " 통과" : ""}
           </span>
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
@@ -1336,9 +1340,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
             ))}
           </ul>
           <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
-            위 {SCREENER_TOTAL_RULES}개 규칙은 전부 공개 지표로 계산됩니다.
-            AI의 판단이 아니라 조건식 결과이며, {SCREENER_PASS_THRESHOLD}개
-            이상 충족 시 홈 화면의 &quot;스크리너 통과&quot;에 노출돼요.
+            위 {SCREENER_TOTAL_RULES}개 규칙은 전부 공개 지표로 계산됩니다. AI의
+            판단이 아니라 조건식 결과이며, {SCREENER_PASS_THRESHOLD}개 이상 충족
+            시 홈 화면의 &quot;스크리너 통과&quot;에 노출돼요.
           </p>
         </div>
 
@@ -1683,7 +1687,8 @@ function WatchlistRow({
                 : "bg-[#f2f4f6] text-[#8b95a1]"
             }`}
           >
-            스크리너 {score}/{SCREENER_TOTAL_RULES}{pass ? " 통과" : ""}
+            스크리너 {score}/{SCREENER_TOTAL_RULES}
+            {pass ? " 통과" : ""}
           </span>
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
