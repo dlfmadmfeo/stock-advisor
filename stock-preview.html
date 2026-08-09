@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI투자 advisor preview</title>
+    <style>
+      :root {
+        --navy-950: #031126;
+        --navy-900: #061a3d;
+        --navy-800: #08285f;
+        --blue-500: #2378ff;
+        --blue-600: #1767e8;
+        --blue-100: #eaf3ff;
+        --mint-500: #19d2a4;
+        --red-500: #f0445f;
+        --slate-900: #0e1a2f;
+        --slate-700: #44536a;
+        --slate-500: #78849a;
+        --slate-300: #d9e1ee;
+        --slate-100: #f3f7fc;
+        --white: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top left, rgba(35, 120, 255, 0.18), transparent 34%),
+          linear-gradient(135deg, #0c1020 0%, #171923 45%, #090d16 100%);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+          "Segoe UI", sans-serif;
+        color: var(--slate-900);
+      }
+
+      .phone {
+        width: min(390px, 100vw);
+        height: min(844px, 100vh);
+        overflow: hidden;
+        border-radius: clamp(0px, 3vw, 18px);
+        background: var(--white);
+        box-shadow: 0 26px 90px rgba(0, 0, 0, 0.5);
+        position: relative;
+      }
+
+      .scroll {
+        height: 100%;
+        overflow-y: auto;
+        padding-bottom: 78px;
+        scrollbar-width: none;
+      }
+
+      .scroll::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hero {
+        min-height: 336px;
+        padding: 24px 19px 20px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        background:
+          linear-gradient(180deg, rgba(3, 17, 38, 0.55), rgba(3, 17, 38, 0.95)),
+          url("./preview-hero-chip.png") center right 24% / cover no-repeat,
+          var(--navy-950);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto -60px -120px -40px;
+        height: 190px;
+        background: radial-gradient(circle, rgba(35, 120, 255, 0.22), transparent 65%);
+        pointer-events: none;
+      }
+
+      .top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .brand {
+        font-size: 17px;
+        line-height: 1;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+      }
+
+      .brand span {
+        color: #3385ff;
+        font-size: 13px;
+        font-weight: 800;
+        margin-left: 4px;
+      }
+
+      .bell {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        position: relative;
+        color: white;
+      }
+
+      .bell svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .bell::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        right: 1px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--blue-500);
+      }
+
+      .hello {
+        position: relative;
+        z-index: 1;
+        margin-top: 30px;
+        font-size: 19px;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+      }
+
+      .subcopy {
+        position: relative;
+        z-index: 1;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .amount-block {
+        position: relative;
+        z-index: 1;
+        margin-top: 29px;
+      }
+
+      .label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.66);
+      }
+
+      .info-dot {
+        width: 14px;
+        height: 14px;
+        display: inline-grid;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.42);
+        border-radius: 50%;
+        font-size: 10px;
+      }
+
+      .amount {
+        margin-top: 6px;
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 950;
+        letter-spacing: -0.05em;
+      }
+
+      .gain {
+        margin-top: 12px;
+        font-size: 13px;
+        font-weight: 900;
+        color: #4f9bff;
+      }
+
+      .profile-row {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 31px;
+        font-size: 12px;
+      }
+
+      .profile-row .muted {
+        color: rgba(255, 255, 255, 0.65);
+        font-weight: 800;
+        margin-right: 6px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 13px;
+        border-radius: 999px;
+        color: white;
+        font-size: 12px;
+        font-weight: 950;
+        border: 1px solid rgba(255, 255, 255, 0.17);
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+      }
+
+      .chip.primary {
+        background: var(--blue-500);
+        border-color: var(--blue-500);
+      }
+
+      .chip.green {
+        color: #36e3bb;
+        background: rgba(15, 160, 128, 0.12);
+        border-color: rgba(54, 227, 187, 0.48);
+      }
+
+      .cta {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 55px;
+        margin-top: 24px;
+        border: 0;
+        border-radius: 7px;
+        background: linear-gradient(135deg, #247dff, #1266ef);
+        color: white;
+        font-size: 17px;
+        font-weight: 950;
+        letter-spacing: -0.03em;
+        box-shadow: 0 18px 32px rgba(18, 102, 239, 0.35);
+        cursor: pointer;
+      }
+
+      .cta:active {
+        transform: translateY(1px);
+      }
+
+      .panel {
+        margin-top: -1px;
+        background: var(--white);
+        border-radius: 4px 4px 0 0;
+        padding: 18px 19px 22px;
+        min-height: 530px;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 950;
+        letter-spacing: -0.03em;
+      }
+
+      .count {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: var(--blue-100);
+        color: var(--blue-600);
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .basis {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--slate-500);
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 22px;
+      }
+
+      .summary-label {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--slate-500);
+      }
+
+      .summary-value {
+        margin-top: 9px;
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 950;
+        letter-spacing: -0.04em;
+        color: var(--blue-600);
+      }
+
+      .trust {
+        display: inline-flex;
+        align-items: center;
+        min-height: 25px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--blue-100);
+        color: var(--blue-600);
+        font-size: 12px;
+        font-weight: 950;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+
+      .range-value {
+        margin-top: 15px;
+        text-align: right;
+        font-size: 18px;
+        font-weight: 950;
+        letter-spacing: -0.02em;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--slate-300);
+        opacity: 0.8;
+        margin: 23px 0 0;
+      }
+
+      .stock {
+        display: grid;
+        grid-template-columns: 27px 48px 1fr 94px;
+        gap: 13px;
+        padding: 21px 0;
+        border-bottom: 1px solid rgba(217, 225, 238, 0.72);
+      }
+
+      .rank {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 5px;
+        background: var(--blue-600);
+        color: white;
+        font-size: 13px;
+        font-weight: 950;
+      }
+
+      .logo {
+        width: 48px;
+        height: 48px;
+        border-radius: 11px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        color: var(--blue-600);
+        font-size: 12px;
+        font-weight: 950;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 8px 18px rgba(15, 23, 42, 0.08);
+      }
+
+      .logo.naver {
+        background: #17c964;
+        color: white;
+        font-size: 32px;
+      }
+
+      .logo.sk {
+        color: #fb3b2e;
+        font-size: 11px;
+      }
+
+      .stock-name {
+        font-size: 15px;
+        font-weight: 950;
+        letter-spacing: -0.03em;
+      }
+
+      .stock-code {
+        margin-top: 4px;
+        color: var(--slate-500);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .comment-label {
+        margin-top: 22px;
+        color: #6d7891;
+        font-size: 11px;
+        font-weight: 950;
+      }
+
+      .comment {
+        margin-top: 7px;
+        color: #536078;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 750;
+      }
+
+      .alloc {
+        text-align: right;
+      }
+
+      .alloc-label,
+      .range-label {
+        color: var(--slate-500);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .alloc-percent {
+        margin-top: 7px;
+        color: var(--blue-600);
+        font-size: 19px;
+        font-weight: 950;
+      }
+
+      .mini-ring {
+        width: 42px;
+        height: 42px;
+        margin: 0 0 17px auto;
+        border-radius: 50%;
+        background: conic-gradient(var(--blue-600) 0 38%, #e5ebf4 38% 100%);
+        display: grid;
+        place-items: center;
+      }
+
+      .mini-ring::after {
+        content: "";
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: white;
+      }
+
+      .target-range {
+        margin-top: 7px;
+        color: var(--blue-600);
+        font-size: 12px;
+        line-height: 1.35;
+        font-weight: 950;
+      }
+
+      .footnote {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 14px;
+        color: var(--slate-500);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .more {
+        border: 0;
+        background: transparent;
+        color: var(--slate-700);
+        font-size: 12px;
+        font-weight: 950;
+        cursor: pointer;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 66px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        background: rgba(255, 255, 255, 0.96);
+        border-top: 1px solid #e4eaf3;
+        backdrop-filter: blur(12px);
+      }
+
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: #647187;
+        font-size: 11px;
+        font-weight: 850;
+        text-decoration: none;
+      }
+
+      .nav-item svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .nav-item.active {
+        color: var(--blue-600);
+      }
+
+      @media (max-width: 430px) {
+        body {
+          display: block;
+          background: white;
+        }
+
+        .phone {
+          width: 100vw;
+          height: 100vh;
+          border-radius: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone">
+      <div class="scroll">
+        <section class="hero">
+          <div class="top">
+            <div class="brand">AI투자 <span>advisor</span></div>
+            <div class="bell" aria-label="알림">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M18 9.5a6 6 0 0 0-12 0c0 7-3 7.5-3 8.5h18c0-1-3-.5-3-8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9.8 21a2.4 2.4 0 0 0 4.4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="hello">김투자님, 좋은 아침입니다!</div>
+          <div class="subcopy">AI가 오늘의 최적 포트폴리오를 제안드려요.</div>
+
+          <div class="amount-block">
+            <div class="label">투자 가능 금액 <span class="info-dot">i</span></div>
+            <div class="amount">32,450,000원</div>
+            <div class="gain">전일 대비 +2,530,000원 (+8.45%)</div>
+          </div>
+
+          <div class="profile-row">
+            <span class="muted">나의 투자 성향</span>
+            <span class="chip primary">균형형</span>
+            <span class="chip">중위험 · 중수익</span>
+            <span class="chip green">✓ 리밸런싱 권장</span>
+          </div>
+
+          <button class="cta">✦ AI 포트폴리오로 투자하기</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              오늘의 AI 추천 포트폴리오
+              <span class="count">3종목</span>
+            </div>
+            <div class="basis">기준: 오늘 09:00 ⓘ</div>
+          </div>
+
+          <div class="summary">
+            <div>
+              <div class="summary-label">예상 수익률 (3개월)</div>
+              <div class="summary-value">+12.4% <span class="trust">신뢰도 높음</span></div>
+            </div>
+            <div>
+              <div class="summary-label" style="text-align: right">예상 범위</div>
+              <div class="range-value">+8.3% ~ +16.8%</div>
+            </div>
+          </div>
+          <div class="divider"></div>
+
+          <article class="stock">
+            <div class="rank">1</div>
+            <div class="logo">SAMSUNG</div>
+            <div>
+              <div class="stock-name">삼성전자</div>
+              <div class="stock-code">005930 · 전기전자</div>
+              <div class="comment-label">✦ AI 코멘트</div>
+              <div class="comment">메모리 업황 개선과 HBM 공급 확대가 실적 성장을 견인할 전망입니다.</div>
+            </div>
+            <div class="alloc">
+              <div class="mini-ring"></div>
+              <div class="alloc-label">편입 비중</div>
+              <div class="alloc-percent">40%</div>
+              <div class="range-label" style="margin-top: 22px">예상 범위 (3개월)</div>
+              <div class="target-range">85,000원 ~ 105,000원</div>
+            </div>
+          </article>
+
+          <article class="stock">
+            <div class="rank">2</div>
+            <div class="logo naver">N</div>
+            <div>
+              <div class="stock-name">NAVER</div>
+              <div class="stock-code">035420 · 서비스업</div>
+              <div class="comment-label">✦ AI 코멘트</div>
+              <div class="comment">광고 성장과 커머스 수익성 개선으로 이익 모멘텀이 강화되고 있습니다.</div>
+            </div>
+            <div class="alloc">
+              <div class="mini-ring" style="background: conic-gradient(var(--blue-600) 0 32%, #e5ebf4 32% 100%)"></div>
+              <div class="alloc-label">편입 비중</div>
+              <div class="alloc-percent">30%</div>
+              <div class="range-label" style="margin-top: 22px">예상 범위 (3개월)</div>
+              <div class="target-range">230,000원 ~ 280,000원</div>
+            </div>
+          </article>
+
+          <article class="stock">
+            <div class="rank">3</div>
+            <div class="logo sk">SK hynix</div>
+            <div>
+              <div class="stock-name">SK하이닉스</div>
+              <div class="stock-code">000660 · 전기전자</div>
+              <div class="comment-label">✦ AI 코멘트</div>
+              <div class="comment">HBM 시장 리더십과 수요 증가로 안정적인 실적 성장이 기대됩니다.</div>
+            </div>
+            <div class="alloc">
+              <div class="mini-ring" style="background: conic-gradient(var(--blue-600) 0 32%, #e5ebf4 32% 100%)"></div>
+              <div class="alloc-label">편입 비중</div>
+              <div class="alloc-percent">30%</div>
+              <div class="range-label" style="margin-top: 22px">예상 범위 (3개월)</div>
+              <div class="target-range">210,000원 ~ 260,000원</div>
+            </div>
+          </article>
+
+          <div class="footnote">
+            <span>방패 AI 분석 모델이 128개 지표를 기반으로 산출한 결과입니다.</span>
+            <button class="more">더보기 ›</button>
+          </div>
+        </section>
+      </div>
+
+      <nav class="bottom-nav" aria-label="하단 내비게이션">
+        <a class="nav-item active" href="#">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 10.4 12 4l8 6.4V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9.6Z"/></svg>
+          홈
+        </a>
+        <a class="nav-item" href="#">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          추천
+        </a>
+        <a class="nav-item" href="#">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.2 5.8a5.2 5.2 0 0 0-7.4 0l-.8.8-.8-.8a5.2 5.2 0 0 0-7.4 7.4l.8.8 7.4 7.2 7.4-7.2.8-.8a5.2 5.2 0 0 0 0-7.4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          관심
+        </a>
+        <a class="nav-item" href="#">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          뉴스
+        </a>
+        <a class="nav-item" href="#">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 21a8 8 0 1 0-16 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="1.7"/></svg>
+          마이
+        </a>
+      </nav>
+    </main>
+  </body>
+</html>

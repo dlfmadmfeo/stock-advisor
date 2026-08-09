@@ -1,0 +1,1734 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  AreaChart,
+  Bell,
+  Bookmark,
+  BriefcaseBusiness,
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Cpu,
+  Filter,
+  Heart,
+  Home,
+  Newspaper,
+  Search,
+  Settings,
+  ArrowDown,
+  ArrowUp,
+  ShieldCheck,
+  Sparkles,
+  Sprout,
+  Star,
+  UserRound,
+  WalletCards,
+  X,
+} from "lucide-react";
+import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
+import { passesScreener, screenerChecks, screenerScore } from "@/lib/screener";
+import {
+  SCREENER_PASS_THRESHOLD,
+  SCREENER_TOTAL_RULES,
+} from "@/lib/screener-config";
+import { mergeLive, useLiveStock, useLiveStocks } from "@/lib/live-stock";
+import { usePagedStocks } from "@/lib/use-paged-stocks";
+import {
+  UNIVERSE_PAGE_SIZE,
+  UNIVERSE_SORT_FIELDS,
+  WATCHLIST_LIMIT,
+  type SortDirection,
+  type SortField,
+} from "@/lib/constants";
+import { useAdvisorStore } from "@/stores/use-advisor-store";
+import { StatusPill, WsStatusPill } from "@/components/status-pill";
+import { RefreshUniverseButton } from "@/components/refresh-universe-button";
+
+type IconComponent = React.ComponentType<{ className?: string }>;
+
+function usePortfolioTotals() {
+  const stocks = useLiveStocks();
+  const byTicker = Object.fromEntries(stocks.map((s) => [s.ticker, s]));
+  const total = HOLDINGS.reduce(
+    (sum, h) => sum + (byTicker[h.ticker]?.price ?? 0) * h.qty,
+    0,
+  );
+  const cost = HOLDINGS.reduce((sum, h) => sum + h.avgBuy * h.qty, 0);
+  const returnAmount = total - cost;
+  const returnPct = cost ? +((returnAmount / cost) * 100).toFixed(1) : 0;
+  return { stocks, byTicker, total, cost, returnAmount, returnPct };
+}
+
+const sectorColors: Record<string, string> = {
+  반도체: "bg-[#3182f6]",
+  플랫폼: "bg-[#ff7a00]",
+  "2차전지": "bg-[#00a878]",
+  자동차: "bg-[#8b5cf6]",
+  바이오: "bg-[#f04452]",
+  금융: "bg-[#0ea5e9]",
+  방산: "bg-[#6b7684]",
+};
+
+const navTabs = [
+  { href: "/notifications", icon: Home, label: "홈" },
+  { href: "/category", icon: Star, label: "추천" },
+  { href: "/mypage", icon: Heart, label: "관심" },
+  { href: "/analysis", icon: AreaChart, label: "자산" },
+  { href: "/news", icon: Newspaper, label: "뉴스" },
+];
+
+const categoryIcons: Record<string, IconComponent> = {
+  반도체: Cpu,
+  금융: CircleDollarSign,
+  바이오: Sprout,
+  플랫폼: Building2,
+};
+const categorySectors = ["반도체", "금융", "바이오", "플랫폼"];
+
+const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "투자 성향"];
+
+const newsItems = [
+  {
+    tag: "시장",
+    title: "코스피, 외국인 매수세 유입에 2,650선 돌파",
+    meta: "연합뉴스 | 10분 전",
+    image: "chart",
+  },
+  {
+    tag: "업종",
+    title: "반도체 업종 강세 지속, 관련주 상승 흐름 뚜렷",
+    meta: "한국경제 | 35분 전",
+    image: "chip",
+  },
+  {
+    tag: "기업",
+    title: "나나다, 2분기 실적 시장 예상치 상회",
+    meta: "뉴스1 | 1시간 전",
+    image: "building",
+  },
+  {
+    tag: "경제",
+    title: "소비자물가 상승률 둔화, 금리 동결 가능성 확대",
+    meta: "매일경제 | 2시간 전",
+    image: "macro",
+  },
+];
+
+const history = [
+  [
+    "삼성전자",
+    "전기전자",
+    "2024.05.23",
+    "42,000원",
+    "48,600원",
+    "+15.71%",
+    "진행중",
+  ],
+  [
+    "나나다",
+    "내수 소비재",
+    "2024.05.20",
+    "28,500원",
+    "31,200원",
+    "+9.47%",
+    "진행중",
+  ],
+  [
+    "그린에너지",
+    "친환경 에너지",
+    "2024.05.15",
+    "19,800원",
+    "17,600원",
+    "-11.11%",
+    "완료",
+  ],
+  [
+    "바이오인사이트",
+    "바이오/헬스케어",
+    "2024.05.10",
+    "33,000원",
+    "29,700원",
+    "-10.00%",
+    "완료",
+  ],
+];
+
+export function NotificationsScreen() {
+  const stocks = useLiveStocks();
+  const passed = stocks.filter((s) => passesScreener(s));
+
+  return (
+    <AppShell>
+      <HomeHeader />
+      <section className="space-y-5 px-5 pb-8 lg:px-8">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <PortfolioSummary />
+          <QuickActions />
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+          <div className="space-y-3">
+            {/* SectionHeader를 다른 요소랑 같은 flex 줄에 욱여넣으면 내부의
+                justify-between이 펼쳐질 공간을 못 받아서 제목이랑 "전체 보기"가
+                딱 붙어버리는 문제가 있었음. 그래서 SectionHeader는 단독으로 한
+                줄 전체를 쓰게 하고, 상태 뱃지들은 그 아래 별도 줄로 뺐어요.
+                모바일 좁은 화면에서도 flex-wrap이 걸려서 넘치지 않고 줄바꿈됨. */}
+            <SectionHeader
+              title="스크리너 통과 종목"
+              action="전체 보기"
+              href="/search"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill />
+              <WsStatusPill />
+              <RefreshUniverseButton />
+            </div>
+            <p className="text-xs font-medium leading-5 text-[#8b95a1]">
+              이동평균·거래량·52주 고저·RSI {SCREENER_TOTAL_RULES}개 공개 지표
+              중 {SCREENER_PASS_THRESHOLD}개 이상 충족한 종목이에요. 최근
+              기준으로 비중이 높아진 종목을 우선적으로 보여주고, 종목을 누르면
+              어떤 조건을 왜 충족했는지 그대로 볼 수 있어요.
+            </p>
+            <PagedStockList
+              emptyText="조건을 충족하는 종목이 없어요."
+              screenerOnly
+            />
+          </div>
+
+          <aside className="space-y-5">
+            {/* 참고: 이 숫자는 store에 이미 로드된 전체 목록(stocks, 웹소켓 실시간
+                병합 포함)에서 클라이언트가 직접 계산한 값이고, 바로 아래 리스트는
+                PagedStockList가 DB의 screenerOk 스냅샷을 페이지 단위로 서버에서
+                가져온 값이라 소스가 달라요. 관심종목(실시간 갱신되는 것)은 둘 다
+                최신이지만, 그 외 종목은 마지막 배치 시점 기준이라 두 값이 완전히
+                일치하지 않을 수 있어요 — 오차가 커지면 통일하는 리팩터링이 필요. */}
+            <section className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <p className="text-sm font-bold text-[#8b95a1]">스크리너 현황</p>
+              <p className="mt-1 text-[28px] font-extrabold tracking-[-0.03em] text-[#191f28]">
+                {passed.length}/{stocks.length}
+                <span className="ml-1 text-base font-bold text-[#8b95a1]">
+                  종목 통과
+                </span>
+              </p>
+              <p className="mt-1 text-xs font-medium text-[#8b95a1]">
+                {SCREENER_TOTAL_RULES}개 규칙 중 {SCREENER_PASS_THRESHOLD}개
+                이상 충족한 종목 수예요. 수익률 예측이 아니라 공개 지표 충족
+                개수입니다.
+              </p>
+            </section>
+
+            <div className="space-y-3">
+              {/* <SectionHeader title="시장 소식" action="더 보기" href="/news" /> */}
+              <div className="space-y-2">
+                {newsItems.slice(0, 3).map((item) => (
+                  <CompactNewsRow item={item} key={item.title} />
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+export function CategoryScreen() {
+  const router = useRouter();
+  const sector = useAdvisorStore((s) => s.searchSector);
+  const setSector = useAdvisorStore((s) => s.setSearchSector);
+  const stocks = useLiveStocks();
+
+  const resultCount = stocks.filter(
+    (s) => sector === "전체" || s.sector === sector,
+  ).length;
+
+  return (
+    <AppShell>
+      <TopBar
+        title="업종별 종목"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+        right={<Search />}
+        rightHref="/search"
+      />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
+        <HeaderText
+          title="업종을 골라볼까요?"
+          subtitle="선택한 업종 안에서 스크리너 통과 여부를 바로 확인할 수 있어요."
+        />
+
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {categorySectors.map((label) => {
+            const Icon = categoryIcons[label];
+            const active = sector === label;
+            const count = stocks.filter((s) => s.sector === label).length;
+            return (
+              <button
+                className={`relative rounded-lg border p-4 text-left transition active:scale-[0.98] ${
+                  active
+                    ? "border-[#3182f6] bg-[#f2f7ff]"
+                    : "border-[#e5e8eb] bg-white"
+                }`}
+                key={label}
+                onClick={() => setSector(active ? "전체" : label)}
+              >
+                {active ? (
+                  <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-[#3182f6] text-white">
+                    <Check className="h-4 w-4" />
+                  </span>
+                ) : null}
+                <div
+                  className={`grid h-11 w-11 place-items-center rounded-lg ${active ? "bg-white" : "bg-[#f2f4f6]"}`}
+                >
+                  <Icon
+                    className={`h-6 w-6 ${active ? "text-[#3182f6]" : "text-[#4e5968]"}`}
+                  />
+                </div>
+                <p className="mt-4 text-base font-bold text-[#191f28]">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm font-medium text-[#8b95a1]">
+                  {count}개 종목
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        <SectionTitle title="필터 (준비 중)" />
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+          {filters.map((filter) => (
+            <button
+              className="flex h-12 w-full items-center justify-between rounded-lg bg-white px-4 text-[15px] font-semibold text-[#333d4b] ring-1 ring-[#e5e8eb] opacity-60"
+              disabled
+              key={filter}
+            >
+              {filter}
+              <span className="flex items-center gap-2 text-[#6b7684]">
+                전체 <ChevronDown className="h-4 w-4" />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          className="mt-6 h-13 w-full rounded-lg bg-[#3182f6] text-base font-bold text-white shadow-[0_8px_20px_rgba(49,130,246,0.22)]"
+          onClick={() => router.push("/search")}
+        >
+          결과 {resultCount}개 보기
+        </button>
+      </section>
+    </AppShell>
+  );
+}
+
+export function AnalysisScreen() {
+  const router = useRouter();
+  const { byTicker, total, returnAmount, returnPct } = usePortfolioTotals();
+
+  const bySector: Record<string, number> = {};
+  HOLDINGS.forEach((h) => {
+    const s = byTicker[h.ticker];
+    if (!s) return;
+    bySector[s.sector] = (bySector[s.sector] ?? 0) + s.price * h.qty;
+  });
+  const sectorEntries = Object.entries(bySector).sort((a, b) => b[1] - a[1]);
+  const donutStyle = buildDonutGradient(sectorEntries, total);
+
+  return (
+    <AppShell>
+      <TopBar
+        title="내 자산"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+        right={<Settings />}
+      />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
+        <HeaderText
+          title="자산 흐름"
+          subtitle="예시 보유 종목 기준으로 계산한 평가액과 배분이에요."
+        />
+        <StatusPill />
+
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MetricCard label="총 평가액" value={`${formatKRW(total)}원`} />
+          <MetricCard
+            label="매입가 대비 손익"
+            value={`${returnAmount >= 0 ? "+" : ""}${formatKRW(returnAmount)}원 (${returnPct >= 0 ? "+" : ""}${returnPct}%)`}
+            positive={returnAmount >= 0}
+          />
+        </div>
+
+        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb] lg:max-w-[620px]">
+          <div>
+            <h2 className="text-lg font-bold text-[#191f28]">자산 배분</h2>
+            <p className="mt-1 text-sm font-semibold text-[#8b95a1]">
+              예시 보유 종목 {HOLDINGS.length}개 기준
+            </p>
+          </div>
+          <div className="mt-6 flex items-center gap-6">
+            <div
+              className="grid h-28 w-28 shrink-0 place-items-center rounded-full"
+              style={{ backgroundImage: donutStyle }}
+            >
+              <div className="grid h-14 w-14 place-items-center rounded-full bg-white">
+                <span className="text-xs font-bold text-[#191f28]">100%</span>
+              </div>
+            </div>
+            <div className="flex-1 space-y-3">
+              {sectorEntries.map(([sec, value]) => (
+                <Allocation
+                  key={sec}
+                  label={sec}
+                  value={`${total ? Math.round((value / total) * 100) : 0}%`}
+                  color={sectorColors[sec] ?? "bg-[#d1d6db]"}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+          <h2 className="text-lg font-bold text-[#191f28]">보유 종목</h2>
+          <div className="mt-3 space-y-2">
+            {HOLDINGS.map((h) => {
+              const s = byTicker[h.ticker];
+              if (!s) return null;
+              const ret = +(((s.price - h.avgBuy) / h.avgBuy) * 100).toFixed(1);
+              return (
+                <Link
+                  key={h.ticker}
+                  href={`/stock/${h.ticker}`}
+                  className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-3 py-2.5"
+                >
+                  <span className="text-sm font-bold text-[#191f28]">
+                    {s.name} · {h.qty}주
+                  </span>
+                  <span
+                    className={`text-sm font-bold ${ret >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+                  >
+                    {ret >= 0 ? "+" : ""}
+                    {ret}%
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[11px] font-medium leading-5 text-[#8b95a1]">
+            실제 계좌와 연동되어 있지 않은 예시 데이터예요. 변동성·최대낙폭 같은
+            지표는 시계열 데이터가 없어 정확히 계산할 수 없어 표시하지 않았어요.
+          </p>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function buildDonutGradient(entries: [string, number][], total: number) {
+  if (!total || entries.length === 0) return "conic-gradient(#d1d6db 0 100%)";
+  let acc = 0;
+  const stops = entries.map(([sec, value]) => {
+    const from = acc;
+    const pct = (value / total) * 100;
+    acc += pct;
+    const color = sectorHex[sec] ?? "#d1d6db";
+    return `${color} ${from}% ${acc}%`;
+  });
+  return `conic-gradient(${stops.join(",")})`;
+}
+
+const sectorHex: Record<string, string> = {
+  반도체: "#3182f6",
+  플랫폼: "#ff7a00",
+  "2차전지": "#00a878",
+  자동차: "#8b5cf6",
+  바이오: "#f04452",
+  금융: "#0ea5e9",
+  방산: "#6b7684",
+};
+
+export function NewsScreen() {
+  const router = useRouter();
+  return (
+    <AppShell>
+      <TopBar
+        title="시장 소식"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+        right={<Search />}
+        rightHref="/search"
+      />
+      <section className="px-5 pb-8 pt-3 lg:px-8">
+        <div className="flex gap-2 overflow-x-auto pb-3">
+          {["전체", "시장", "업종", "기업", "경제"].map((item, index) => (
+            <button
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
+                index === 0
+                  ? "bg-[#191f28] text-white"
+                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+              }`}
+              key={item}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {newsItems.map((item) => (
+            <NewsRow item={item} key={item.title} />
+          ))}
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+export function MyPageScreen() {
+  return (
+    <AppShell>
+      <TopBar title="마이" right={<Settings />} />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
+        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+          <div className="flex items-center gap-4">
+            <div className="grid h-16 w-16 place-items-center rounded-full bg-[#f2f7ff]">
+              <UserRound className="h-8 w-8 text-[#3182f6]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-[22px] font-extrabold tracking-[-0.02em] text-[#191f28]">
+                  김투자님
+                </h1>
+                <span className="rounded-full bg-[#191f28] px-2.5 py-1 text-xs font-bold text-white">
+                  VIP
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-medium text-[#6b7684]">
+                투자 경력 2년 3개월
+              </p>
+              <p className="text-sm font-medium text-[#6b7684]">
+                kimtuja@example.com
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-[#8b95a1]" />
+          </div>
+        </div>
+
+        <SectionTitle title="포트폴리오 요약" action="자세히" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MetricCard label="총 자산" value="32,450,000원" />
+          <MetricCard label="평가 손익" value="+2,530,000원" positive />
+          <MetricCard label="보유 종목" value="24개" />
+          <MetricCard label="현금 비중" value="12.5%" />
+        </div>
+
+        <SectionTitle title="자주 쓰는 메뉴" />
+        <MenuGrid
+          items={[
+            [WalletCards, "거래 내역"],
+            [BriefcaseBusiness, "입출금"],
+            [Bookmark, "추천 이력"],
+            [Heart, "관심 종목"],
+            [Bell, "알림 설정"],
+            [ShieldCheck, "보안 설정"],
+          ]}
+        />
+      </section>
+    </AppShell>
+  );
+}
+
+export function HistoryScreen() {
+  const router = useRouter();
+  return (
+    <AppShell>
+      <TopBar
+        title="스크리너 이력"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+        right={<Filter />}
+      />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
+        <p className="mb-3 rounded-lg bg-[#fff4e8] px-3 py-2 text-[11px] font-semibold leading-5 text-[#9a5b00]">
+          예시 데이터예요. 실제 스크리너 통과/이탈 이력이 쌓이기 전까지 화면
+          구성 참고용으로만 봐주세요.
+        </p>
+        <div className="grid grid-cols-3 rounded-lg bg-[#e5e8eb] p-1 text-sm font-bold">
+          {["전체", "진행중", "완료"].map((item, index) => (
+            <button
+              className={`h-10 rounded-md ${index === 0 ? "bg-white text-[#191f28] shadow-sm" : "text-[#6b7684]"}`}
+              key={item}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 space-y-3">
+          {history.map(([name, sector, date, start, now, rate, status]) => (
+            <article
+              className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
+              key={name}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-[#191f28]">{name}</h3>
+                  <p className="mt-1 text-sm font-medium text-[#8b95a1]">
+                    {sector} · {date}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${status === "진행중" ? "bg-[#f2f7ff] text-[#3182f6]" : "bg-[#f2f4f6] text-[#6b7684]"}`}
+                >
+                  {status}
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <HistoryMetric label="추천가" value={start} />
+                <HistoryMetric label="현재가" value={now} />
+                <HistoryMetric
+                  label="수익률"
+                  value={rate}
+                  positive={rate.startsWith("+")}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function HomeHeader() {
+  return (
+    <header className="px-5 pb-2 pt-5 lg:px-8 lg:pt-8">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
+          <h1 className="mt-1 text-[22px] font-extrabold leading-tight tracking-[-0.03em] text-[#191f28]">
+            오늘 투자 현황을 확인해볼까요?
+          </h1>
+        </div>
+        <button className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white ring-1 ring-[#e5e8eb]">
+          <Bell className="h-5 w-5 text-[#333d4b]" />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#f04452]" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function PortfolioSummary() {
+  const { total, returnAmount, returnPct } = usePortfolioTotals();
+  return (
+    <section className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="lg:flex lg:items-end lg:justify-between lg:gap-8">
+        <div>
+          <div className="flex items-center justify-between lg:justify-start lg:gap-3">
+            <p className="text-sm font-bold text-[#6b7684]">보유 자산 평가액</p>
+          </div>
+          <p className="mt-2 text-[30px] font-extrabold tracking-[-0.035em] text-[#191f28]">
+            {formatKRW(total)} <span className="text-[20px]">원</span>
+          </p>
+          <p
+            className={`mt-1 text-sm font-bold ${returnAmount >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+          >
+            매입가 대비 {returnAmount >= 0 ? "+" : ""}
+            {formatKRW(returnAmount)}원 ({returnPct >= 0 ? "+" : ""}
+            {returnPct}%)
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#e5e8eb] pt-4 lg:mt-0 lg:min-w-[320px] lg:border-t-0 lg:pt-0">
+          <SummaryItem label="보유 종목" value={`${HOLDINGS.length}개`} />
+          <SummaryItem
+            label="매입원가"
+            value={`${formatKRW(HOLDINGS.reduce((s, h) => s + h.avgBuy * h.qty, 0) / 10000)}만원`}
+          />
+          <SummaryItem label="상세" value="자산 탭" />
+        </div>
+      </div>
+      <Link
+        className="mt-4 flex h-12 items-center justify-center gap-2 rounded-lg bg-[#3182f6] text-[15px] font-bold text-white active:scale-[0.99] lg:w-[220px]"
+        href="/category"
+      >
+        <Sparkles className="h-4 w-4" />
+        업종별 스크리너 보기
+      </Link>
+    </section>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
+      <p className="mt-1 text-sm font-bold text-[#191f28]">{value}</p>
+    </div>
+  );
+}
+
+function QuickActions() {
+  return (
+    <section className="grid grid-cols-4 gap-1.5 rounded-lg bg-white p-3 ring-1 ring-[#e5e8eb] lg:grid-cols-1 lg:gap-0">
+      {[
+        [AreaChart, "자산", "/analysis"],
+        [Star, "추천", "/category"],
+        [Bookmark, "관심종목", "/watchlist"],
+        [Newspaper, "뉴스", "/news"],
+      ].map(([Icon, label, href]) => {
+        const TypedIcon = Icon as IconComponent;
+        return (
+          <Link
+            className="flex flex-col items-center justify-center rounded-lg px-3 py-3 text-center active:scale-[0.98] lg:h-14 lg:flex-row lg:justify-start lg:gap-3 lg:text-left lg:hover:bg-[#f7f8fa]"
+            href={href as string}
+            key={label as string}
+          >
+            <TypedIcon className="h-5 w-5 text-[#3182f6]" />
+            <p className="mt-2 text-sm font-semibold text-[#333d4b] lg:mt-0">
+              {label as string}
+            </p>
+          </Link>
+        );
+      })}
+    </section>
+  );
+}
+
+// 종목이 많은 리스트(검색 결과, 스크리너 통과 종목 등)를 react-virtuoso로
+function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="min-h-dvh bg-[#e9edf2] text-[#191f28]">
+      <div
+        className="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-[#f7f8fa] shadow-[0_18px_50px_rgba(25,31,40,0.14)] sm:h-[812px] sm:rounded-[24px] sm:border sm:border-[#d1d6db] lg:h-dvh lg:max-w-none lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
+        data-testid="app-webview"
+      >
+        <DesktopSidebar />
+        <div className="min-h-0 flex-1 overflow-y-auto pb-[72px] lg:pb-0">
+          <DisclaimerBar />
+          <div className="mx-auto w-full lg:max-w-[1280px]">{children}</div>
+        </div>
+        <BottomNav />
+      </div>
+    </main>
+  );
+}
+
+// react-query(useInfiniteQuery)로 한 번에 20개씩 서버에서 실제로 페이지네이션
+// 해오는 리스트입니다. /api/universe/paged가 DB에서 skip/take로 잘라서
+// 내려주고, 리스트 끝에 도달하면(IntersectionObserver) 다음 페이지를 진짜
+// fetch합니다 — 프론트에서 이미 다 받아놓은 걸 자르는 흉내가 아니라, 스크롤
+// 안 하면 뒷부분은 아예 요청조차 안 나가요.
+function PagedStockList({
+  screenerOnly,
+  sector,
+  q,
+  emptyText,
+}: {
+  screenerOnly?: boolean;
+  sector?: string;
+  q?: string;
+  emptyText: string;
+}) {
+  const liveQuotes = useAdvisorStore((s) => s.liveQuotes);
+
+  // 정렬 필드를 아무것도 안 고르면(null) "기본 순서"예요. 버튼을 누를 때마다
+  // 없음 → 자연방향 → 반대방향 → 없음, 3단으로 순환합니다.
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+
+  function handleSortClick(field: SortField, naturalDirection: SortDirection) {
+    if (sortField !== field) {
+      setSortField(field);
+      setSortDir(naturalDirection);
+      return;
+    }
+    if (sortDir === naturalDirection) {
+      setSortDir(naturalDirection === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortField(null);
+  }
+
+  const {
+    data,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = usePagedStocks({
+    screenerOnly,
+    sector,
+    q,
+    sort: sortField,
+    dir: sortDir,
+  });
+
+  // 리스트 맨 아래 보이지 않는 센서(sentinel)가 화면에 들어오면 자동으로
+  // 다음 페이지를 불러옵니다. 참고: 리스트 영역이 화면보다 짧으면(항목이
+  // 몇 개 안 남았을 때 등) 센서가 계속 보이는 상태라 스크롤 안 해도 페이지가
+  // 연달아 로드될 수 있어요 — 결과적으로 데이터가 틀리진 않지만, 의도한
+  // "스크롤해야 더 온다"는 느낌은 덜할 수 있습니다. 그래도 항상 동작하는
+  // "더 보기" 버튼을 같이 둬서 옵저버가 안 먹히는 기기에서도 안전하게 했어요.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const pages = data?.pages ?? [];
+  const stocks = pages
+    .flatMap((p) => p.stocks)
+    .map((s) => mergeLive(s, liveQuotes[s.ticker]));
+  const total = pages[0]?.total ?? 0;
+
+  // 정렬 선택 칩은 로딩/에러/빈 목록 상태에서도 계속 보여야 다른 정렬로
+  // 바로 바꿔볼 수 있어서, 이 아래 상태 분기랑 별개로 항상 렌더링합니다.
+  // 버튼 하나가 필드 하나: 안 눌렀으면 화살표 없음(=기본 순서에 영향 없음),
+  // 누르면 그 필드의 자연방향 화살표, 한 번 더 누르면 반대방향, 한 번 더
+  // 누르면 다시 화살표 없음(기본 순서로 복귀).
+  const sortChips = (
+    <div className="flex flex-wrap gap-1.5">
+      {UNIVERSE_SORT_FIELDS.map((field) => {
+        const active = sortField === field.value;
+        const shownDirection = active ? sortDir : null;
+        return (
+          <button
+            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold ${
+              active
+                ? "bg-[#191f28] text-white"
+                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+            }`}
+            key={field.value}
+            onClick={() => handleSortClick(field.value, field.naturalDirection)}
+            type="button"
+          >
+            {field.label}
+            {shownDirection === "asc" ? (
+              <ArrowUp className="h-3 w-3" />
+            ) : shownDirection === "desc" ? (
+              <ArrowDown className="h-3 w-3" />
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {sortChips}
+        <LoadingSpinnerRow text="불러오는 중..." />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="space-y-3">
+        {sortChips}
+        <EmptyState text="종목을 불러오지 못했어요." />
+      </div>
+    );
+  }
+  if (!stocks.length) {
+    return (
+      <div className="space-y-3">
+        {sortChips}
+        <EmptyState text={emptyText} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {sortChips}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-[#8b95a1]">
+          {stocks.length}/{total}개 표시 중 (한 번에 {UNIVERSE_PAGE_SIZE}개씩)
+        </p>
+        {stocks.map((s) => (
+          <StockRow key={s.ticker} stock={s} />
+        ))}
+        <div ref={sentinelRef} />
+        {isFetchingNextPage ? (
+          <LoadingSpinnerRow text={``} />
+        ) : hasNextPage ? (
+          <button
+            className="w-full rounded-lg bg-white py-3 text-sm font-bold text-[#3182f6] ring-1 ring-[#e5e8eb] active:scale-[0.99]"
+            onClick={() => fetchNextPage()}
+            type="button"
+          >
+            {UNIVERSE_PAGE_SIZE}개 더 보기
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LoadingSpinnerRow({ text }: { text: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-lg bg-white py-6 ring-1 ring-[#e5e8eb]">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#e5e8eb] border-t-[#3182f6]" />
+      <span className="text-xs font-semibold text-[#8b95a1]">{text}</span>
+    </div>
+  );
+}
+
+function DisclaimerBar() {
+  return (
+    <div className="bg-[#fff4e8] px-5 py-2 text-center text-[11px] font-semibold leading-4 text-[#9a5b00] lg:px-8">
+      투자 자문 아님 · &quot;스크리너 통과&quot;는 공개 지표 4개를 기계적으로
+      적용한 결과이며 매수·매도 추천이 아니에요
+    </div>
+  );
+}
+
+function DesktopSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="hidden w-[236px] shrink-0 border-r border-[#e5e8eb] bg-white px-4 py-5 lg:flex lg:flex-col">
+      <Link className="px-2" href="/notifications">
+        <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
+        <p className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-[#191f28]">
+          Stock Advisor
+        </p>
+      </Link>
+
+      <nav className="mt-8 space-y-1">
+        {navTabs.map((item) => {
+          const active =
+            pathname === item.href ||
+            (pathname === "/history" && item.href === "/category");
+          return (
+            <Link
+              className={`flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold ${
+                active
+                  ? "bg-[#f2f7ff] text-[#3182f6]"
+                  : "text-[#4e5968] hover:bg-[#f7f8fa]"
+              }`}
+              href={item.href}
+              key={item.label}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto rounded-lg bg-[#f7f8fa] p-4">
+        <p className="text-xs font-bold text-[#8b95a1]">오늘 기준</p>
+        <p className="mt-1 text-sm font-semibold text-[#191f28]">
+          시장 상태를 반영한 추천 결과입니다.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function TopBar({
+  title,
+  left,
+  right,
+  onLeftClick,
+  rightHref,
+}: {
+  title: string;
+  left?: React.ReactNode;
+  right?: React.ReactNode;
+  onLeftClick?: () => void;
+  rightHref?: string;
+}) {
+  const buttonClass =
+    "grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5";
+  return (
+    <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between bg-[#f7f8fa]/95 px-4 backdrop-blur lg:px-8">
+      <div className="flex w-10 items-center justify-start">
+        {left ? (
+          onLeftClick ? (
+            <button className={buttonClass} onClick={onLeftClick} type="button">
+              {left}
+            </button>
+          ) : (
+            <IconButton>{left}</IconButton>
+          )
+        ) : (
+          <div className="h-10 w-10" />
+        )}
+      </div>
+      <h1 className="text-xl font-extrabold tracking-[-0.02em] text-[#191f28]">
+        {title}
+      </h1>
+      <div className="flex w-10 items-center justify-end">
+        {right ? (
+          rightHref ? (
+            <Link className={buttonClass} href={rightHref}>
+              {right}
+            </Link>
+          ) : (
+            <IconButton>{right}</IconButton>
+          )
+        ) : (
+          <div className="h-10 w-10" />
+        )}
+      </div>
+    </header>
+  );
+}
+
+function IconButton({ children }: { children: React.ReactNode }) {
+  return (
+    <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5">
+      {children}
+    </button>
+  );
+}
+
+function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h1 className="text-[23px] font-extrabold tracking-[-0.03em] text-[#191f28]">
+        {title}
+      </h1>
+      <p className="mt-1 text-sm font-semibold leading-5 text-[#6b7684]">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function StockRow({ stock }: { stock: Stock }) {
+  const score = screenerScore(stock);
+  const pass = score >= SCREENER_PASS_THRESHOLD;
+  const up = stock.chg >= 0;
+  return (
+    <Link
+      href={`/stock/${stock.ticker}`}
+      className="flex items-center justify-between rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]"
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-base font-bold text-[#191f28]">
+            {stock.name}
+          </h3>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              pass
+                ? "bg-[#e6f9f1] text-[#00a878]"
+                : "bg-[#f2f4f6] text-[#8b95a1]"
+            }`}
+          >
+            스크리너 {score}/{SCREENER_TOTAL_RULES}
+            {pass ? " 통과" : ""}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
+          {stock.sector} · {stock.ticker}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-bold text-[#191f28]">
+          {formatKRW(stock.price)}
+        </p>
+        <p
+          className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+        >
+          {up ? "+" : ""}
+          {stock.chg}%
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <p className="rounded-lg bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
+      {text}
+    </p>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+}) {
+  return (
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
+      <p
+        className={`mt-2 text-xl font-bold tracking-[-0.02em] ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Allocation({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+        <span className="text-sm font-bold text-[#4e5968]">{label}</span>
+      </div>
+      <span className="text-sm font-semibold text-[#191f28]">{value}</span>
+    </div>
+  );
+}
+
+function NewsRow({ item }: { item: (typeof newsItems)[number] }) {
+  return (
+    <article className="grid grid-cols-[92px_1fr_22px] gap-3 rounded-lg bg-white p-3 ring-1 ring-[#e5e8eb]">
+      <div
+        aria-hidden="true"
+        className="h-[78px] rounded-lg bg-cover"
+        style={thumbnailStyle(item.image)}
+      />
+      <div className="min-w-0">
+        <span className="rounded-md bg-[#f2f7ff] px-2 py-1 text-xs font-bold text-[#3182f6]">
+          {item.tag}
+        </span>
+        <h3 className="mt-2 line-clamp-2 text-[15px] font-bold leading-5 text-[#191f28]">
+          {item.title}
+        </h3>
+        <p className="mt-1 text-xs font-bold text-[#8b95a1]">{item.meta}</p>
+      </div>
+      <Bookmark className="mt-2 h-5 w-5 text-[#8b95a1]" />
+    </article>
+  );
+}
+
+function CompactNewsRow({ item }: { item: (typeof newsItems)[number] }) {
+  return (
+    <Link
+      className="flex items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]"
+      href="/news"
+    >
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-[#3182f6]">{item.tag}</p>
+        <p className="mt-1 truncate text-sm font-semibold text-[#191f28]">
+          {item.title}
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-[#8b95a1]" />
+    </Link>
+  );
+}
+
+function thumbnailStyle(type: string): React.CSSProperties {
+  const positions: Record<string, string> = {
+    chart: "0% 0%",
+    chip: "100% 0%",
+    building: "0% 100%",
+    macro: "100% 100%",
+  };
+  return {
+    backgroundImage: "url('/news-thumbnails.png')",
+    backgroundPosition: positions[type],
+    backgroundSize: "205% 205%",
+  };
+}
+
+function SectionHeader({
+  title,
+  action,
+  href,
+}: {
+  title: string;
+  action?: string;
+  href?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+        {title}
+      </h2>
+      {action && href ? (
+        <Link className="text-sm font-bold text-[#3182f6]" href={href}>
+          {action}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function SectionTitle({ title, action }: { title: string; action?: string }) {
+  return (
+    <div className="mb-3 mt-7 flex items-center justify-between">
+      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+        {title}
+      </h2>
+      {action ? (
+        <button className="text-sm font-bold text-[#3182f6]">{action}</button>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuGrid({ items }: { items: Array<[IconComponent, string]> }) {
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {items.map(([Icon, label]) => (
+        <button
+          className="rounded-lg bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
+          key={label}
+        >
+          <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
+          <p className="mt-2 text-xs font-semibold text-[#333d4b]">{label}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HistoryMetric({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+}) {
+  return (
+    <div className="rounded-lg bg-[#f7f8fa] px-3 py-2">
+      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
+      <p
+        className={`mt-1 text-sm font-semibold ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function BottomNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-5 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+      {navTabs.map((item) => {
+        const active =
+          pathname === item.href ||
+          (pathname === "/history" && item.href === "/category");
+        return (
+          <Link
+            className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
+              active ? "text-[#3182f6]" : "text-[#8b95a1]"
+            }`}
+            href={item.href}
+            key={item.label}
+          >
+            <item.icon className="h-5 w-5" />
+            {item.label}
+            {item.label === "뉴스" ? (
+              <span className="absolute right-[27%] top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f04452] px-1 text-[9px] leading-none text-white">
+                3
+              </span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function StockDetailScreen({ ticker }: { ticker: string }) {
+  const router = useRouter();
+  const stock = useLiveStock(ticker);
+
+  if (!stock) {
+    return (
+      <AppShell>
+        <TopBar
+          title="종목 정보"
+          left={<ChevronLeft />}
+          onLeftClick={() => router.back()}
+        />
+        <div className="px-5 py-16 text-center text-sm font-semibold text-[#8b95a1]">
+          종목을 찾을 수 없어요.
+        </div>
+      </AppShell>
+    );
+  }
+
+  const checks = screenerChecks(stock);
+  const score = screenerScore(stock);
+  const up = stock.chg >= 0;
+
+  return (
+    <AppShell>
+      <TopBar
+        title={stock.name}
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+      />
+      <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
+        <StatusPill />
+
+        <div>
+          <p className="text-sm font-bold text-[#8b95a1]">
+            {stock.sector} · {stock.ticker}
+          </p>
+          <p className="mt-1 text-[30px] font-extrabold tracking-[-0.03em] text-[#191f28]">
+            {formatKRW(stock.price)}원
+          </p>
+          <p
+            className={`mt-1 text-sm font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+          >
+            {up ? "▲" : "▼"} {Math.abs(stock.chg)}% 오늘
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-[#191f28]">
+              스크리너 조건 충족 현황
+            </h2>
+            <span
+              className={`text-sm font-extrabold ${score >= SCREENER_PASS_THRESHOLD ? "text-[#00a878]" : "text-[#8b95a1]"}`}
+            >
+              {score}/{SCREENER_TOTAL_RULES}
+            </span>
+          </div>
+          <ul className="mt-3 space-y-2.5">
+            {checks.map((c) => (
+              <li
+                key={c.label}
+                className="flex items-start gap-2 text-[13px] leading-5"
+              >
+                <span
+                  className={`mt-0.5 font-bold ${c.pass ? "text-[#00a878]" : "text-[#c3c9d1]"}`}
+                >
+                  {c.pass ? "✓" : "○"}
+                </span>
+                <span className={c.pass ? "text-[#333d4b]" : "text-[#8b95a1]"}>
+                  {c.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+            위 {SCREENER_TOTAL_RULES}개 규칙은 전부 공개 지표로 계산됩니다. AI의
+            판단이 아니라 조건식 결과이며, {SCREENER_PASS_THRESHOLD}개 이상 충족
+            시 홈 화면의 &quot;스크리너 통과&quot;에 노출돼요.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard label="시가총액" value={stock.cap} />
+          <MetricCard label="PER" value={`${stock.per}배`} />
+          <MetricCard label="52주 최고" value={`${formatKRW(stock.hi)}원`} />
+          <MetricCard label="52주 최저" value={`${formatKRW(stock.lo)}원`} />
+        </div>
+
+        <p className="text-center text-[11px] font-semibold text-[#8b95a1]">
+          프로토타입 화면이에요 · 매수/매도 버튼은 아직 연결되어 있지 않아요
+        </p>
+      </section>
+    </AppShell>
+  );
+}
+
+export function SearchScreen() {
+  const router = useRouter();
+  const query = useAdvisorStore((s) => s.searchQuery);
+  const sector = useAdvisorStore((s) => s.searchSector);
+  const setQuery = useAdvisorStore((s) => s.setSearchQuery);
+  const setSector = useAdvisorStore((s) => s.setSearchSector);
+  const stocks = useLiveStocks();
+
+  // DB 유니버스는 종목마다 KIS 업종명이 그대로 들어있어서(스크린 디자인 때
+  // 쓰던 "반도체/플랫폼/2차전지" 같은 고정 태그와 다를 수 있음) 필터 버튼은
+  // 지금 로드된 종목들의 실제 업종명을 그대로 뽑아 씁니다. (이건 이미
+  // store에 로드돼있는 전체 목록에서 뽑는 거라 페이지네이션이랑 무관해요.)
+  const sectorOptions = [
+    "전체",
+    ...Array.from(new Set(stocks.map((s) => s.sector))).sort(),
+  ];
+
+  // 검색어는 타이핑할 때마다 바로 서버에 쏘면 요청이 너무 잦아지니, 300ms
+  // debounce를 걸어서 입력이 잠깐 멈췄을 때만 실제 쿼리(react-query)가
+  // 나가도록 합니다. 입력창 자체는 debounce 없이 바로 반응해요.
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <AppShell>
+      <TopBar
+        title="종목 검색"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+      />
+      <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+        <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+          <Search className="h-4 w-4 text-[#8b95a1]" />
+          <input
+            className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="종목명 또는 코드 검색"
+            value={query}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {sectorOptions.map((sec) => (
+            <button
+              className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                sector === sec
+                  ? "bg-[#191f28] text-white"
+                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+              }`}
+              key={sec}
+              onClick={() => setSector(sec)}
+            >
+              {sec}
+            </button>
+          ))}
+        </div>
+
+        <PagedStockList
+          emptyText="일치하는 종목이 없어요."
+          q={debouncedQuery}
+          sector={sector}
+        />
+      </section>
+    </AppShell>
+  );
+}
+
+type WatchlistItem = {
+  ticker: string;
+  addedAt: string;
+  name: string | null;
+  sector: string | null;
+  price: number | null;
+  chg: number | null;
+  cap: string | null;
+};
+
+export function WatchlistScreen() {
+  const router = useRouter();
+  const universeStocks = useLiveStocks();
+
+  const [items, setItems] = useState<WatchlistItem[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [busyTicker, setBusyTicker] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [showAllCandidates, setShowAllCandidates] = useState(false);
+
+  const loadWatchlist = useCallback(async () => {
+    try {
+      const res = await fetch("/api/watchlist");
+      const data = await res.json();
+      setItems(data.items ?? []);
+    } catch {
+      setItems([]);
+      setError("관심종목을 불러오지 못했어요.");
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWatchlist();
+  }, [loadWatchlist]);
+
+  const watchedTickers = new Set((items ?? []).map((i) => i.ticker));
+
+  // 추가 후보는 "지금 유니버스(top 200)에 있고, 아직 관심종목이 아닌" 종목만.
+  // stock-advisor-server가 DB Stock 테이블에 없는 종목은 실시간 갱신을 못 해서
+  // (RealtimeUpdateService 참고) 유니버스 밖 종목은 애초에 후보에서 뺐어요.
+  //
+  // 기본값은 스크리너 통과(추천) 종목만 후보로 보여주고, "전체 종목 보기"를
+  // 눌러야 200종목 전체가 후보로 나옵니다. 입력창에 아무것도 안 쳤어도
+  // focus만 하면 해당 풀의 상위 종목이 최대 20개, 검색어를 치면 그 풀 안에서
+  // 이름/코드 일치하는 것만 최대 8개 보여줍니다.
+  const trimmedQuery = query.trim();
+  const notWatched = universeStocks.filter(
+    (s) => !watchedTickers.has(s.ticker),
+  );
+  const recommendedPool = notWatched.filter((s) => passesScreener(s));
+  const candidatePool = showAllCandidates ? notWatched : recommendedPool;
+  const candidates = trimmedQuery
+    ? candidatePool
+        .filter(
+          (s) =>
+            s.name.includes(trimmedQuery) || s.ticker.includes(trimmedQuery),
+        )
+        .slice(0, 8)
+    : inputFocused
+      ? candidatePool.slice(0, 20)
+      : [];
+
+  async function addTicker(ticker: string) {
+    setBusyTicker(ticker);
+    setError(null);
+    try {
+      const res = await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.message ?? "추가에 실패했어요.");
+        return;
+      }
+      setQuery("");
+      await loadWatchlist();
+    } catch {
+      setError("서버에 연결할 수 없어요.");
+    } finally {
+      setBusyTicker(null);
+    }
+  }
+
+  async function removeTicker(ticker: string) {
+    setBusyTicker(ticker);
+    try {
+      await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
+      await loadWatchlist();
+    } finally {
+      setBusyTicker(null);
+    }
+  }
+
+  return (
+    <AppShell>
+      <TopBar
+        title="관심종목"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+      />
+      <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+        <div className="flex items-center justify-between">
+          <WsStatusPill />
+          <p className="text-sm font-bold text-[#8b95a1]">
+            {items?.length ?? 0}/{WATCHLIST_LIMIT}개
+          </p>
+        </div>
+
+        <div className="relative">
+          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+            <Search className="h-4 w-4 text-[#8b95a1]" />
+            <input
+              className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
+              onBlur={() => setInputFocused(false)}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setInputFocused(true)}
+              placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
+              value={query}
+            />
+          </div>
+          {candidates.length ? (
+            <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
+              {candidates.map((s) => (
+                <button
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
+                  disabled={busyTicker === s.ticker}
+                  key={s.ticker}
+                  // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
+                  // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
+                  // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
+                  onClick={() => addTicker(s.ticker)}
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <span>
+                    {s.name}{" "}
+                    <span className="text-xs font-medium text-[#8b95a1]">
+                      {s.ticker}
+                    </span>
+                  </span>
+                  <span className="text-xs font-bold text-[#3182f6]">추가</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+              !showAllCandidates
+                ? "bg-[#191f28] text-white"
+                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+            }`}
+            onClick={() => setShowAllCandidates(false)}
+            type="button"
+          >
+            추천종목만
+          </button>
+          <button
+            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+              showAllCandidates
+                ? "bg-[#191f28] text-white"
+                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+            }`}
+            onClick={() => setShowAllCandidates(true)}
+            type="button"
+          >
+            전체 종목
+          </button>
+        </div>
+
+        {error ? (
+          <p className="text-xs font-semibold text-[#f04452]">{error}</p>
+        ) : null}
+
+        <p className="text-xs font-medium leading-5 text-[#8b95a1]">
+          검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
+          종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
+          관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
+          체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
+          {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
+        </p>
+
+        <div className="space-y-2">
+          {items === null ? (
+            <EmptyState text="불러오는 중..." />
+          ) : items.length === 0 ? (
+            <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
+          ) : (
+            items.map((item) => (
+              <WatchlistRow
+                busy={busyTicker === item.ticker}
+                item={item}
+                key={item.ticker}
+                onRemove={removeTicker}
+              />
+            ))
+          )}
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function WatchlistRow({
+  item,
+  busy,
+  onRemove,
+}: {
+  item: WatchlistItem;
+  busy: boolean;
+  onRemove: (ticker: string) => void;
+}) {
+  // 유니버스에 있는 종목이면 useLiveStock이 실시간 병합된 값을 줌 — 웹소켓
+  // 푸시가 오면 이 컴포넌트도 자동으로 다시 렌더링됨.
+  const stock = useLiveStock(item.ticker);
+
+  // 삭제 버튼을 카드 밖에 별도 원형 버튼으로 두면 카드 두 개가 붙어있는
+  // 것처럼 어색해 보여서, 카드 하나 안에 이름/시세와 나란히 배치하는
+  // 구조로 바꿨습니다. 평소엔 옅은 회색으로 있다가 누르기 전엔 눈에
+  // 띄지 않고, hover/press 시에만 빨갛게 반응하는 "고스트" 버튼 스타일.
+  if (!stock) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <p className="min-w-0 truncate text-sm font-semibold text-[#8b95a1]">
+          {item.name ?? item.ticker} · 시세 정보 없음
+        </p>
+        <DeleteWatchlistButton
+          busy={busy}
+          onClick={() => onRemove(item.ticker)}
+        />
+      </div>
+    );
+  }
+
+  const score = screenerScore(stock);
+  const pass = score >= SCREENER_PASS_THRESHOLD;
+  const up = stock.chg >= 0;
+
+  return (
+    <div className="flex items-center gap-1 rounded-lg bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
+      <Link className="min-w-0 flex-1" href={`/stock/${stock.ticker}`}>
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-base font-bold text-[#191f28]">
+            {stock.name}
+          </h3>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              pass
+                ? "bg-[#e6f9f1] text-[#00a878]"
+                : "bg-[#f2f4f6] text-[#8b95a1]"
+            }`}
+          >
+            스크리너 {score}/{SCREENER_TOTAL_RULES}
+            {pass ? " 통과" : ""}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
+          {stock.sector} · {stock.ticker}
+        </p>
+      </Link>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-bold text-[#191f28]">
+          {formatKRW(stock.price)}
+        </p>
+        <p
+          className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+        >
+          {up ? "+" : ""}
+          {stock.chg}%
+        </p>
+      </div>
+      <DeleteWatchlistButton
+        busy={busy}
+        onClick={() => onRemove(item.ticker)}
+      />
+    </div>
+  );
+}
+
+function DeleteWatchlistButton({
+  busy,
+  onClick,
+}: {
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label="관심종목에서 삭제"
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[#c3c9d1] transition hover:bg-[#fdeeee] hover:text-[#f04452] active:scale-90 disabled:opacity-50"
+      disabled={busy}
+      onClick={onClick}
+    >
+      <X className="h-4 w-4" strokeWidth={2.5} />
+    </button>
+  );
+}

@@ -1,0 +1,47 @@
+// 시가총액 상위 종목 유니버스 + 배치로 계산한 스크리너 지표를 저장하는 스키마.
+// 로컬 MySQL로 연결합니다 (SQLite로 되돌리려면 provider를 "sqlite"로,
+// DATABASE_URL을 "file:./dev.db"로 바꾸면 됩니다).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Stock {
+  ticker     String   @id
+  name       String
+  sector     String
+  market     String // KOSPI | KOSDAQ
+  price      Int
+  chg        Float
+  cap        String // "2,069조원" 같은 표시용 문자열
+  capEok     Float // 정렬/필터용 원본 숫자 (억원 단위)
+  per        Float?
+  hi         Int
+  lo         Int
+  ma5over20  Boolean
+  volRatio   Float
+  rsi        Float
+  screenerOk    Boolean // score >= 3 캐시 (조회 편의용)
+  screenerScore Int      @default(0) // 4개 규칙 중 몇 개 통과했는지(0~4). "스크리너 많이 통과한 순" 정렬용.
+  // 기본값 0을 준 이유: 이미 있는 150개 row에 새 NOT NULL 컬럼을 추가하는
+  // 거라 기본값이 없으면 prisma db push가 거부함. 0으로 채워두고 다음
+  // 배치("새로고침" 버튼)나 실시간 틱이 오면 진짜 값으로 갱신됩니다.
+  updatedAt     DateTime @updatedAt
+
+  @@index([sector])
+  @@index([screenerOk])
+  @@index([screenerScore])
+}
+
+// 사용자가 화면에서 추가/삭제하는 관심종목. stock-advisor-server(Spring)가
+// 시작할 때 이 테이블을 읽어 KIS 웹소켓 실시간 구독 목록을 만듭니다.
+// (Spring은 이 테이블의 스키마를 건드리지 않고 읽기/쓰기만 함 — ddl-auto: none)
+model Watchlist {
+  ticker  String   @id
+  addedAt DateTime @default(now())
+}
