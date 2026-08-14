@@ -5,17 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AreaChart,
-  Bell,
   Bookmark,
-  BriefcaseBusiness,
   Building2,
   Check,
   ChevronDown,
   ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
   Cpu,
-  Filter,
   Heart,
   Home,
   Newspaper,
@@ -23,16 +19,24 @@ import {
   Settings,
   ArrowDown,
   ArrowUp,
-  ShieldCheck,
   Sparkles,
   Sprout,
   Star,
-  UserRound,
-  WalletCards,
   X,
 } from "lucide-react";
 import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
 import type { NewsArticle } from "@/lib/naver-news";
+import { CompactNewsRow, newsItems } from "@/components/news-content";
+import { UserMenu } from "@/components/user-menu";
+import {
+  Allocation,
+  EmptyState,
+  MetricCard,
+  SectionHeader,
+  SectionTitle,
+  TopBar,
+  type IconComponent,
+} from "@/components/ui-primitives";
 import {
   getRecommendation,
   passesScreener,
@@ -62,8 +66,6 @@ import {
 import { useAdvisorStore } from "@/stores/use-advisor-store";
 import { StatusPill, WsStatusPill } from "@/components/status-pill";
 import { RefreshUniverseButton } from "@/components/refresh-universe-button";
-
-type IconComponent = React.ComponentType<{ className?: string }>;
 
 function usePortfolioTotals() {
   const stocks = useLiveStocks();
@@ -102,7 +104,7 @@ function chartColor(index: number) {
 const navTabs = [
   { href: "/notifications", icon: Home, label: "홈" },
   { href: "/category", icon: Star, label: "추천" },
-  { href: "/mypage", icon: Heart, label: "관심" },
+  { href: "/watchlist", icon: Heart, label: "관심" },
   { href: "/analysis", icon: AreaChart, label: "자산" },
   { href: "/news", icon: Newspaper, label: "뉴스" },
 ];
@@ -117,71 +119,8 @@ const categorySectors = ["반도체", "금융", "바이오", "플랫폼"];
 
 const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "투자 성향"];
 
-const newsItems = [
-  {
-    tag: "시장",
-    title: "코스피, 외국인 매수세 유입에 2,650선 돌파",
-    meta: "연합뉴스 | 10분 전",
-    image: "chart",
-  },
-  {
-    tag: "업종",
-    title: "반도체 업종 강세 지속, 관련주 상승 흐름 뚜렷",
-    meta: "한국경제 | 35분 전",
-    image: "chip",
-  },
-  {
-    tag: "기업",
-    title: "나나다, 2분기 실적 시장 예상치 상회",
-    meta: "뉴스1 | 1시간 전",
-    image: "building",
-  },
-  {
-    tag: "경제",
-    title: "소비자물가 상승률 둔화, 금리 동결 가능성 확대",
-    meta: "매일경제 | 2시간 전",
-    image: "macro",
-  },
-];
-
-const history = [
-  [
-    "삼성전자",
-    "전기전자",
-    "2024.05.23",
-    "42,000원",
-    "48,600원",
-    "+15.71%",
-    "진행중",
-  ],
-  [
-    "나나다",
-    "내수 소비재",
-    "2024.05.20",
-    "28,500원",
-    "31,200원",
-    "+9.47%",
-    "진행중",
-  ],
-  [
-    "그린에너지",
-    "친환경 에너지",
-    "2024.05.15",
-    "19,800원",
-    "17,600원",
-    "-11.11%",
-    "완료",
-  ],
-  [
-    "바이오인사이트",
-    "바이오/헬스케어",
-    "2024.05.10",
-    "33,000원",
-    "29,700원",
-    "-10.00%",
-    "완료",
-  ],
-];
+// history 데이터는 src/components/history-content.tsx로 옮겼습니다 (서버
+// 컴포넌트 분리 확장).
 
 export function NotificationsScreen() {
   const stocks = useLiveStocks();
@@ -193,7 +132,7 @@ export function NotificationsScreen() {
       <section className="space-y-5 px-5 pb-8 lg:px-8">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
           <PortfolioSummary />
-          <QuickActions />
+          {/* <QuickActions /> */}
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
@@ -466,156 +405,43 @@ function buildDonutGradient(entries: [string, number][], total: number) {
   return `conic-gradient(${stops.join(",")})`;
 }
 
-export function NewsScreen() {
+// ---------------------------------------------------------------------------
+// 2026-08-14 세션: 서버 컴포넌트 분리 파일럿으로 NewsScreen을 제거했습니다.
+// "시장 소식" 화면(/news)은 이제 src/app/news/page.tsx(서버 컴포넌트)가
+// AppShell + BackTopBar(아래, 뒤로가기 버튼만 담당하는 작은 클라이언트
+// 조각) + NewsContent(src/components/news-content.tsx, 서버 컴포넌트)를
+// 직접 조합해서 렌더링합니다. 화면 내용 자체는 이제 클라이언트 JS로 안
+// 내려가요 — 상세한 이유는 news-content.tsx 상단 주석 참고.
+//
+// BackTopBar는 "뒤로가기"(useRouter 필요)만 담당하는 범용 조각이라, 다른
+// 화면을 같은 방식으로 서버 컴포넌트화할 때도 재사용할 수 있습니다.
+// ---------------------------------------------------------------------------
+export function BackTopBar({
+  title,
+  right,
+  rightHref,
+}: {
+  title: string;
+  right?: React.ReactNode;
+  rightHref?: string;
+}) {
   const router = useRouter();
   return (
-    <AppShell>
-      <TopBar
-        title="시장 소식"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-        right={<Search />}
-        rightHref="/search"
-      />
-      <section className="px-5 pb-8 pt-3 lg:px-8">
-        <div className="flex gap-2 overflow-x-auto pb-3">
-          {["전체", "시장", "업종", "기업", "경제"].map((item, index) => (
-            <button
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
-                index === 0
-                  ? "bg-[#191f28] text-white"
-                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-              }`}
-              key={item}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {newsItems.map((item) => (
-            <NewsRow item={item} key={item.title} />
-          ))}
-        </div>
-      </section>
-    </AppShell>
+    <TopBar
+      title={title}
+      left={<ChevronLeft />}
+      onLeftClick={() => router.back()}
+      right={right}
+      rightHref={rightHref}
+    />
   );
 }
 
-export function MyPageScreen() {
-  return (
-    <AppShell>
-      <TopBar title="마이" right={<Settings />} />
-      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 place-items-center rounded-full bg-[#f2f7ff]">
-              <UserRound className="h-8 w-8 text-[#3182f6]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-[22px] font-extrabold tracking-[-0.02em] text-[#191f28]">
-                  김투자님
-                </h1>
-                <span className="rounded-full bg-[#191f28] px-2.5 py-1 text-xs font-bold text-white">
-                  VIP
-                </span>
-              </div>
-              <p className="mt-1 text-sm font-medium text-[#6b7684]">
-                투자 경력 2년 3개월
-              </p>
-              <p className="text-sm font-medium text-[#6b7684]">
-                kimtuja@example.com
-              </p>
-            </div>
-            <ChevronRight className="h-5 w-5 text-[#8b95a1]" />
-          </div>
-        </div>
-
-        <SectionTitle title="포트폴리오 요약" action="자세히" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard label="총 자산" value="32,450,000원" />
-          <MetricCard label="평가 손익" value="+2,530,000원" positive />
-          <MetricCard label="보유 종목" value="24개" />
-          <MetricCard label="현금 비중" value="12.5%" />
-        </div>
-
-        <SectionTitle title="자주 쓰는 메뉴" />
-        <MenuGrid
-          items={[
-            [WalletCards, "거래 내역"],
-            [BriefcaseBusiness, "입출금"],
-            [Bookmark, "추천 이력"],
-            [Heart, "관심 종목"],
-            [Bell, "알림 설정"],
-            [ShieldCheck, "보안 설정"],
-          ]}
-        />
-      </section>
-    </AppShell>
-  );
-}
-
-export function HistoryScreen() {
-  const router = useRouter();
-  return (
-    <AppShell>
-      <TopBar
-        title="스크리너 이력"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-        right={<Filter />}
-      />
-      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <p className="mb-3 rounded-lg bg-[#fff4e8] px-3 py-2 text-[11px] font-semibold leading-5 text-[#9a5b00]">
-          예시 데이터예요. 실제 스크리너 통과/이탈 이력이 쌓이기 전까지 화면
-          구성 참고용으로만 봐주세요.
-        </p>
-        <div className="grid grid-cols-3 rounded-lg bg-[#e5e8eb] p-1 text-sm font-bold">
-          {["전체", "진행중", "완료"].map((item, index) => (
-            <button
-              className={`h-10 rounded-md ${index === 0 ? "bg-white text-[#191f28] shadow-sm" : "text-[#6b7684]"}`}
-              key={item}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 space-y-3">
-          {history.map(([name, sector, date, start, now, rate, status]) => (
-            <article
-              className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]"
-              key={name}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-[#191f28]">{name}</h3>
-                  <p className="mt-1 text-sm font-medium text-[#8b95a1]">
-                    {sector} · {date}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${status === "진행중" ? "bg-[#f2f7ff] text-[#3182f6]" : "bg-[#f2f4f6] text-[#6b7684]"}`}
-                >
-                  {status}
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <HistoryMetric label="추천가" value={start} />
-                <HistoryMetric label="현재가" value={now} />
-                <HistoryMetric
-                  label="수익률"
-                  value={rate}
-                  positive={rate.startsWith("+")}
-                />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-    </AppShell>
-  );
-}
+// MyPageScreen/HistoryScreen 제거됨 (2026-08-14 세션, 서버 컴포넌트 분리
+// 확장). 둘 다 실제로는 정적 목업 콘텐츠라 뉴스 화면과 같은 패턴으로
+// src/app/mypage/page.tsx, src/app/history/page.tsx(둘 다 서버 컴포넌트)에서
+// 직접 조립합니다. `history` 데이터는 src/components/history-content.tsx로
+// 옮겼어요.
 
 function HomeHeader() {
   return (
@@ -624,10 +450,9 @@ function HomeHeader() {
         <div className="min-w-0">
           <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
         </div>
-        <button className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white ring-1 ring-[#e5e8eb]">
-          <Bell className="h-5 w-5 text-[#333d4b]" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#f04452]" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
@@ -653,7 +478,7 @@ function PortfolioSummary() {
           <p className="text-[13px] font-medium text-[#8b95a1]">
             보유 자산 평가액
           </p>
-          <p className="mt-1.5 text-[30px] font-extrabold tracking-[-0.03em] text-white">
+          <p className="mt-1.5 text-[24px] font-extrabold tracking-[-0.03em] text-white">
             {formatKRW(total)}{" "}
             <span className="text-[18px] text-[#c1c9d2]">원</span>
           </p>
@@ -736,7 +561,13 @@ function QuickActions() {
 }
 
 // 종목이 많은 리스트(검색 결과, 스크리너 통과 종목 등)를 react-virtuoso로
-function AppShell({ children }: { children: React.ReactNode }) {
+// AppShell은 news/page.tsx 같은 서버 컴포넌트 page.tsx에서 직접 import해서,
+// 서버에서 렌더링한 children(정적 콘텐츠)을 이 클라이언트 셸 안에 끼워
+// 넣는 용도로도 씁니다 (DesktopSidebar/BottomNav가 usePathname을 써서
+// 셸 자체는 클라이언트여야 하지만, children으로 전달되는 내용은 각자의
+// 렌더링 방식을 그대로 유지해요 — React Server Components의 "서버
+// 컴포넌트를 클라이언트 컴포넌트의 children으로 전달" 패턴).
+export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-dvh bg-[#e9edf2] text-[#191f28]">
       <div
@@ -1008,63 +839,8 @@ function DesktopSidebar() {
   );
 }
 
-function TopBar({
-  title,
-  left,
-  right,
-  onLeftClick,
-  rightHref,
-}: {
-  title: string;
-  left?: React.ReactNode;
-  right?: React.ReactNode;
-  onLeftClick?: () => void;
-  rightHref?: string;
-}) {
-  const buttonClass =
-    "grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5";
-  return (
-    <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between bg-[#f7f8fa]/95 px-4 backdrop-blur lg:px-8">
-      <div className="flex w-10 items-center justify-start">
-        {left ? (
-          onLeftClick ? (
-            <button className={buttonClass} onClick={onLeftClick} type="button">
-              {left}
-            </button>
-          ) : (
-            <IconButton>{left}</IconButton>
-          )
-        ) : (
-          <div className="h-10 w-10" />
-        )}
-      </div>
-      <h1 className="text-xl font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h1>
-      <div className="flex w-10 items-center justify-end">
-        {right ? (
-          rightHref ? (
-            <Link className={buttonClass} href={rightHref}>
-              {right}
-            </Link>
-          ) : (
-            <IconButton>{right}</IconButton>
-          )
-        ) : (
-          <div className="h-10 w-10" />
-        )}
-      </div>
-    </header>
-  );
-}
-
-function IconButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5">
-      {children}
-    </button>
-  );
-}
+// TopBar/IconButton은 src/components/ui-primitives.tsx로 옮겼습니다 (서버
+// 컴포넌트 분리 확장 — ui-primitives.tsx 상단 주석 참고).
 
 function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -1166,183 +942,12 @@ const StockRow = memo(function StockRow({
   );
 });
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <p className="rounded-2xl bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
-      {text}
-    </p>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  positive,
-}: {
-  label: string;
-  value: string;
-  positive?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-2 text-xl font-bold tracking-[-0.02em] ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function Allocation({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        <span className="text-sm font-bold text-[#4e5968]">{label}</span>
-      </div>
-      <span className="text-sm font-semibold text-[#191f28]">{value}</span>
-    </div>
-  );
-}
-
-function NewsRow({ item }: { item: (typeof newsItems)[number] }) {
-  return (
-    <article className="grid grid-cols-[92px_1fr_22px] gap-3 rounded-2xl bg-white p-3 ring-1 ring-[#e5e8eb]">
-      <div
-        aria-hidden="true"
-        className="h-[78px] rounded-xl bg-cover"
-        style={thumbnailStyle(item.image)}
-      />
-      <div className="min-w-0">
-        <span className="rounded-md bg-[#f2f7ff] px-2 py-1 text-xs font-bold text-[#3182f6]">
-          {item.tag}
-        </span>
-        <h3 className="mt-2 line-clamp-2 text-[15px] font-bold leading-5 text-[#191f28]">
-          {item.title}
-        </h3>
-        <p className="mt-1 text-xs font-bold text-[#8b95a1]">{item.meta}</p>
-      </div>
-      <Bookmark className="mt-2 h-5 w-5 text-[#8b95a1]" />
-    </article>
-  );
-}
-
-function CompactNewsRow({ item }: { item: (typeof newsItems)[number] }) {
-  return (
-    <Link
-      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-[#e5e8eb]"
-      href="/news"
-    >
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-[#3182f6]">{item.tag}</p>
-        <p className="mt-1 truncate text-sm font-semibold text-[#191f28]">
-          {item.title}
-        </p>
-      </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-[#8b95a1]" />
-    </Link>
-  );
-}
-
-function thumbnailStyle(type: string): React.CSSProperties {
-  const positions: Record<string, string> = {
-    chart: "0% 0%",
-    chip: "100% 0%",
-    building: "0% 100%",
-    macro: "100% 100%",
-  };
-  return {
-    backgroundImage: "url('/news-thumbnails.png')",
-    backgroundPosition: positions[type],
-    backgroundSize: "205% 205%",
-  };
-}
-
-function SectionHeader({
-  title,
-  action,
-  href,
-}: {
-  title: string;
-  action?: string;
-  href?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h2>
-      {action && href ? (
-        <Link className="text-sm font-bold text-[#3182f6]" href={href}>
-          {action}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-function SectionTitle({ title, action }: { title: string; action?: string }) {
-  return (
-    <div className="mb-3 mt-7 flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h2>
-      {action ? (
-        <button className="text-sm font-bold text-[#3182f6]">{action}</button>
-      ) : null}
-    </div>
-  );
-}
-
-function MenuGrid({ items }: { items: Array<[IconComponent, string]> }) {
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {items.map(([Icon, label]) => (
-        <button
-          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
-          key={label}
-        >
-          <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
-          <p className="mt-2 text-xs font-semibold text-[#333d4b]">{label}</p>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function HistoryMetric({
-  label,
-  value,
-  positive,
-}: {
-  label: string;
-  value: string;
-  positive?: boolean;
-}) {
-  return (
-    <div className="rounded-lg bg-[#f7f8fa] px-3 py-2">
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-1 text-sm font-semibold ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+// EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
+// HistoryMetric/NewsRow/thumbnailStyle은 전부 서버 컴포넌트 분리 작업으로
+// src/components/ui-primitives.tsx, src/components/news-content.tsx로
+// 옮겼습니다 (위 AppShell 주석 참고). CompactNewsRow는 홈 화면
+// (NotificationsScreen, 클라이언트)에서 계속 쓰여서 news-content.tsx에서
+// import해왔습니다.
 
 function BottomNav() {
   const pathname = usePathname();
