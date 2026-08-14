@@ -97,3 +97,100 @@ export function computeScreenerInputs(dailyBars: DailyBar[], weeklyBars: DailyBa
     lo: Math.round(lo),
   };
 }
+
+// ---------------------------------------------------------------------------
+// 급락-안정화(드롭 리버설) 신호 (2026-08-14 세션 추가).
+//
+// 기존 4개 지표는 "골든크로스 + 추세 확인" 계열이라 급락 직후 반등을 노리는
+// 전략과는 반대 성격입니다(급락 직후엔 보통 MA5<MA20, RSI 과매도라 기존
+// 스크리너를 통과 못 함). 그래서 완전히 별개의 판정 함수로 분리했습니다.
+//
+// 정의: 최근 lookbackDays 거래일 안에서
+//   1) 고점(peak) 대비 저점(trough)까지 dropThresholdPct% 이상 하락(peak이
+//      trough보다 먼저 나와야 "하락"으로 인정 — 순서 무관하게 최고/최저만
+//      뽑으면 상승 구간을 하락으로 오인할 수 있어서 순서를 강제함).
+//   2) 저점 이후 minDaysSinceTrough~maxDaysSinceTrough 거래일이 지남
+//      (너무 이르면 "아직 하락 중"일 수 있고, 너무 늦으면 반등이 이미
+//      끝났을 수 있어서 타이밍 창을 둠).
+//   3) 저점 이후 신저점을 다시 갱신하지 않음(안정화 확인 — 여전히 떨어지고
+//      있으면 후보에서 제외, noNewLowTolerancePct만큼의 노이즈는 허용).
+//   4) 오늘 종가가 저점 대비 reboundToleranceFromTroughPct% 이내(이미 많이
+//      올라버렸으면 "놓친 반등"이라 진입 매력이 떨어져서 제외).
+//
+// ⚠️ 뉴스/이벤트 원인은 전혀 안 봅니다 — 순수 가격 패턴으로만 "급락 후
+// 안정화 구간"을 근사한 것이라, 실적 쇼크처럼 하락이 정당한(펀더멘털이
+// 실제로 나빠진) 경우와 일시적 패닉/이벤트성 급락을 구분하지 못합니다.
+// 그 구분은 백테스트로 검증 불가능한 영역이라 별도(뉴스 연동) 과제로 남겨둠.
+// ---------------------------------------------------------------------------
+
+export type DropReversalThresholds = {
+  lookbackDays: number;
+  dropThresholdPct: number;
+  minDaysSinceTrough: number;
+  maxDaysSinceTrough: number;
+  reboundToleranceFromTroughPct: number;
+  noNewLowTolerancePct: number;
+};
+
+export const DROP_REVERSAL_DEFAULTS: DropReversalThresholds = {
+  lookbackDays: 20,
+  dropThresholdPct: 10,
+  minDaysSinceTrough: 2,
+  maxDaysSinceTrough: 8,
+  reboundToleranceFromTroughPct: 6,
+  noNewLowTolerancePct: 1.5,
+};
+
+export type DropReversalSignal = {
+  isCandidate: boolean;
+  dropPct: number;
+  daysSinceTrough: number;
+  troughDate: string;
+  peakDate: string;
+};
+
+export function detectDropReversal(
+  bars: DailyBar[],
+  opts: DropReversalThresholds = DROP_REVERSAL_DEFAULTS,
+): DropReversalSignal | null {
+  if (bars.length < opts.lookbackDays + 1) return null;
+  const window = bars.slice(-opts.lookbackDays);
+
+  let peakIdx = 0;
+  for (let k = 1; k < window.length; k++) {
+    if (window[k].close > window[peakIdx].close) peakIdx = k;
+  }
+
+  // 고점 이후 구간에서만 저점을 찾습니다 — 순서를 강제해야 "하락"이 성립.
+  let troughIdx = -1;
+  for (let k = peakIdx + 1; k < window.length; k++) {
+    if (troughIdx === -1 || window[k].close < window[troughIdx].close) troughIdx = k;
+  }
+  if (troughIdx === -1) {
+    return { isCandidate: false, dropPct: 0, daysSinceTrough: 0, troughDate: "", peakDate: window[peakIdx].date };
+  }
+
+  const peak = window[peakIdx].close;
+  const trough = window[troughIdx].close;
+  const dropPct = +(((peak - trough) / peak) * 100).toFixed(2);
+  const daysSinceTrough = window.length - 1 - troughIdx;
+  const todayClose = window[window.length - 1].close;
+
+  const meetsDropThreshold = dropPct >= opts.dropThresholdPct;
+  const withinTimingWindow =
+    daysSinceTrough >= opts.minDaysSinceTrough && daysSinceTrough <= opts.maxDaysSinceTrough;
+  const notAlreadyRallied = todayClose <= trough * (1 + opts.reboundToleranceFromTroughPct / 100);
+
+  let madeNewLow = false;
+  for (let k = troughIdx + 1; k < window.length; k++) {
+    if (window[k].close < trough * (1 - opts.noNewLowTolerancePct / 100)) madeNewLow = true;
+  }
+
+  return {
+    isCandidate: meetsDropThreshold && withinTimingWindow && notAlreadyRallied && !madeNewLow,
+    dropPct,
+    daysSinceTrough,
+    troughDate: window[troughIdx].date,
+    peakDate: window[peakIdx].date,
+  };
+}

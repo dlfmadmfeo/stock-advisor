@@ -19,6 +19,16 @@ export const SCREENER_THRESHOLDS = {
   reboundFromHighRatio: 0.9,
   rsiMin: 30,
   rsiMax: 70,
+  // PER이 같은 업종 평균 대비 이 비율을 넘으면 "고평가", 이 비율 아래면
+  // "저평가"로 취급 (예: 1.2 = 업종 평균보다 20% 이상 비쌈, 0.8 = 20% 이상 쌈).
+  // 업종 평균은 지금 로드된 유니버스(최대 상위 200종목) 안에서 같은 업종
+  // 종목들의 PER을 평균낸 값이라, 유니버스가 작을수록(예시 10종목) 평균이
+  // 튈 수 있어요 — 참고용 상대 비교로만 쓰세요.
+  perOvervaluedRatio: 1.2,
+  perUndervaluedRatio: 0.8,
+  // PBR도 같은 방식(업종 평균 대비 비율)으로 비교합니다.
+  pbrOvervaluedRatio: 1.2,
+  pbrUndervaluedRatio: 0.8,
 } as const;
 
 // 전체 규칙 개수 (화면의 "N/4 통과" 표시에 쓰임 — 규칙을 추가/삭제하면 이 값도

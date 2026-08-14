@@ -60,6 +60,7 @@ function toStock(r: {
   chg: number;
   cap: string;
   per: number | null;
+  pbr: number | null;
   hi: number;
   lo: number;
   ma5over20: boolean;
@@ -74,6 +75,7 @@ function toStock(r: {
     chg: r.chg,
     cap: r.cap,
     per: r.per ?? 0,
+    pbr: r.pbr ?? null,
     hi: r.hi,
     lo: r.lo,
     ma5over20: r.ma5over20,

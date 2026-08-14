@@ -175,6 +175,7 @@ export type QuoteDetail = {
   price: number;
   chg: number;
   per: number | null;
+  pbr: number | null; // KIS pbr 필드 — per과 같은 응답에 같이 들어있어서 추가 호출 없이 파싱만 함
   marketCapEok: number | null; // 억원 단위 (KIS hts_avls 필드)
   w52High: number | null;
   w52Low: number | null;
@@ -197,6 +198,9 @@ export async function fetchQuoteDetail(ticker: string): Promise<QuoteDetail | nu
     if (!Number.isFinite(price)) return null;
 
     const per = Number(out?.per);
+    // ⚠️ 이 세션은 KIS를 직접 호출해 검증 못 했어요 — "pbr"이 실제 응답
+    // 필드명이 맞는지 pnpm dev로 한 번 찍어보고, 다르면 여기만 고치면 됩니다.
+    const pbr = Number(out?.pbr);
     const marketCap = Number(out?.hts_avls); // 억원
     const w52High = Number(out?.w52_hgpr);
     const w52Low = Number(out?.w52_lwpr);
@@ -208,6 +212,7 @@ export async function fetchQuoteDetail(ticker: string): Promise<QuoteDetail | nu
       price: Math.round(price),
       chg: Number.isFinite(chg) ? +chg.toFixed(1) : 0,
       per: Number.isFinite(per) && per > 0 ? +per.toFixed(1) : null,
+      pbr: Number.isFinite(pbr) && pbr > 0 ? +pbr.toFixed(2) : null,
       marketCapEok: Number.isFinite(marketCap) && marketCap > 0 ? marketCap : null,
       w52High: Number.isFinite(w52High) && w52High > 0 ? Math.round(w52High) : null,
       w52Low: Number.isFinite(w52Low) && w52Low > 0 ? Math.round(w52Low) : null,
@@ -269,6 +274,84 @@ export async function fetchDailyBars(
     console.error(`[KIS] ${ticker} 일봉 조회 실패:`, e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 장기 일봉 조회 (백테스트용, 최대 수년치).
+//
+// ⚠️ 이 세션은 KIS를 직접 호출해 검증 못 했어요. inquire-daily-itemchartprice는
+// (커뮤니티 자료 기준) 한 번 호출에 날짜 범위를 아무리 넓게 줘도 최대 100건
+// 안팎만 돌려주는 것으로 알려져 있어서, 여기서는 날짜 범위를 CHUNK_DAYS씩
+// 잘라 여러 번 호출해서 이어붙입니다. 실제로 돌려보면 한 번에 더 많이/적게
+// 올 수도 있는데, 그래도 날짜 기준으로 자르고 중복 제거(dedupe)를 하기 때문에
+// 안전합니다 — 다만 예상보다 API 호출 수가 늘어나면(=속도 느려지면) 여기
+// CHUNK_DAYS를 조정하면 됩니다.
+// ---------------------------------------------------------------------------
+const HISTORY_CHUNK_DAYS = 95;
+
+export async function fetchDailyBarsHistory(
+  ticker: string,
+  days: number,
+  endDate?: Date,
+): Promise<DailyBar[] | null> {
+  const byDate = new Map<string, DailyBar>();
+  // endDate를 주면 "그 날짜까지" 과거 데이터를 받아옵니다 — 백테스트를 최근
+  // 구간뿐 아니라 예전 특정 기간(예: 하락장/횡보장 구간)으로도 돌려볼 수
+  // 있게 하기 위함입니다.
+  let cursorEnd = endDate ?? new Date();
+  let remaining = days;
+  let emptyChunksInARow = 0;
+
+  try {
+    while (remaining > 0 && emptyChunksInARow < 2) {
+      const chunkDays = Math.min(HISTORY_CHUNK_DAYS, remaining);
+      const start = new Date(cursorEnd);
+      start.setDate(start.getDate() - chunkDays);
+
+      const json = await kisGet(
+        "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+        "FHKST03010100",
+        {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_DATE_1: yyyymmdd(start),
+          FID_INPUT_DATE_2: yyyymmdd(cursorEnd),
+          FID_PERIOD_DIV_CODE: "D",
+          FID_ORG_ADJ_PRC: "0",
+        },
+      );
+      const rows = json?.output2;
+      const bars: DailyBar[] = Array.isArray(rows)
+        ? rows
+            .map((r: Record<string, string>) => ({
+              date: r.stck_bsop_date,
+              open: Number(r.stck_oprc),
+              high: Number(r.stck_hgpr),
+              low: Number(r.stck_lwpr),
+              close: Number(r.stck_clpr),
+              volume: Number(r.acml_vol),
+            }))
+            .filter((b: DailyBar) => Number.isFinite(b.close) && b.close > 0 && b.date)
+        : [];
+
+      if (bars.length === 0) {
+        emptyChunksInARow += 1;
+      } else {
+        emptyChunksInARow = 0;
+        for (const b of bars) byDate.set(b.date, b);
+      }
+
+      remaining -= chunkDays;
+      cursorEnd = new Date(start);
+      cursorEnd.setDate(cursorEnd.getDate() - 1);
+    }
+  } catch (e) {
+    console.error(`[KIS] ${ticker} 장기 일봉 조회 실패:`, e instanceof Error ? e.message : e);
+    if (byDate.size === 0) return null;
+  }
+
+  const bars = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return bars.length ? bars : null;
 }
 
 // ---------------------------------------------------------------------------

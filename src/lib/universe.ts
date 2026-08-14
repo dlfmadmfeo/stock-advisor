@@ -28,6 +28,7 @@ export async function getUniverse(): Promise<UniverseResult> {
       chg: r.chg,
       cap: r.cap,
       per: r.per ?? 0,
+      pbr: r.pbr ?? null,
       hi: r.hi,
       lo: r.lo,
       ma5over20: r.ma5over20,

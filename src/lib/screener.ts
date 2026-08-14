@@ -1,5 +1,9 @@
 import type { Stock } from "./stocks";
-import { SCREENER_PASS_THRESHOLD, SCREENER_THRESHOLDS } from "./screener-config";
+import {
+  SCREENER_PASS_THRESHOLD,
+  SCREENER_THRESHOLDS,
+  SCREENER_TOTAL_RULES,
+} from "./screener-config";
 
 // ---------------------------------------------------------------------------
 // 스크리너: 공개된 규칙을 기계적으로 적용합니다. "AI 판단"이 아니라 조건식
@@ -37,4 +41,188 @@ export function screenerScore(s: Stock): number {
 
 export function passesScreener(s: Stock): boolean {
   return screenerScore(s) >= SCREENER_PASS_THRESHOLD;
+}
+
+// ---------------------------------------------------------------------------
+// 업종 평균 PER/PBR: 같은 업종 종목들의 값을 평균내서, 개별 종목이 업종 대비
+// 싼지 비싼지 상대 비교하는 용도로 씁니다. 0 이하(적자 등 의미 없는 값)는
+// 평균 계산에서 제외해요. 절대적인 "저평가/고평가" 판단이 아니라 지금 로드된
+// 유니버스 안에서의 상대 위치일 뿐입니다.
+// ---------------------------------------------------------------------------
+function sectorAverage(stocks: Stock[], pick: (s: Stock) => number | null | undefined): Record<string, number> {
+  const sums: Record<string, { total: number; count: number }> = {};
+  for (const s of stocks) {
+    const v = pick(s);
+    if (!(typeof v === "number" && v > 0)) continue;
+    const bucket = (sums[s.sector] ??= { total: 0, count: 0 });
+    bucket.total += v;
+    bucket.count += 1;
+  }
+  const result: Record<string, number> = {};
+  for (const [sector, { total, count }] of Object.entries(sums)) {
+    if (count > 0) result[sector] = total / count;
+  }
+  return result;
+}
+
+export function sectorAveragePer(stocks: Stock[]): Record<string, number> {
+  return sectorAverage(stocks, (s) => s.per);
+}
+
+export function sectorAveragePbr(stocks: Stock[]): Record<string, number> {
+  return sectorAverage(stocks, (s) => s.pbr);
+}
+
+// 업종 평균 대비 PER/PBR을 각각 비교해서, 둘 중 하나라도 크게 높으면
+// "고평가", 둘 다 값이 있고 크게 낮으면 "저평가"로 봅니다. (보수적으로 잡되,
+// PBR 데이터가 아직 없는 종목도 많을 수 있어서 PER만 있어도 판단은 동작해요.)
+type Valuation = {
+  overvalued: boolean;
+  undervalued: boolean;
+  detail: string | null;
+};
+
+function evaluateValuation(
+  s: Stock,
+  t: typeof SCREENER_THRESHOLDS,
+  sectorAvgPer?: number,
+  sectorAvgPbr?: number,
+): Valuation {
+  const perOver = s.per > 0 && !!sectorAvgPer && sectorAvgPer > 0 && s.per >= sectorAvgPer * t.perOvervaluedRatio;
+  const perUnder = s.per > 0 && !!sectorAvgPer && sectorAvgPer > 0 && s.per <= sectorAvgPer * t.perUndervaluedRatio;
+  const pbrOver = !!s.pbr && s.pbr > 0 && !!sectorAvgPbr && sectorAvgPbr > 0 && s.pbr >= sectorAvgPbr * t.pbrOvervaluedRatio;
+  const pbrUnder = !!s.pbr && s.pbr > 0 && !!sectorAvgPbr && sectorAvgPbr > 0 && s.pbr <= sectorAvgPbr * t.pbrUndervaluedRatio;
+
+  let detail: string | null = null;
+  if (perOver && pbrOver) {
+    detail = `PER(${s.per})·PBR(${s.pbr})이 둘 다 업종 평균(PER ${sectorAvgPer?.toFixed(1)} / PBR ${sectorAvgPbr?.toFixed(1)}) 대비 많이 높아요.`;
+  } else if (perOver) {
+    detail = `PER(${s.per})이 업종 평균(${sectorAvgPer?.toFixed(1)}) 대비 많이 높아요.`;
+  } else if (pbrOver) {
+    detail = `PBR(${s.pbr})이 업종 평균(${sectorAvgPbr?.toFixed(1)}) 대비 많이 높아요.`;
+  } else if (perUnder && pbrUnder) {
+    detail = `PER(${s.per})·PBR(${s.pbr})이 둘 다 업종 평균 대비 낮은 편이에요.`;
+  } else if (perUnder) {
+    detail = `PER(${s.per})이 업종 평균(${sectorAvgPer?.toFixed(1)}) 대비 낮은 편이에요.`;
+  } else if (pbrUnder) {
+    detail = `PBR(${s.pbr})이 업종 평균(${sectorAvgPbr?.toFixed(1)}) 대비 낮은 편이에요.`;
+  }
+
+  return { overvalued: perOver || pbrOver, undervalued: perUnder || pbrUnder, detail };
+}
+
+function hasValuationData(s: Stock): boolean {
+  return s.per > 0 || !!(s.pbr && s.pbr > 0);
+}
+
+// ---------------------------------------------------------------------------
+// 매수/매도/보유 판정: 4개 스크리너 조건식 + (있으면) 업종 대비 PER/PBR 상대
+// 밸류에이션만 조합한 규칙 기반 판정입니다. 실적·재무 데이터 심층 분석·
+// 백테스트·AI 판단이 들어가지 않으므로 투자 자문이 아니고, "지금 이 조건들이
+// 이런 상태다"를 요약해서 보여주는 용도예요.
+//
+//   - 매도: 5일선이 20일선 아래(하락 추세)인 상태에서 RSI 과매수거나,
+//           4개 중 1개 이하만 충족(추세가 매우 약함), 또는 업종 대비
+//           PER·PBR이 크게 높은데(고평가) 추세까지 꺾인 경우
+//   - 강한 매수: 4개 지표를 전부 충족 + RSI 과매수 아님 + 고평가 아님
+//   - 매수: 3개만 충족했지만(4개 전부는 아니지만) RSI 과매수 아님 + 고평가
+//           아님 + 업종 대비 저평가까지 확인된 경우 (기술적 신호가 약한
+//           만큼 밸류에이션이 싸다는 근거가 추가로 있어야 "매수"로 인정)
+//   - 보유: 위 어디에도 안 걸리는 경우 — 예를 들어 3개만 충족했는데
+//           저평가 확인이 안 되면(밸류에이션 데이터가 없거나 딱히 싸지
+//           않으면) 예전엔 "매수"였지만 지금은 "보유"로 내려감. 신호가
+//           너무 자주 뜨는 문제(스크리너 3/4 기준이 상승장 대부분의 날에
+//           걸림) 때문에 기준을 이렇게 높였어요.
+//
+// PER/PBR이 둘 다 없는 종목(예: 적자 기업, 데이터 미확보)은 밸류에이션
+// 판단을 아예 못 하는데, 이 경우도 "고평가 아님"으로 조용히 넘어가지 않게
+// reason 문구에 명시적으로 표시합니다(valuationAvailable 필드 참고).
+// ---------------------------------------------------------------------------
+
+export type RecommendationSignal = "buy" | "sell" | "hold";
+export type RecommendationStrength = "strong" | "normal" | null;
+
+export type Recommendation = {
+  signal: RecommendationSignal;
+  strength: RecommendationStrength;
+  label: string;
+  reason: string;
+  valuationAvailable: boolean;
+};
+
+export function getRecommendation(
+  s: Stock,
+  sectorAvgPer?: number,
+  sectorAvgPbr?: number,
+): Recommendation {
+  const t = SCREENER_THRESHOLDS;
+  const score = screenerScore(s);
+  const overbought = s.rsi > t.rsiMax;
+  const oversold = s.rsi < t.rsiMin;
+  const downtrend = !s.ma5over20;
+  const valuationAvailable = hasValuationData(s);
+  const valuationNote = valuationAvailable
+    ? ""
+    : " (PER·PBR 데이터가 없어 밸류에이션은 확인 못 했어요.)";
+
+  const { overvalued, undervalued, detail } = evaluateValuation(s, t, sectorAvgPer, sectorAvgPbr);
+
+  if (downtrend && (overbought || score <= 1 || overvalued)) {
+    return {
+      signal: "sell",
+      strength: null,
+      label: "매도",
+      reason:
+        (overbought
+          ? "5일선이 20일선 아래(하락 추세)인데 RSI는 과매수 구간이라 되돌림 위험이 있어요."
+          : overvalued && detail
+            ? `하락 추세인데 ${detail}`
+            : `공개 지표 ${SCREENER_TOTAL_RULES}개 중 ${score}개만 충족해 추세가 약해요.`) + valuationNote,
+      valuationAvailable,
+    };
+  }
+
+  const fullScore = score >= SCREENER_TOTAL_RULES;
+  const passScore = score >= SCREENER_PASS_THRESHOLD;
+
+  if (fullScore && !overbought && !overvalued) {
+    return {
+      signal: "buy",
+      strength: "strong",
+      label: "강한 매수",
+      reason:
+        (undervalued && detail
+          ? `공개 지표 ${SCREENER_TOTAL_RULES}개를 전부 충족했고, ${detail}`
+          : `공개 지표 ${SCREENER_TOTAL_RULES}개를 전부 충족했고 RSI도 과매수 구간이 아니에요.`) + valuationNote,
+      valuationAvailable,
+    };
+  }
+
+  if (passScore && !overbought && !overvalued && undervalued) {
+    return {
+      signal: "buy",
+      strength: "normal",
+      label: "매수",
+      reason: `공개 지표 ${SCREENER_TOTAL_RULES}개 중 ${score}개만 충족했지만, ${detail}`,
+      valuationAvailable,
+    };
+  }
+
+  const holdReason = oversold
+    ? "RSI가 과매도 구간이라 반등 여부를 좀 더 지켜볼 필요가 있어요."
+    : overvalued && detail
+      ? `조건은 일부 충족했지만 ${detail} 매수 신호로 보기엔 부담스러워요.`
+      : passScore && !valuationAvailable
+        ? `공개 지표 ${SCREENER_TOTAL_RULES}개 중 ${score}개를 충족했지만, 4개 전부는 아니고 PER·PBR 데이터도 없어서 밸류에이션(저평가 여부) 확인이 더 필요해요.`
+        : passScore
+          ? `공개 지표 ${SCREENER_TOTAL_RULES}개 중 ${score}개를 충족했지만, 업종 평균 대비 뚜렷하게 저평가는 아니라서 매수로 올리진 않았어요.`
+          : `공개 지표 ${SCREENER_TOTAL_RULES}개 중 ${score}개를 충족해 추세가 뚜렷하지 않아요.`;
+
+  return {
+    signal: "hold",
+    strength: null,
+    label: "보유",
+    reason: holdReason,
+    valuationAvailable,
+  };
 }
