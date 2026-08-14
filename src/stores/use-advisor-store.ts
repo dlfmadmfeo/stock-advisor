@@ -23,6 +23,7 @@ export type LiveQuote = {
   lo?: number;
   cap?: string;
   per?: number;
+  pbr?: number;
 };
 export type LiveStatus = "checking" | "live" | "sample";
 export type LiveSource = "kis" | "yahoo" | "yahoo-fallback" | null;

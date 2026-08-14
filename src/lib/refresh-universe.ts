@@ -54,6 +54,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
   const lo = detail?.w52Low ?? inputs.lo;
   const capEok = detail?.marketCapEok ?? 0;
   const per = detail?.per ?? null;
+  const pbr = detail?.pbr ?? null;
   const sector = detail?.sector ?? DEFAULT_SECTOR;
 
   const screenerInputForScore = {
@@ -64,6 +65,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
     chg,
     cap: formatMarketCapEok(capEok),
     per: per ?? 0,
+    pbr,
     hi,
     lo,
     ma5over20: inputs.ma5over20,
@@ -83,6 +85,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
       cap: formatMarketCapEok(capEok),
       capEok,
       per,
+      pbr,
       hi,
       lo,
       ma5over20: inputs.ma5over20,
@@ -99,6 +102,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
       cap: formatMarketCapEok(capEok),
       capEok,
       per,
+      pbr,
       hi,
       lo,
       ma5over20: inputs.ma5over20,

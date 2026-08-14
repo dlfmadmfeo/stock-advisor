@@ -21,6 +21,8 @@ model Stock {
   cap        String // "2,069조원" 같은 표시용 문자열
   capEok     Float // 정렬/필터용 원본 숫자 (억원 단위)
   per        Float?
+  pbr        Float? // PBR(주가순자산비율). 기존 per 컬럼과 같은 방식(nullable + 기본값 없음)으로
+                     // 추가 — 이미 있는 row는 다음 배치("새로고침" 버튼)가 돌 때 채워집니다.
   hi         Int
   lo         Int
   ma5over20  Boolean

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -32,12 +32,25 @@ import {
   X,
 } from "lucide-react";
 import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
-import { passesScreener, screenerChecks, screenerScore } from "@/lib/screener";
+import type { NewsArticle } from "@/lib/naver-news";
+import {
+  getRecommendation,
+  passesScreener,
+  screenerChecks,
+  screenerScore,
+  type RecommendationSignal,
+} from "@/lib/screener";
 import {
   SCREENER_PASS_THRESHOLD,
   SCREENER_TOTAL_RULES,
 } from "@/lib/screener-config";
-import { mergeLive, useLiveStock, useLiveStocks } from "@/lib/live-stock";
+import {
+  useLiveStock,
+  useLiveStocks,
+  useMergedStocksWithLive,
+  useSectorAvgPbr,
+  useSectorAvgPer,
+} from "@/lib/live-stock";
 import { usePagedStocks } from "@/lib/use-paged-stocks";
 import {
   UNIVERSE_PAGE_SIZE,
@@ -65,15 +78,26 @@ function usePortfolioTotals() {
   return { stocks, byTicker, total, cost, returnAmount, returnPct };
 }
 
-const sectorColors: Record<string, string> = {
-  반도체: "bg-[#3182f6]",
-  플랫폼: "bg-[#ff7a00]",
-  "2차전지": "bg-[#00a878]",
-  자동차: "bg-[#8b5cf6]",
-  바이오: "bg-[#f04452]",
-  금융: "bg-[#0ea5e9]",
-  방산: "bg-[#6b7684]",
-};
+// 예전엔 업종명을 "반도체/플랫폼/2차전지" 같은 고정 태그로 미리 정해두고
+// 색을 매칭했는데, 실제 DB 유니버스는 KIS가 주는 업종명을 그대로 쓰기 때문에
+// (예: "반도체와반도체장비") 이 고정 태그랑 안 맞으면 전부 매칭 실패로
+// 회색(#d1d6db) 처리돼서 도넛이 온통 회색 한 덩어리로 보였어요 — 비중이
+// 바뀌어도 색 구분이 안 되니 "그래프에 반영이 안 된다"고 느껴진 원인.
+// 업종명이 뭐가 오든 항상 구분되는 색을 주도록 순서 기반 팔레트로 바꿨어요.
+const CHART_PALETTE = [
+  "#3182f6",
+  "#ff7a00",
+  "#00a878",
+  "#8b5cf6",
+  "#f04452",
+  "#0ea5e9",
+  "#c2984f",
+  "#6b7684",
+];
+
+function chartColor(index: number) {
+  return CHART_PALETTE[index % CHART_PALETTE.length];
+}
 
 const navTabs = [
   { href: "/notifications", icon: Home, label: "홈" },
@@ -167,7 +191,7 @@ export function NotificationsScreen() {
     <AppShell>
       <HomeHeader />
       <section className="space-y-5 px-5 pb-8 lg:px-8">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
           <PortfolioSummary />
           <QuickActions />
         </div>
@@ -208,7 +232,7 @@ export function NotificationsScreen() {
                 가져온 값이라 소스가 달라요. 관심종목(실시간 갱신되는 것)은 둘 다
                 최신이지만, 그 외 종목은 마지막 배치 시점 기준이라 두 값이 완전히
                 일치하지 않을 수 있어요 — 오차가 커지면 통일하는 리팩터링이 필요. */}
-            <section className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+            <section className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
               <p className="text-sm font-bold text-[#8b95a1]">스크리너 현황</p>
               <p className="mt-1 text-[28px] font-extrabold tracking-[-0.03em] text-[#191f28]">
                 {passed.length}/{stocks.length}
@@ -270,7 +294,7 @@ export function CategoryScreen() {
             const count = stocks.filter((s) => s.sector === label).length;
             return (
               <button
-                className={`relative rounded-lg border p-4 text-left transition active:scale-[0.98] ${
+                className={`relative rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
                   active
                     ? "border-[#3182f6] bg-[#f2f7ff]"
                     : "border-[#e5e8eb] bg-white"
@@ -284,7 +308,7 @@ export function CategoryScreen() {
                   </span>
                 ) : null}
                 <div
-                  className={`grid h-11 w-11 place-items-center rounded-lg ${active ? "bg-white" : "bg-[#f2f4f6]"}`}
+                  className={`grid h-11 w-11 place-items-center rounded-full ${active ? "bg-white" : "bg-[#eaf1fd]"}`}
                 >
                   <Icon
                     className={`h-6 w-6 ${active ? "text-[#3182f6]" : "text-[#4e5968]"}`}
@@ -365,7 +389,7 @@ export function AnalysisScreen() {
           />
         </div>
 
-        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb] lg:max-w-[620px]">
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] lg:max-w-[620px]">
           <div>
             <h2 className="text-lg font-bold text-[#191f28]">자산 배분</h2>
             <p className="mt-1 text-sm font-semibold text-[#8b95a1]">
@@ -374,7 +398,7 @@ export function AnalysisScreen() {
           </div>
           <div className="mt-6 flex items-center gap-6">
             <div
-              className="grid h-28 w-28 shrink-0 place-items-center rounded-full"
+              className="animate-donut-in grid h-28 w-28 shrink-0 origin-center place-items-center rounded-full"
               style={{ backgroundImage: donutStyle }}
             >
               <div className="grid h-14 w-14 place-items-center rounded-full bg-white">
@@ -382,19 +406,19 @@ export function AnalysisScreen() {
               </div>
             </div>
             <div className="flex-1 space-y-3">
-              {sectorEntries.map(([sec, value]) => (
+              {sectorEntries.map(([sec, value], i) => (
                 <Allocation
                   key={sec}
                   label={sec}
                   value={`${total ? Math.round((value / total) * 100) : 0}%`}
-                  color={sectorColors[sec] ?? "bg-[#d1d6db]"}
+                  color={chartColor(i)}
                 />
               ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <h2 className="text-lg font-bold text-[#191f28]">보유 종목</h2>
           <div className="mt-3 space-y-2">
             {HOLDINGS.map((h) => {
@@ -405,7 +429,7 @@ export function AnalysisScreen() {
                 <Link
                   key={h.ticker}
                   href={`/stock/${h.ticker}`}
-                  className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-3 py-2.5"
+                  className="flex items-center justify-between rounded-xl bg-[#f7f8fa] px-3 py-2.5"
                 >
                   <span className="text-sm font-bold text-[#191f28]">
                     {s.name} · {h.qty}주
@@ -433,25 +457,14 @@ export function AnalysisScreen() {
 function buildDonutGradient(entries: [string, number][], total: number) {
   if (!total || entries.length === 0) return "conic-gradient(#d1d6db 0 100%)";
   let acc = 0;
-  const stops = entries.map(([sec, value]) => {
+  const stops = entries.map(([, value], i) => {
     const from = acc;
     const pct = (value / total) * 100;
     acc += pct;
-    const color = sectorHex[sec] ?? "#d1d6db";
-    return `${color} ${from}% ${acc}%`;
+    return `${chartColor(i)} ${from}% ${acc}%`;
   });
   return `conic-gradient(${stops.join(",")})`;
 }
-
-const sectorHex: Record<string, string> = {
-  반도체: "#3182f6",
-  플랫폼: "#ff7a00",
-  "2차전지": "#00a878",
-  자동차: "#8b5cf6",
-  바이오: "#f04452",
-  금융: "#0ea5e9",
-  방산: "#6b7684",
-};
 
 export function NewsScreen() {
   const router = useRouter();
@@ -494,7 +507,7 @@ export function MyPageScreen() {
     <AppShell>
       <TopBar title="마이" right={<Settings />} />
       <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center gap-4">
             <div className="grid h-16 w-16 place-items-center rounded-full bg-[#f2f7ff]">
               <UserRound className="h-8 w-8 text-[#3182f6]" />
@@ -571,7 +584,7 @@ export function HistoryScreen() {
         <div className="mt-4 space-y-3">
           {history.map(([name, sector, date, start, now, rate, status]) => (
             <article
-              className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
+              className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]"
               key={name}
             >
               <div className="flex items-start justify-between gap-3">
@@ -610,9 +623,6 @@ function HomeHeader() {
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
-          <h1 className="mt-1 text-[22px] font-extrabold leading-tight tracking-[-0.03em] text-[#191f28]">
-            오늘 투자 현황을 확인해볼까요?
-          </h1>
         </div>
         <button className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white ring-1 ring-[#e5e8eb]">
           <Bell className="h-5 w-5 text-[#333d4b]" />
@@ -623,58 +633,82 @@ function HomeHeader() {
   );
 }
 
+// 홈 화면에서 제일 먼저 눈에 들어와야 하는 카드라, 나머지 흰 카드들과 구분되게
+// 다크 톤으로 분리했어요. 시선이 자연스럽게 여기로 먼저 가고, 그 아래 흰 카드들은
+// 옅은 보더만으로 충분히 정돈돼 보입니다.
 function PortfolioSummary() {
   const { total, returnAmount, returnPct } = usePortfolioTotals();
   return (
-    <section className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
-      <div className="lg:flex lg:items-end lg:justify-between lg:gap-8">
+    <section className="relative overflow-hidden rounded-2xl bg-[#191f28] p-5 text-white">
+      {/* 데스크톱에서 이 카드가 QuickActions(고정폭)를 뺀 나머지 공간을 전부
+          차지하다 보니, justify-between으로 양 끝에 내용을 붙이면 가운데가
+          휑하게 비어 보였어요. 대신 내용은 왼쪽으로 모으고, 남는 공간엔 은은한
+          워터마크 아이콘을 깔아서 "의도된 여백"처럼 보이게 했습니다. */}
+      <AreaChart
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-8 -right-8 hidden h-44 w-44 text-white/[0.05] lg:block"
+      />
+      <div className="relative lg:flex lg:items-end lg:gap-14">
         <div>
-          <div className="flex items-center justify-between lg:justify-start lg:gap-3">
-            <p className="text-sm font-bold text-[#6b7684]">보유 자산 평가액</p>
-          </div>
-          <p className="mt-2 text-[30px] font-extrabold tracking-[-0.035em] text-[#191f28]">
-            {formatKRW(total)} <span className="text-[20px]">원</span>
+          <p className="text-[13px] font-medium text-[#8b95a1]">
+            보유 자산 평가액
+          </p>
+          <p className="mt-1.5 text-[30px] font-extrabold tracking-[-0.03em] text-white">
+            {formatKRW(total)}{" "}
+            <span className="text-[18px] text-[#c1c9d2]">원</span>
           </p>
           <p
-            className={`mt-1 text-sm font-bold ${returnAmount >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+            className={`mt-1 text-sm font-bold ${returnAmount >= 0 ? "text-[#ff6b6b]" : "text-[#85b7eb]"}`}
           >
             매입가 대비 {returnAmount >= 0 ? "+" : ""}
             {formatKRW(returnAmount)}원 ({returnPct >= 0 ? "+" : ""}
             {returnPct}%)
           </p>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#e5e8eb] pt-4 lg:mt-0 lg:min-w-[320px] lg:border-t-0 lg:pt-0">
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 lg:mt-0 lg:min-w-[280px] lg:border-t-0 lg:pt-0">
           <SummaryItem label="보유 종목" value={`${HOLDINGS.length}개`} />
           <SummaryItem
             label="매입원가"
             value={`${formatKRW(HOLDINGS.reduce((s, h) => s + h.avgBuy * h.qty, 0) / 10000)}만원`}
           />
-          <SummaryItem label="상세" value="자산 탭" />
+          <SummaryItem label="상세" value="자산 탭" link />
         </div>
       </div>
       <Link
-        className="mt-4 flex h-12 items-center justify-center gap-2 rounded-lg bg-[#3182f6] text-[15px] font-bold text-white active:scale-[0.99] lg:w-[220px]"
+        className="relative mt-4 flex h-12 items-center justify-center gap-2 rounded-sm bg-[#3182f6] text-[15px] font-bold text-white active:scale-[0.99] lg:w-[220px]"
         href="/category"
       >
-        <Sparkles className="h-4 w-4" />
+        {/* <Sparkles className="h-4 w-4" /> */}
         업종별 스크리너 보기
       </Link>
     </section>
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({
+  label,
+  value,
+  link,
+}: {
+  label: string;
+  value: string;
+  link?: boolean;
+}) {
   return (
     <div>
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p className="mt-1 text-sm font-bold text-[#191f28]">{value}</p>
+      <p className="text-[11px] font-medium text-[#8b95a1]">{label}</p>
+      <p
+        className={`mt-1 text-sm font-bold ${link ? "text-[#85b7eb]" : "text-white"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
 function QuickActions() {
   return (
-    <section className="grid grid-cols-4 gap-1.5 rounded-lg bg-white p-3 ring-1 ring-[#e5e8eb] lg:grid-cols-1 lg:gap-0">
+    <section className="grid grid-cols-4 gap-1.5 rounded-2xl bg-white p-3 ring-1 ring-[#e5e8eb] lg:grid-cols-2 lg:gap-2">
       {[
         [AreaChart, "자산", "/analysis"],
         [Star, "추천", "/category"],
@@ -684,11 +718,13 @@ function QuickActions() {
         const TypedIcon = Icon as IconComponent;
         return (
           <Link
-            className="flex flex-col items-center justify-center rounded-lg px-3 py-3 text-center active:scale-[0.98] lg:h-14 lg:flex-row lg:justify-start lg:gap-3 lg:text-left lg:hover:bg-[#f7f8fa]"
+            className="flex flex-col items-center justify-center rounded-xl px-3 py-3 text-center active:scale-[0.98] lg:h-24 lg:justify-center lg:gap-1.5 lg:hover:bg-[#f7f8fa]"
             href={href as string}
             key={label as string}
           >
-            <TypedIcon className="h-5 w-5 text-[#3182f6]" />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#eaf1fd] lg:h-10 lg:w-10">
+              <TypedIcon className="h-[18px] w-[18px] text-[#3182f6]" />
+            </span>
             <p className="mt-2 text-sm font-semibold text-[#333d4b] lg:mt-0">
               {label as string}
             </p>
@@ -709,7 +745,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       >
         <DesktopSidebar />
         <div className="min-h-0 flex-1 overflow-y-auto pb-[72px] lg:pb-0">
-          <DisclaimerBar />
           <div className="mx-auto w-full lg:max-w-[1280px]">{children}</div>
         </div>
         <BottomNav />
@@ -734,8 +769,6 @@ function PagedStockList({
   q?: string;
   emptyText: string;
 }) {
-  const liveQuotes = useAdvisorStore((s) => s.liveQuotes);
-
   // 정렬 필드를 아무것도 안 고르면(null) "기본 순서"예요. 버튼을 누를 때마다
   // 없음 → 자연방향 → 반대방향 → 없음, 3단으로 순환합니다.
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -791,9 +824,14 @@ function PagedStockList({
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const pages = data?.pages ?? [];
-  const stocks = pages
-    .flatMap((p) => p.stocks)
-    .map((s) => mergeLive(s, liveQuotes[s.ticker]));
+  // pages 자체가 안 바뀌었으면 flatMap도 다시 안 돌리도록 메모이즈. 그 위에
+  // useMergedStocksWithLive가 티커별로 이전 live 참조를 기억해뒀다가 안 바뀐
+  // 종목은 같은 객체를 재사용해요 — 그래야 아래 StockRow(React.memo)가 실제로
+  // 리렌더를 건너뛸 수 있습니다. (자세한 이유는 live-stock.ts 참고)
+  const rawStocks = useMemo(() => pages.flatMap((p) => p.stocks), [pages]);
+  const stocks = useMergedStocksWithLive(rawStocks);
+  const sectorAvgPer = useSectorAvgPer();
+  const sectorAvgPbr = useSectorAvgPbr();
   const total = pages[0]?.total ?? 0;
 
   // 정렬 선택 칩은 로딩/에러/빈 목록 상태에서도 계속 보여야 다른 정렬로
@@ -833,7 +871,11 @@ function PagedStockList({
     return (
       <div className="space-y-3">
         {sortChips}
-        <LoadingSpinnerRow text="불러오는 중..." />
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StockRowSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -862,7 +904,12 @@ function PagedStockList({
           {stocks.length}/{total}개 표시 중 (한 번에 {UNIVERSE_PAGE_SIZE}개씩)
         </p>
         {stocks.map((s) => (
-          <StockRow key={s.ticker} stock={s} />
+          <StockRow
+            key={s.ticker}
+            stock={s}
+            sectorAvgPer={sectorAvgPer[s.sector]}
+            sectorAvgPbr={sectorAvgPbr[s.sector]}
+          />
         ))}
         <div ref={sentinelRef} />
         {isFetchingNextPage ? (
@@ -886,6 +933,24 @@ function LoadingSpinnerRow({ text }: { text: string }) {
     <div className="flex items-center justify-center gap-2 rounded-lg bg-white py-6 ring-1 ring-[#e5e8eb]">
       <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#e5e8eb] border-t-[#3182f6]" />
       <span className="text-xs font-semibold text-[#8b95a1]">{text}</span>
+    </div>
+  );
+}
+
+// 종목 리스트 첫 로딩 때, 빈 화면이나 스피너 한 줄 대신 카드 모양 그대로 회색
+// 블록으로 채워서 보여줘요. 로딩이 끝나고 실제 StockRow로 바뀔 때 레이아웃이
+// 거의 안 튀어서(카드 높이가 같음) 덜 깜빡이는 느낌을 줍니다.
+function StockRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-28 animate-pulse rounded-full bg-[#eef0f2]" />
+        <div className="h-3 w-20 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
+      <div className="shrink-0 space-y-2 text-right">
+        <div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#eef0f2]" />
+        <div className="ml-auto h-3 w-10 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
     </div>
   );
 }
@@ -1014,20 +1079,63 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-function StockRow({ stock }: { stock: Stock }) {
+// stock 참조가 안 바뀌면(=이 종목 시세가 이번 틱에 안 바뀌었으면) 리렌더를
+// 건너뜁니다. 위쪽 useMergedStocksWithLive/useLiveStocks가 티커별로 참조를
+// 안정적으로 유지해주기 때문에 memo가 실제로 의미가 있어요.
+const RECOMMENDATION_STYLE: Record<RecommendationSignal, string> = {
+  buy: "bg-[#fdecec] text-[#f04452]",
+  sell: "bg-[#eaf1fd] text-[#3182f6]",
+  hold: "bg-[#f2f4f6] text-[#8b95a1]",
+};
+
+function RecommendationBadge({
+  stock,
+  sectorAvgPer,
+  sectorAvgPbr,
+  className,
+}: {
+  stock: Stock;
+  sectorAvgPer?: number;
+  sectorAvgPbr?: number;
+  className?: string;
+}) {
+  const rec = getRecommendation(stock, sectorAvgPer, sectorAvgPbr);
+  return (
+    <span
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${RECOMMENDATION_STYLE[rec.signal]} ${className ?? ""}`}
+    >
+      {rec.label}
+    </span>
+  );
+}
+
+const StockRow = memo(function StockRow({
+  stock,
+  sectorAvgPer,
+  sectorAvgPbr,
+}: {
+  stock: Stock;
+  sectorAvgPer?: number;
+  sectorAvgPbr?: number;
+}) {
   const score = screenerScore(stock);
   const pass = score >= SCREENER_PASS_THRESHOLD;
   const up = stock.chg >= 0;
   return (
     <Link
       href={`/stock/${stock.ticker}`}
-      className="flex items-center justify-between rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]"
+      className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99] active:bg-[#f7f8fa]"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">
             {stock.name}
           </h3>
+          <RecommendationBadge
+            stock={stock}
+            sectorAvgPer={sectorAvgPer}
+            sectorAvgPbr={sectorAvgPbr}
+          />
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
               pass
@@ -1056,11 +1164,11 @@ function StockRow({ stock }: { stock: Stock }) {
       </div>
     </Link>
   );
-}
+});
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <p className="rounded-lg bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
+    <p className="rounded-2xl bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
       {text}
     </p>
   );
@@ -1076,7 +1184,7 @@ function MetricCard({
   positive?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
       <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
       <p
         className={`mt-2 text-xl font-bold tracking-[-0.02em] ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
@@ -1099,7 +1207,10 @@ function Allocation({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+        <span
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: color }}
+        />
         <span className="text-sm font-bold text-[#4e5968]">{label}</span>
       </div>
       <span className="text-sm font-semibold text-[#191f28]">{value}</span>
@@ -1109,10 +1220,10 @@ function Allocation({
 
 function NewsRow({ item }: { item: (typeof newsItems)[number] }) {
   return (
-    <article className="grid grid-cols-[92px_1fr_22px] gap-3 rounded-lg bg-white p-3 ring-1 ring-[#e5e8eb]">
+    <article className="grid grid-cols-[92px_1fr_22px] gap-3 rounded-2xl bg-white p-3 ring-1 ring-[#e5e8eb]">
       <div
         aria-hidden="true"
-        className="h-[78px] rounded-lg bg-cover"
+        className="h-[78px] rounded-xl bg-cover"
         style={thumbnailStyle(item.image)}
       />
       <div className="min-w-0">
@@ -1132,7 +1243,7 @@ function NewsRow({ item }: { item: (typeof newsItems)[number] }) {
 function CompactNewsRow({ item }: { item: (typeof newsItems)[number] }) {
   return (
     <Link
-      className="flex items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]"
+      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-[#e5e8eb]"
       href="/news"
     >
       <div className="min-w-0">
@@ -1201,7 +1312,7 @@ function MenuGrid({ items }: { items: Array<[IconComponent, string]> }) {
     <div className="grid grid-cols-3 gap-3">
       {items.map(([Icon, label]) => (
         <button
-          className="rounded-lg bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
+          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
           key={label}
         >
           <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
@@ -1264,9 +1375,178 @@ function BottomNav() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// 종목별 뉴스 카드 (2026-08-14 세션 추가). /api/news?name=종목명 을 호출해서
+// 네이버 뉴스 검색 결과를 보여줍니다. 긍정/부정 배지는 키워드 포함 여부로
+// 대충 분류한 거라(진짜 감성분석 아님) 참고만 하시라는 안내 문구를 같이 둡니다.
+// 알고리즘(매매 판단)에는 아직 연결 안 함 — 화면 표시 전용.
+// ---------------------------------------------------------------------------
+const SENTIMENT_STYLE: Record<NewsArticle["sentiment"], string> = {
+  positive: "bg-[#fdeeee] text-[#f04452]",
+  negative: "bg-[#eef4ff] text-[#3182f6]",
+  neutral: "bg-[#f2f4f6] text-[#8b95a1]",
+};
+const SENTIMENT_LABEL: Record<NewsArticle["sentiment"], string> = {
+  positive: "호재 키워드",
+  negative: "악재 키워드",
+  neutral: "중립",
+};
+// 정렬 기준: "감성순"은 호재→중립→악재 순으로 먼저 묶고, 같은 그룹 안에서는
+// 최신순으로 2차 정렬합니다.
+const SENTIMENT_RANK: Record<NewsArticle["sentiment"], number> = {
+  positive: 0,
+  neutral: 1,
+  negative: 2,
+};
+const NEWS_SORT_OPTIONS = [
+  { key: "latest", label: "최신순" },
+  { key: "sentiment", label: "호재순" },
+] as const;
+type NewsSortMode = (typeof NEWS_SORT_OPTIONS)[number]["key"];
+
+// pubDate는 네이버가 RFC 822 형식("Fri, 14 Aug 2026 14:36:00 +0900")으로 줍니다.
+// 절대 시각 대신 "10분 전"류 상대 시간으로 보여주고, 일주일 넘게 지난 기사는
+// "8월 3일"처럼 날짜로 전환합니다. 렌더링 시점 기준 계산이라(실시간 카운트업
+// 아님) 화면을 새로고침해야 값이 갱신돼요.
+function formatNewsDate(pubDate: string): string {
+  const date = new Date(pubDate);
+  if (Number.isNaN(date.getTime())) return pubDate;
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+function sortNewsArticles(
+  articles: NewsArticle[],
+  mode: NewsSortMode,
+): NewsArticle[] {
+  const byLatest = (a: NewsArticle, b: NewsArticle) =>
+    new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
+  if (mode === "sentiment") {
+    return [...articles].sort((a, b) => {
+      const rankDiff =
+        SENTIMENT_RANK[a.sentiment] - SENTIMENT_RANK[b.sentiment];
+      return rankDiff !== 0 ? rankDiff : byLatest(a, b);
+    });
+  }
+  return [...articles].sort(byLatest);
+}
+
+function StockNewsCard({ name }: { name: string }) {
+  const [articles, setArticles] = useState<NewsArticle[] | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<NewsSortMode>("latest");
+
+  useEffect(() => {
+    let cancelled = false;
+    setArticles(null);
+    setErrorMessage(null);
+    fetch(`/api/news?name=${encodeURIComponent(name)}`)
+      .then((res) => res.json())
+      .then(
+        (data: { ok: boolean; message: string; articles: NewsArticle[] }) => {
+          if (cancelled) return;
+          if (!data.ok) {
+            setErrorMessage(data.message || "뉴스를 불러오지 못했어요.");
+            setArticles([]);
+            return;
+          }
+          setArticles(data.articles);
+        },
+      )
+      .catch(() => {
+        if (!cancelled) {
+          setErrorMessage("뉴스를 불러오지 못했어요.");
+          setArticles([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+
+  const sortedArticles = useMemo(
+    () => (articles ? sortNewsArticles(articles, sortMode) : []),
+    [articles, sortMode],
+  );
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
+        {articles && articles.length > 0 ? (
+          <div className="flex gap-1">
+            {NEWS_SORT_OPTIONS.map((opt) => (
+              <button
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  sortMode === opt.key
+                    ? "bg-[#191f28] text-white"
+                    : "bg-[#f2f4f6] text-[#8b95a1]"
+                }`}
+                key={opt.key}
+                onClick={() => setSortMode(opt.key)}
+                type="button"
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {articles === null ? (
+        <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+      ) : errorMessage ? (
+        <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+          {errorMessage}
+        </p>
+      ) : articles.length === 0 ? (
+        <p className="mt-3 text-[13px] text-[#8b95a1]">
+          최근 관련 뉴스가 없어요.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {sortedArticles.map((a) => (
+            <li key={a.link}>
+              <a
+                className="block"
+                href={a.link}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${SENTIMENT_STYLE[a.sentiment]}`}
+                  >
+                    {SENTIMENT_LABEL[a.sentiment]} · {a.eventType}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#8b95a1]">
+                    {formatNewsDate(a.pubDate)}
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[14px] font-semibold leading-5 text-[#191f28]">
+                  {a.title}
+                </p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function StockDetailScreen({ ticker }: { ticker: string }) {
   const router = useRouter();
   const stock = useLiveStock(ticker);
+  // stock이 없어도(종목을 못 찾은 경우) 훅 호출 순서는 항상 같아야 해서
+  // (React Hooks 규칙) 아래 early return보다 먼저 호출합니다.
+  const sectorAvgPer = useSectorAvgPer();
+  const sectorAvgPbr = useSectorAvgPbr();
 
   if (!stock) {
     return (
@@ -1285,6 +1565,11 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
   const checks = screenerChecks(stock);
   const score = screenerScore(stock);
+  const rec = getRecommendation(
+    stock,
+    sectorAvgPer[stock.sector],
+    sectorAvgPbr[stock.sector],
+  );
   const up = stock.chg >= 0;
 
   return (
@@ -1311,7 +1596,25 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           </p>
         </div>
 
-        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-[#191f28]">매매 판단</h2>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-extrabold ${RECOMMENDATION_STYLE[rec.signal]}`}
+            >
+              {rec.label}
+            </span>
+          </div>
+          <p className="mt-2 text-[13px] leading-5 text-[#4e5968]">
+            {rec.reason}
+          </p>
+          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+            아래 {SCREENER_TOTAL_RULES}개 공개 지표 조건식과 업종 평균 대비
+            PER·PBR만으로 계산한 결과입니다.
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-[#191f28]">
               스크리너 조건 충족 현황
@@ -1326,12 +1629,21 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
             {checks.map((c) => (
               <li
                 key={c.label}
-                className="flex items-start gap-2 text-[13px] leading-5"
+                className="flex items-center gap-2.5 text-[13px] leading-5"
               >
                 <span
-                  className={`mt-0.5 font-bold ${c.pass ? "text-[#00a878]" : "text-[#c3c9d1]"}`}
+                  className={`grid h-4 w-4 shrink-0 place-items-center rounded-full ${
+                    c.pass ? "bg-[#e6f9f1]" : "bg-[#f2f4f6]"
+                  }`}
                 >
-                  {c.pass ? "✓" : "○"}
+                  {c.pass ? (
+                    <Check
+                      className="h-2.5 w-2.5 text-[#00a878]"
+                      strokeWidth={3}
+                    />
+                  ) : (
+                    <span className="h-1 w-1 rounded-full bg-[#c3c9d1]" />
+                  )}
                 </span>
                 <span className={c.pass ? "text-[#333d4b]" : "text-[#8b95a1]"}>
                   {c.label}
@@ -1342,20 +1654,23 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
             위 {SCREENER_TOTAL_RULES}개 규칙은 전부 공개 지표로 계산됩니다. AI의
             판단이 아니라 조건식 결과이며, {SCREENER_PASS_THRESHOLD}개 이상 충족
-            시 홈 화면의 &quot;스크리너 통과&quot;에 노출돼요.
+            시 홈 화면의 &quot;스크리너 통과&quot;에 노출됩니다.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div
+          className={`grid gap-3 ${stock.pbr ? "grid-cols-3" : "grid-cols-2"}`}
+        >
           <MetricCard label="시가총액" value={stock.cap} />
           <MetricCard label="PER" value={`${stock.per}배`} />
+          {stock.pbr ? (
+            <MetricCard label="PBR" value={`${stock.pbr}배`} />
+          ) : null}
           <MetricCard label="52주 최고" value={`${formatKRW(stock.hi)}원`} />
           <MetricCard label="52주 최저" value={`${formatKRW(stock.lo)}원`} />
         </div>
 
-        <p className="text-center text-[11px] font-semibold text-[#8b95a1]">
-          프로토타입 화면이에요 · 매수/매도 버튼은 아직 연결되어 있지 않아요
-        </p>
+        <StockNewsCard name={stock.name} />
       </section>
     </AppShell>
   );
@@ -1657,7 +1972,7 @@ function WatchlistRow({
   // 띄지 않고, hover/press 시에만 빨갛게 반응하는 "고스트" 버튼 스타일.
   if (!stock) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="flex items-center justify-between gap-2 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
         <p className="min-w-0 truncate text-sm font-semibold text-[#8b95a1]">
           {item.name ?? item.ticker} · 시세 정보 없음
         </p>
@@ -1674,7 +1989,7 @@ function WatchlistRow({
   const up = stock.chg >= 0;
 
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
+    <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
       <Link className="min-w-0 flex-1" href={`/stock/${stock.ticker}`}>
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">

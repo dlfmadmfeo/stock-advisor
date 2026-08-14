@@ -30,6 +30,7 @@ type Quote = {
   lo?: number;
   cap?: string;
   per?: number;
+  pbr?: number;
 };
 
 async function fetchFromKis(ticker: string): Promise<Quote | null> {
@@ -48,6 +49,7 @@ async function fetchFromKis(ticker: string): Promise<Quote | null> {
   if (detail?.w52High) quote.hi = detail.w52High;
   if (detail?.w52Low) quote.lo = detail.w52Low;
   if (detail?.per) quote.per = detail.per;
+  if (detail?.pbr) quote.pbr = detail.pbr;
   if (detail?.marketCapEok) quote.cap = formatMarketCapEok(detail.marketCapEok);
 
   return quote;
@@ -98,6 +100,7 @@ export async function GET() {
         lo: s.lo,
         cap: s.cap,
         per: s.per,
+        pbr: s.pbr ?? undefined,
       };
     }
     return NextResponse.json({ quotes, status: "live", source: "kis" });
