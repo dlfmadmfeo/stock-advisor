@@ -1430,10 +1430,10 @@ function WatchlistBody() {
     setBusyTicker(ticker);
     setError(null);
     try {
-      const res = await fetch(`/api/watchlist`, {
+      const res = await fetch(`/api/watchlist/${ticker}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker }),
+        // body: JSON.stringify({ ticker }),
       });
       const data = await res.json();
       if (!data.ok) {
