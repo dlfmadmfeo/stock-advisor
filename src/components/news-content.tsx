@@ -56,7 +56,7 @@ export function thumbnailStyle(type: string): React.CSSProperties {
     macro: "100% 100%",
   };
   return {
-    backgroundImage: "url('/news-thumbnails.png')",
+    backgroundImage: "url('/news-thumbnails.webp')",
     backgroundPosition: positions[type],
     backgroundSize: "205% 205%",
   };

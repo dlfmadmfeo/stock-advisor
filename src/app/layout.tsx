@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { LiveQuoteLoader } from "@/components/live-quote-loader";
-import { UniverseLoader } from "@/components/universe-loader";
-import { PriceSocket } from "@/components/price-socket";
+import { AppLoaders } from "@/components/app-loaders";
 import { QueryProvider } from "@/components/query-provider";
 
 const inter = Inter({
@@ -29,9 +27,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <UniverseLoader />
-          <LiveQuoteLoader />
-          <PriceSocket />
+          <AppLoaders />
           {children}
         </QueryProvider>
       </body>
