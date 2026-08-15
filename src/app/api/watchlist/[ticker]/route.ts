@@ -49,13 +49,25 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ticker
         { status: 409 },
       );
     }
-  } catch {
-    // stock-advisor-server가 꺼져있는 경우. DB엔 추가하되, 실시간 구독은
-    // 안 되고 있다는 걸 알려줌 (서버 켜지면 재시작 시 DB에서 다시 읽어감).
+  } catch (e) {
+    // stock-advisor-server가 꺼져있거나(REALTIME_SERVER_URL이 프로덕션에서
+    // localhost로 남아있는 경우 등) 연결 자체가 안 되는 경우. DB엔
+    // 추가하되, 실시간 구독은 안 되고 있다는 걸 알려줌 (서버 켜지면
+    // 재시작 시 DB에서 다시 읽어감). console.error를 안 찍으면 Vercel
+    // Logs에도 아무 단서가 안 남아서(2026-08-14 세션에 실제로 겪음) 꼭 남김.
+    console.error(`[watchlist POST] ${ticker} 실시간 구독 요청 실패:`, e);
     realtimeWarning = "실시간 서버(stock-advisor-server)에 연결할 수 없어 DB에만 추가됐어요. 서버를 켜면 다음 재시작 때 자동으로 구독돼요.";
   }
 
-  await prisma.watchlist.create({ data: { ticker } });
+  try {
+    await prisma.watchlist.create({ data: { ticker } });
+  } catch (e) {
+    console.error(`[watchlist POST] ${ticker} DB 저장 실패:`, e);
+    return NextResponse.json(
+      { ok: false, message: "관심종목 저장에 실패했어요. 잠시 후 다시 시도해주세요." },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true, warning: realtimeWarning });
 }
