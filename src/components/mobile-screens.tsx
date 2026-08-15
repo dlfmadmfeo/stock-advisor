@@ -1598,7 +1598,18 @@ function WatchlistRow({
 
   return (
     <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
-      <Link className="min-w-0 flex-1" href={`/stock/${stock.ticker}`}>
+      <Link
+        aria-disabled={busy}
+        className={`min-w-0 flex-1 ${busy ? "pointer-events-none opacity-60" : ""}`}
+        href={`/stock/${stock.ticker}`}
+        // 삭제 요청이 나간 동안(busy)엔 카드를 눌러도 상세 화면으로 안 가게
+        // 막습니다 — pointer-events-none만으로는 키보드/스크린리더 접근이나
+        // 혹시 남아있는 클릭 이벤트를 완전히 못 막을 수 있어서 onClick에서도
+        // 한 번 더 막아둡니다.
+        onClick={(e) => {
+          if (busy) e.preventDefault();
+        }}
+      >
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">
             {stock.name}
