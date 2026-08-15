@@ -2,6 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { NewsArticle } from "@/lib/naver-news";
+import { resolveApiUrl } from "@/lib/api-url";
 
 // ---------------------------------------------------------------------------
 // StockNewsCard(mobile-screens.tsx)를 Suspense로 전환하면서 추가 (2026-08-14
@@ -13,7 +14,7 @@ import type { NewsArticle } from "@/lib/naver-news";
 // ---------------------------------------------------------------------------
 
 async function fetchStockNews(name: string): Promise<NewsArticle[]> {
-  const res = await fetch(`/api/news?name=${encodeURIComponent(name)}`);
+  const res = await fetch(resolveApiUrl(`/api/news?name=${encodeURIComponent(name)}`));
   const data: { ok: boolean; message: string; articles: NewsArticle[] } = await res.json();
   if (!data.ok) throw new Error(data.message || "뉴스를 불러오지 못했어요.");
   return data.articles;

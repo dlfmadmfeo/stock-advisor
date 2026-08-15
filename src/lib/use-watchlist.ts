@@ -1,6 +1,7 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { resolveApiUrl } from "@/lib/api-url";
 
 // ---------------------------------------------------------------------------
 // WatchlistScreen(mobile-screens.tsx)의 목록 로딩을 Suspense로 전환하면서
@@ -22,7 +23,7 @@ export type WatchlistItem = {
 };
 
 async function fetchWatchlist(): Promise<WatchlistItem[]> {
-  const res = await fetch("/api/watchlist");
+  const res = await fetch(resolveApiUrl("/api/watchlist"));
   if (!res.ok) throw new Error("관심종목을 불러오지 못했어요.");
   const data = await res.json();
   return data.items ?? [];

@@ -1,6 +1,14 @@
 "use client";
 
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,7 +23,6 @@ import {
   Cpu,
   Heart,
   Home,
-  Newspaper,
   Search,
   Settings,
   ArrowDown,
@@ -27,11 +34,14 @@ import {
 } from "lucide-react";
 import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
 import type { NewsArticle } from "@/lib/naver-news";
-import { CompactNewsRow, newsItems } from "@/components/news-content";
 import { UserMenu } from "@/components/user-menu";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useStockNews } from "@/lib/use-stock-news";
-import { useWatchlistQuery, WATCHLIST_QUERY_KEY, type WatchlistItem } from "@/lib/use-watchlist";
+import {
+  useWatchlistQuery,
+  WATCHLIST_QUERY_KEY,
+  type WatchlistItem,
+} from "@/lib/use-watchlist";
 import {
   Allocation,
   EmptyState,
@@ -110,7 +120,6 @@ const navTabs = [
   { href: "/category", icon: Star, label: "추천" },
   { href: "/watchlist", icon: Heart, label: "관심" },
   { href: "/analysis", icon: AreaChart, label: "자산" },
-  { href: "/news", icon: Newspaper, label: "뉴스" },
 ];
 
 const categoryIcons: Record<string, IconComponent> = {
@@ -189,15 +198,6 @@ export function NotificationsScreen() {
                 개수입니다.
               </p>
             </section>
-
-            <div className="space-y-3">
-              {/* <SectionHeader title="시장 소식" action="더 보기" href="/news" /> */}
-              <div className="space-y-2">
-                {newsItems.slice(0, 3).map((item) => (
-                  <CompactNewsRow item={item} key={item.title} />
-                ))}
-              </div>
-            </div>
           </aside>
         </div>
       </section>
@@ -410,15 +410,10 @@ function buildDonutGradient(entries: [string, number][], total: number) {
 }
 
 // ---------------------------------------------------------------------------
-// 2026-08-14 세션: 서버 컴포넌트 분리 파일럿으로 NewsScreen을 제거했습니다.
-// "시장 소식" 화면(/news)은 이제 src/app/news/page.tsx(서버 컴포넌트)가
-// AppShell + BackTopBar(아래, 뒤로가기 버튼만 담당하는 작은 클라이언트
-// 조각) + NewsContent(src/components/news-content.tsx, 서버 컴포넌트)를
-// 직접 조합해서 렌더링합니다. 화면 내용 자체는 이제 클라이언트 JS로 안
-// 내려가요 — 상세한 이유는 news-content.tsx 상단 주석 참고.
-//
-// BackTopBar는 "뒤로가기"(useRouter 필요)만 담당하는 범용 조각이라, 다른
-// 화면을 같은 방식으로 서버 컴포넌트화할 때도 재사용할 수 있습니다.
+// BackTopBar: "뒤로가기"(useRouter 필요)만 담당하는 작은 클라이언트 조각.
+// 서버 컴포넌트인 page.tsx(예: src/app/history/page.tsx)가 AppShell과 함께
+// 직접 조합해서 씁니다. ("시장 소식" 화면은 2026-08-14 세션에 아예
+// 제거했습니다 — 목업 데이터만 있던 화면이라 정리했어요.)
 // ---------------------------------------------------------------------------
 export function BackTopBar({
   title,
@@ -542,7 +537,6 @@ function QuickActions() {
         [AreaChart, "자산", "/analysis"],
         [Star, "추천", "/category"],
         [Bookmark, "관심종목", "/watchlist"],
-        [Newspaper, "뉴스", "/news"],
       ].map(([Icon, label, href]) => {
         const TypedIcon = Icon as IconComponent;
         return (
@@ -947,17 +941,14 @@ const StockRow = memo(function StockRow({
 });
 
 // EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
-// HistoryMetric/NewsRow/thumbnailStyle은 전부 서버 컴포넌트 분리 작업으로
-// src/components/ui-primitives.tsx, src/components/news-content.tsx로
-// 옮겼습니다 (위 AppShell 주석 참고). CompactNewsRow는 홈 화면
-// (NotificationsScreen, 클라이언트)에서 계속 쓰여서 news-content.tsx에서
-// import해왔습니다.
+// HistoryMetric은 전부 서버 컴포넌트 분리 작업으로 src/components/
+// ui-primitives.tsx로 옮겼습니다 (위 AppShell 주석 참고).
 
 function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-5 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
         const active =
           pathname === item.href ||
@@ -1373,7 +1364,9 @@ export function WatchlistScreen() {
       <ErrorBoundary
         fallback={(error) => (
           <section className="px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
-            <EmptyState text={error.message || "관심종목을 불러오지 못했어요."} />
+            <EmptyState
+              text={error.message || "관심종목을 불러오지 못했어요."}
+            />
           </section>
         )}
       >
@@ -1437,7 +1430,7 @@ function WatchlistBody() {
     setBusyTicker(ticker);
     setError(null);
     try {
-      const res = await fetch("/api/watchlist", {
+      const res = await fetch(`/api/watchlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticker }),
@@ -1475,95 +1468,95 @@ function WatchlistBody() {
         </p>
       </div>
 
-        <div className="relative">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
-            <Search className="h-4 w-4 text-[#8b95a1]" />
-            <input
-              className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
-              onBlur={() => setInputFocused(false)}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setInputFocused(true)}
-              placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
-              value={query}
-            />
-          </div>
-          {candidates.length ? (
-            <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
-              {candidates.map((s) => (
-                <button
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
-                  disabled={busyTicker === s.ticker}
-                  key={s.ticker}
-                  // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
-                  // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
-                  // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
-                  onClick={() => addTicker(s.ticker)}
-                  onMouseDown={(e) => e.preventDefault()}
-                >
-                  <span>
-                    {s.name}{" "}
-                    <span className="text-xs font-medium text-[#8b95a1]">
-                      {s.ticker}
-                    </span>
+      <div className="relative">
+        <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+          <Search className="h-4 w-4 text-[#8b95a1]" />
+          <input
+            className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
+            onBlur={() => setInputFocused(false)}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setInputFocused(true)}
+            placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
+            value={query}
+          />
+        </div>
+        {candidates.length ? (
+          <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
+            {candidates.map((s) => (
+              <button
+                className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
+                disabled={busyTicker === s.ticker}
+                key={s.ticker}
+                // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
+                // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
+                // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
+                onClick={() => addTicker(s.ticker)}
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <span>
+                  {s.name}{" "}
+                  <span className="text-xs font-medium text-[#8b95a1]">
+                    {s.ticker}
                   </span>
-                  <span className="text-xs font-bold text-[#3182f6]">추가</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-              !showAllCandidates
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-            }`}
-            onClick={() => setShowAllCandidates(false)}
-            type="button"
-          >
-            추천종목만
-          </button>
-          <button
-            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-              showAllCandidates
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-            }`}
-            onClick={() => setShowAllCandidates(true)}
-            type="button"
-          >
-            전체 종목
-          </button>
-        </div>
-
-        {error ? (
-          <p className="text-xs font-semibold text-[#f04452]">{error}</p>
+                </span>
+                <span className="text-xs font-bold text-[#3182f6]">추가</span>
+              </button>
+            ))}
+          </div>
         ) : null}
+      </div>
 
-        <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-          검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
-          종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
-          관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
-          체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
-          {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
-        </p>
+      <div className="flex items-center gap-1.5">
+        <button
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+            !showAllCandidates
+              ? "bg-[#191f28] text-white"
+              : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+          }`}
+          onClick={() => setShowAllCandidates(false)}
+          type="button"
+        >
+          추천종목만
+        </button>
+        <button
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+            showAllCandidates
+              ? "bg-[#191f28] text-white"
+              : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+          }`}
+          onClick={() => setShowAllCandidates(true)}
+          type="button"
+        >
+          전체 종목
+        </button>
+      </div>
 
-        <div className="space-y-2">
-          {items.length === 0 ? (
-            <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
-          ) : (
-            items.map((item) => (
-              <WatchlistRow
-                busy={busyTicker === item.ticker}
-                item={item}
-                key={item.ticker}
-                onRemove={removeTicker}
-              />
-            ))
-          )}
-        </div>
+      {error ? (
+        <p className="text-xs font-semibold text-[#f04452]">{error}</p>
+      ) : null}
+
+      <p className="text-xs font-medium leading-5 text-[#8b95a1]">
+        검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
+        종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
+        관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
+        체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
+        {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
+      </p>
+
+      <div className="space-y-2">
+        {items.length === 0 ? (
+          <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
+        ) : (
+          items.map((item) => (
+            <WatchlistRow
+              busy={busyTicker === item.ticker}
+              item={item}
+              key={item.ticker}
+              onRemove={removeTicker}
+            />
+          ))
+        )}
+      </div>
     </section>
   );
 }
