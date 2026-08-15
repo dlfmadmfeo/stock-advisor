@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -62,6 +63,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ticker
   try {
     await prisma.watchlist.create({ data: { ticker } });
   } catch (e) {
+    // P2002 = PRIMARY(ticker) 유니크 제약 위반, 즉 "이미 있음". 위의
+    // existing 체크가 놓친 경우(예: 이전 요청은 클라이언트엔 에러로
+    // 보였지만 실제로는 DB 저장에 성공한 뒤 화면이 새로고침 안 된 채로
+    // 다시 추가를 시도한 경우, 또는 거의 동시에 두 번 클릭한 레이스
+    // 컨디션)에도 500 대신 "이미 있음"으로 정상 처리합니다.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ ok: true, message: "이미 관심종목에 있어요.", alreadyExists: true });
+    }
     console.error(`[watchlist POST] ${ticker} DB 저장 실패:`, e);
     return NextResponse.json(
       { ok: false, message: "관심종목 저장에 실패했어요. 잠시 후 다시 시도해주세요." },
