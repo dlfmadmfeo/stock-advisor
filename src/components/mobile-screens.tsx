@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -28,6 +29,9 @@ import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
 import type { NewsArticle } from "@/lib/naver-news";
 import { CompactNewsRow, newsItems } from "@/components/news-content";
 import { UserMenu } from "@/components/user-menu";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { useStockNews } from "@/lib/use-stock-news";
+import { useWatchlistQuery, WATCHLIST_QUERY_KEY, type WatchlistItem } from "@/lib/use-watchlist";
 import {
   Allocation,
   EmptyState,
@@ -1042,41 +1046,28 @@ function sortNewsArticles(
   return [...articles].sort(byLatest);
 }
 
+// 뉴스가 로딩 중일 때 <Suspense fallback>으로 보여주는 스켈레톤. 실제
+// 카드(StockNewsCard)랑 바깥 padding/틀이 최대한 비슷해야 로딩→완료 전환이
+// 덜 튀어 보여요.
+function StockNewsCardSkeleton() {
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
+      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+    </div>
+  );
+}
+
 function StockNewsCard({ name }: { name: string }) {
-  const [articles, setArticles] = useState<NewsArticle[] | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // useSuspenseQuery는 데이터가 준비될 때까지 이 컴포넌트 렌더링 자체를
+  // "중단"하고 가장 가까운 <Suspense fallback>을 대신 보여줍니다. 그래서
+  // 여기엔 더 이상 로딩 상태(articles === null)가 없어요 — 이 줄까지
+  // 왔다는 건 이미 데이터가 있다는 뜻.
+  const { data: articles } = useStockNews(name);
   const [sortMode, setSortMode] = useState<NewsSortMode>("latest");
 
-  useEffect(() => {
-    let cancelled = false;
-    setArticles(null);
-    setErrorMessage(null);
-    fetch(`/api/news?name=${encodeURIComponent(name)}`)
-      .then((res) => res.json())
-      .then(
-        (data: { ok: boolean; message: string; articles: NewsArticle[] }) => {
-          if (cancelled) return;
-          if (!data.ok) {
-            setErrorMessage(data.message || "뉴스를 불러오지 못했어요.");
-            setArticles([]);
-            return;
-          }
-          setArticles(data.articles);
-        },
-      )
-      .catch(() => {
-        if (!cancelled) {
-          setErrorMessage("뉴스를 불러오지 못했어요.");
-          setArticles([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [name]);
-
   const sortedArticles = useMemo(
-    () => (articles ? sortNewsArticles(articles, sortMode) : []),
+    () => sortNewsArticles(articles, sortMode),
     [articles, sortMode],
   );
 
@@ -1084,7 +1075,7 @@ function StockNewsCard({ name }: { name: string }) {
     <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
-        {articles && articles.length > 0 ? (
+        {articles.length > 0 ? (
           <div className="flex gap-1">
             {NEWS_SORT_OPTIONS.map((opt) => (
               <button
@@ -1103,13 +1094,7 @@ function StockNewsCard({ name }: { name: string }) {
           </div>
         ) : null}
       </div>
-      {articles === null ? (
-        <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
-      ) : errorMessage ? (
-        <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
-          {errorMessage}
-        </p>
-      ) : articles.length === 0 ? (
+      {articles.length === 0 ? (
         <p className="mt-3 text-[13px] text-[#8b95a1]">
           최근 관련 뉴스가 없어요.
         </p>
@@ -1275,7 +1260,21 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           <MetricCard label="52주 최저" value={`${formatKRW(stock.lo)}원`} />
         </div>
 
-        <StockNewsCard name={stock.name} />
+        <ErrorBoundary
+          fallback={(error) => (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
+              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+                {error.message || "뉴스를 불러오지 못했어요."}
+              </p>
+            </div>
+          )}
+          resetKey={stock.ticker}
+        >
+          <Suspense fallback={<StockNewsCardSkeleton />}>
+            <StockNewsCard name={stock.name} />
+          </Suspense>
+        </ErrorBoundary>
       </section>
     </AppShell>
   );
@@ -1351,43 +1350,63 @@ export function SearchScreen() {
   );
 }
 
-type WatchlistItem = {
-  ticker: string;
-  addedAt: string;
-  name: string | null;
-  sector: string | null;
-  price: number | null;
-  chg: number | null;
-  cap: string | null;
-};
+// 관심종목 목록 로딩 중(useWatchlistQuery의 <Suspense> fallback) 보여주는
+// 스켈레톤. TopBar는 이 아래(WatchlistScreen)에서 항상 먼저 그려지고, 여기
+// 안쪽(검색창~목록)만 로딩 동안 이걸로 대체돼요.
+function WatchlistBodySkeleton() {
+  return (
+    <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+      <EmptyState text="불러오는 중..." />
+    </section>
+  );
+}
 
 export function WatchlistScreen() {
   const router = useRouter();
-  const universeStocks = useLiveStocks();
+  return (
+    <AppShell>
+      <TopBar
+        title="관심종목"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+      />
+      <ErrorBoundary
+        fallback={(error) => (
+          <section className="px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+            <EmptyState text={error.message || "관심종목을 불러오지 못했어요."} />
+          </section>
+        )}
+      >
+        <Suspense fallback={<WatchlistBodySkeleton />}>
+          <WatchlistBody />
+        </Suspense>
+      </ErrorBoundary>
+    </AppShell>
+  );
+}
 
-  const [items, setItems] = useState<WatchlistItem[] | null>(null);
+// items 로딩(useWatchlistQuery)이 끝난 뒤에만 마운트되는 실제 화면 내용.
+// TopBar를 이 컴포넌트 밖(WatchlistScreen)으로 뺀 이유는, useSuspenseQuery가
+// 데이터를 기다리는 동안 이 컴포넌트 전체가 <Suspense fallback>으로
+// 대체되기 때문 — TopBar까지 이 안에 있으면 로딩 중엔 뒤로가기 버튼도 같이
+// 사라져버려요.
+function WatchlistBody() {
+  const queryClient = useQueryClient();
+  const universeStocks = useLiveStocks();
+  const { data: items } = useWatchlistQuery();
+
   const [query, setQuery] = useState("");
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
   const [showAllCandidates, setShowAllCandidates] = useState(false);
 
-  const loadWatchlist = useCallback(async () => {
-    try {
-      const res = await fetch("/api/watchlist");
-      const data = await res.json();
-      setItems(data.items ?? []);
-    } catch {
-      setItems([]);
-      setError("관심종목을 불러오지 못했어요.");
-    }
-  }, []);
+  const refetchWatchlist = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY }),
+    [queryClient],
+  );
 
-  useEffect(() => {
-    loadWatchlist();
-  }, [loadWatchlist]);
-
-  const watchedTickers = new Set((items ?? []).map((i) => i.ticker));
+  const watchedTickers = new Set(items.map((i) => i.ticker));
 
   // 추가 후보는 "지금 유니버스(top 200)에 있고, 아직 관심종목이 아닌" 종목만.
   // stock-advisor-server가 DB Stock 테이블에 없는 종목은 실시간 갱신을 못 해서
@@ -1429,7 +1448,7 @@ export function WatchlistScreen() {
         return;
       }
       setQuery("");
-      await loadWatchlist();
+      await refetchWatchlist();
     } catch {
       setError("서버에 연결할 수 없어요.");
     } finally {
@@ -1441,26 +1460,20 @@ export function WatchlistScreen() {
     setBusyTicker(ticker);
     try {
       await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
-      await loadWatchlist();
+      await refetchWatchlist();
     } finally {
       setBusyTicker(null);
     }
   }
 
   return (
-    <AppShell>
-      <TopBar
-        title="관심종목"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-      />
-      <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
-        <div className="flex items-center justify-between">
-          <WsStatusPill />
-          <p className="text-sm font-bold text-[#8b95a1]">
-            {items?.length ?? 0}/{WATCHLIST_LIMIT}개
-          </p>
-        </div>
+    <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+      <div className="flex items-center justify-between">
+        <WsStatusPill />
+        <p className="text-sm font-bold text-[#8b95a1]">
+          {items.length}/{WATCHLIST_LIMIT}개
+        </p>
+      </div>
 
         <div className="relative">
           <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
@@ -1538,9 +1551,7 @@ export function WatchlistScreen() {
         </p>
 
         <div className="space-y-2">
-          {items === null ? (
-            <EmptyState text="불러오는 중..." />
-          ) : items.length === 0 ? (
+          {items.length === 0 ? (
             <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
           ) : (
             items.map((item) => (
@@ -1553,8 +1564,7 @@ export function WatchlistScreen() {
             ))
           )}
         </div>
-      </section>
-    </AppShell>
+    </section>
   );
 }
 
