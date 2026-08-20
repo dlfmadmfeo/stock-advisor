@@ -1,23 +1,16 @@
 // ---------------------------------------------------------------------------
-// 데모 로그인 세션 (2026-08-14 세션 추가). 실제 인증 인프라가 없어서
-// (login-screen.tsx 상단 주석 참고) 로그인 폼에 입력한 이메일을 localStorage에
-// 저장해뒀다가, GNB 프로필 드롭다운(user-menu.tsx)이 읽어서 보여줍니다.
-// 로그아웃하면 지워요.
+// [DEPRECATED, 2026-08-18 세션] 예전엔 로그인 폼에 입력한 이메일을
+// localStorage에 저장해두고 GNB 프로필 드롭다운이 읽는 "가짜 세션"이었는데,
+// 이제 실제 User 테이블 + 쿠키 기반 세션(src/lib/auth.ts, 서버 전용)이
+// 생겨서 이 파일은 더 이상 안 씁니다.
+//
+// - 서버(라우트 핸들러 등)에서 로그인 여부/유저 조회 → src/lib/auth.ts의
+//   getSessionUser()
+// - 클라이언트 컴포넌트에서 로그인 여부 표시 → src/lib/use-session.ts의
+//   useSession()
+//
+// 이 파일은 남겨진 import를 깨뜨리지 않으려고만 비워둔 거라 삭제해도 됩니다
+// (이번 세션에서 사용처는 다 새 방식으로 옮겨놨어요).
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = "stock-advisor:userEmail";
-
-export function setStoredEmail(email: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, email);
-}
-
-export function getStoredEmail(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(STORAGE_KEY);
-}
-
-export function clearStoredEmail() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
-}
+export {};

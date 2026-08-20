@@ -961,7 +961,18 @@ function BottomNav() {
             href={item.href}
             key={item.label}
           >
-            <item.icon className="h-5 w-5" />
+            {/* Home(house)/AreaChart(chart-area)는 아이콘 안에 path가 2개예요
+                — 문/축선 같은 "디테일 선"이 첫 번째, 집/차트 영역을 이루는
+                "메인 도형"이 마지막(closed path)입니다. 활성일 때 메인
+                도형(마지막 path)만 파란색으로 채우고, 디테일 선(마지막이
+                아닌 path)은 상태와 상관없이 항상 고정 회색으로 둬서 파란
+                채움 위에서도 안 묻히게 합니다. Star/Heart처럼 path가 1개뿐인
+                아이콘은 그 path가 곧 마지막 path라 그대로 채워집니다. */}
+            <item.icon
+              className={`h-5 w-5 [&>path:not(:last-child)]:stroke-[#8b95a1] ${
+                active ? "[&>path:last-child]:fill-[#3182f6]" : ""
+              }`}
+            />
             {item.label}
             {item.label === "뉴스" ? (
               <span className="absolute right-[27%] top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f04452] px-1 text-[9px] leading-none text-white">
@@ -1352,7 +1363,13 @@ function WatchlistBodySkeleton() {
   );
 }
 
-export function WatchlistScreen() {
+export function WatchlistScreen({
+  initialItems,
+}: {
+  // 서버 컴포넌트(app/watchlist/page.tsx)가 DB에서 직접 읽어서 넘겨주는
+  // 초기 목록 — SSR 쿠키 문제 피하려고 씀(use-watchlist.ts 주석 참고).
+  initialItems?: WatchlistItem[];
+} = {}) {
   const router = useRouter();
   return (
     <AppShell>
@@ -1371,7 +1388,7 @@ export function WatchlistScreen() {
         )}
       >
         <Suspense fallback={<WatchlistBodySkeleton />}>
-          <WatchlistBody />
+          <WatchlistBody initialItems={initialItems} />
         </Suspense>
       </ErrorBoundary>
     </AppShell>
@@ -1383,16 +1400,29 @@ export function WatchlistScreen() {
 // 데이터를 기다리는 동안 이 컴포넌트 전체가 <Suspense fallback>으로
 // 대체되기 때문 — TopBar까지 이 안에 있으면 로딩 중엔 뒤로가기 버튼도 같이
 // 사라져버려요.
-function WatchlistBody() {
+function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
   const queryClient = useQueryClient();
   const universeStocks = useLiveStocks();
-  const { data: items } = useWatchlistQuery();
+  const { data: items } = useWatchlistQuery(initialItems);
 
   const [query, setQuery] = useState("");
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
-  const [showAllCandidates, setShowAllCandidates] = useState(false);
+  const [showAllCandidates, setShowAllCandidates] = useState(true);
+  // 종목 추가 버튼(onMouseDown preventDefault) 때문에 브라우저에 따라 탭해도
+  // input이 blur되지 않는 경우가 있어서, 추가가 끝나면 이 ref로 명시적으로
+  // blur()를 걸어 드롭다운을 닫고 모바일 키보드도 내려가게 합니다.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // 추가 요청이 서버 왕복하는 동안(POST → 실시간 구독 → refetch) 화면에
+  // 아무 반응이 없으면 사용자가 버튼이 안 눌린 줄 알 수 있어서, 낙관적으로
+  // 리스트 맨 위에 스켈레톤 카드를 하나 끼워둡니다. Suspense를 다시 태우면
+  // WatchlistBody 전체가 깜빡이니까(전체 로딩용 Suspense와는 별개 문제),
+  // 이건 그냥 로컬 state로 처리합니다.
+  const [pendingAdd, setPendingAdd] = useState<{
+    ticker: string;
+    name: string;
+  } | null>(null);
 
   const refetchWatchlist = useCallback(
     () => queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY }),
@@ -1426,9 +1456,10 @@ function WatchlistBody() {
       ? candidatePool.slice(0, 20)
       : [];
 
-  async function addTicker(ticker: string) {
+  async function addTicker(ticker: string, name: string) {
     setBusyTicker(ticker);
     setError(null);
+    setPendingAdd({ ticker, name });
     try {
       const res = await fetch(`/api/watchlist/${ticker}`, {
         method: "POST",
@@ -1442,10 +1473,14 @@ function WatchlistBody() {
       }
       setQuery("");
       await refetchWatchlist();
+      // 추가 성공 후엔 드롭다운을 닫고 모바일 키보드도 내려가게 함.
+      setInputFocused(false);
+      searchInputRef.current?.blur();
     } catch {
       setError("서버에 연결할 수 없어요.");
     } finally {
       setBusyTicker(null);
+      setPendingAdd(null);
     }
   }
 
@@ -1477,6 +1512,7 @@ function WatchlistBody() {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setInputFocused(true)}
             placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
+            ref={searchInputRef}
             value={query}
           />
         </div>
@@ -1490,7 +1526,7 @@ function WatchlistBody() {
                 // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
                 // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
                 // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
-                onClick={() => addTicker(s.ticker)}
+                onClick={() => addTicker(s.ticker, s.name)}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 <span>
@@ -1506,7 +1542,7 @@ function WatchlistBody() {
         ) : null}
       </div>
 
-      <div className="flex items-center gap-1.5">
+      {/* <div className="flex items-center gap-1.5">
         <button
           className={`rounded-full px-3 py-1.5 text-xs font-bold ${
             !showAllCandidates
@@ -1529,7 +1565,7 @@ function WatchlistBody() {
         >
           전체 종목
         </button>
-      </div>
+      </div> */}
 
       {error ? (
         <p className="text-xs font-semibold text-[#f04452]">{error}</p>
@@ -1544,20 +1580,64 @@ function WatchlistBody() {
       </p>
 
       <div className="space-y-2">
-        {items.length === 0 ? (
+        {items.length === 0 && !pendingAdd ? (
           <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
         ) : (
-          items.map((item) => (
-            <WatchlistRow
-              busy={busyTicker === item.ticker}
-              item={item}
-              key={item.ticker}
-              onRemove={removeTicker}
-            />
-          ))
+          <>
+            {/* 새로 추가 중인 종목은 아직 items(서버 응답)에 없으니 맨 위에
+                낙관적으로 스켈레톤 카드를 하나 끼워둠. refetch가 끝나서
+                items에 실제로 들어오면(watchedTickers에 잡히면) 곧바로 숨겨서
+                실제 카드랑 잠깐이라도 중복으로 안 보이게 함. */}
+            {pendingAdd && !watchedTickers.has(pendingAdd.ticker) ? (
+              <WatchlistRowSkeleton
+                key={`pending-${pendingAdd.ticker}`}
+                name={pendingAdd.name}
+                ticker={pendingAdd.ticker}
+              />
+            ) : null}
+            {items.map((item) => (
+              <WatchlistRow
+                busy={busyTicker === item.ticker}
+                item={item}
+                key={item.ticker}
+                onRemove={removeTicker}
+              />
+            ))}
+          </>
         )}
       </div>
     </section>
+  );
+}
+
+// 추가 요청이 서버 왕복하는 동안 리스트 맨 위에 낙관적으로 보여주는 카드.
+// 이름/코드는 이미 알고 있으니(후보 목록에서 눌렀으니까) 그대로 보여주고,
+// 아직 없는 시세/등락률 자리만 회색 펄스로 채워서 "확인 중" 느낌을 줍니다.
+function WatchlistRowSkeleton({
+  name,
+  ticker,
+}: {
+  name: string;
+  ticker: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb]">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-base font-bold text-[#191f28]">
+            {name}
+          </h3>
+          <span className="shrink-0 text-xs font-medium text-[#8b95a1]">
+            {ticker}
+          </span>
+        </div>
+        <div className="mt-2 h-3 w-24 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
+      <div className="shrink-0 space-y-2 text-right">
+        <div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#eef0f2]" />
+        <div className="ml-auto h-3 w-10 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
+    </div>
   );
 }
 

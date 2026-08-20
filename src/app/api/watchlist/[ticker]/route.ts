@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 const REALTIME_SERVER_URL = process.env.REALTIME_SERVER_URL ?? "http://localhost:8081";
 const TICKER_RE = /^\d{6}$/;
@@ -9,8 +10,24 @@ const TICKER_RE = /^\d{6}$/;
 // 경로에 넣는 방식으로 바뀌면서, 원래 src/app/api/watchlist/route.ts에
 // 있던 POST 핸들러를 이쪽(경로 기반)으로 옮겨왔습니다. DELETE랑 같은
 // 위치(경로에 ticker)에 있는 게 REST스럽게 더 일관돼서 이대로 유지.
+//
+// 2026-08-18 세션: 회원가입/로그인 도입하면서 Watchlist가 (userId, ticker)
+// 유니크로 바뀜. Spring(stock-advisor-server)은 어느 유저 건지 알 방법이
+// 없어서(내부 API에 userId를 안 실음) 더 이상 Watchlist 테이블에 못 씀 —
+// WatchlistController.add()/remove()에서 DB 쓰기 코드를 제거했어요. 그래서
+// DB 쓰기는 이제 항상 여기(Next.js/Prisma)가 맡고, Spring은 실시간
+// 구독(웹소켓)만 관리합니다. (예전엔 Spring이 먼저 써서 여기선 Spring
+// 실패했을 때만 대신 썼는데, 그 전제가 없어졌어요.)
 export async function POST(_req: Request, { params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
+
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, message: "로그인이 필요해요." },
+      { status: 401 },
+    );
+  }
 
   if (!TICKER_RE.test(ticker)) {
     return NextResponse.json(
@@ -34,20 +51,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ticker
     );
   }
 
-  const existing = await prisma.watchlist.findUnique({ where: { ticker } });
+  const existing = await prisma.watchlist.findUnique({
+    where: { userId_ticker: { userId: user.id, ticker } },
+  });
   if (existing) {
     return NextResponse.json({ ok: true, message: "이미 관심종목에 있어요.", alreadyExists: true });
   }
 
-  // Spring 서버(stock-advisor-server)에 구독 요청 — 구독 한도(40개) 초과 등은
-  // 여기서 걸러짐. WatchlistController.add()가 구독 성공 시 Watchlist
-  // 테이블에 직접 INSERT까지 하기 때문에(같은 MySQL 테이블을 JPA로도
-  // 매핑해둠 — WatchlistEntity 참고), 여기서 res.ok를 받으면 DB 쓰기는
-  // 이미 끝난 상태입니다. 예전엔 이 뒤에 prisma.watchlist.create()를 또
-  // 호출해서 매번 유니크 제약(P2002) 위반이 나고, 그게 "이미 있음"으로
-  // 처리되는 바람에 최초 추가인데도 alreadyExists가 뜨는 버그가 있었음
-  // (2026-08-15 세션에 발견/수정). DB 쓰기 책임은 서버(Spring) 쪽에 맡기고
-  // Next.js는 Spring이 죽어있을 때만 대신 씁니다.
+  // Spring 서버(stock-advisor-server)에 구독 요청 — 구독 한도(40개, 전체
+  // 유저 공유) 초과 등은 여기서 걸러짐. 이미 다른 유저가 담아둬서 구독
+  // 중이면 Spring이 "이미 구독 중"으로 바로 200을 줌 — 그래도 이 유저
+  // 개인 row는 새로 만들어야 하니 아래 create는 그대로 진행.
+  let realtimeWarning: string | null = null;
   try {
     const res = await fetch(`${REALTIME_SERVER_URL}/watchlist/${ticker}`, { method: "POST" });
     if (!res.ok) {
@@ -57,50 +72,59 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ticker
         { status: 409 },
       );
     }
-    return NextResponse.json({ ok: true });
   } catch (e) {
-    // stock-advisor-server가 꺼져있거나(REALTIME_SERVER_URL이 프로덕션에서
-    // localhost로 남아있는 경우 등) 연결 자체가 안 되는 경우. 이때만 Next.js가
-    // 대신 DB에 추가하고, 실시간 구독은 안 되고 있다는 걸 알려줌 (서버 켜지면
-    // 재시작 시 DB에서 다시 읽어감). console.error를 안 찍으면 Vercel
-    // Logs에도 아무 단서가 안 남아서(2026-08-14 세션에 실제로 겪음) 꼭 남김.
+    // stock-advisor-server가 꺼져있거나 연결 자체가 안 되는 경우. DB엔
+    // 그대로 추가하고, 실시간 구독은 안 되고 있다는 걸 알려줌 (서버 켜지면
+    // 재시작 시 DB에서 distinct ticker를 다시 읽어감).
     console.error(`[watchlist POST] ${ticker} 실시간 구독 요청 실패:`, e);
-
-    try {
-      await prisma.watchlist.create({ data: { ticker } });
-    } catch (createErr) {
-      // P2002 = PRIMARY(ticker) 유니크 제약 위반, 즉 "이미 있음". 위의
-      // existing 체크가 놓친 경우(거의 동시에 두 번 클릭한 레이스 컨디션 등)에도
-      // 500 대신 "이미 있음"으로 정상 처리합니다.
-      if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === "P2002") {
-        return NextResponse.json({ ok: true, message: "이미 관심종목에 있어요.", alreadyExists: true });
-      }
-      console.error(`[watchlist POST] ${ticker} DB 저장 실패:`, createErr);
-      return NextResponse.json(
-        { ok: false, message: "관심종목 저장에 실패했어요. 잠시 후 다시 시도해주세요." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      warning: "실시간 서버(stock-advisor-server)에 연결할 수 없어 DB에만 추가됐어요. 서버를 켜면 다음 재시작 때 자동으로 구독돼요.",
-    });
+    realtimeWarning =
+      "실시간 서버(stock-advisor-server)에 연결할 수 없어 DB에만 추가됐어요. 서버를 켜면 다음 재시작 때 자동으로 구독돼요.";
   }
+
+  try {
+    await prisma.watchlist.create({ data: { userId: user.id, ticker } });
+  } catch (e) {
+    // P2002 = (userId, ticker) 유니크 제약 위반, 즉 "이미 있음". 위의
+    // existing 체크가 놓친 경우(거의 동시에 두 번 클릭한 레이스 컨디션 등)에도
+    // 500 대신 "이미 있음"으로 정상 처리합니다.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ ok: true, message: "이미 관심종목에 있어요.", alreadyExists: true });
+    }
+    console.error(`[watchlist POST] ${ticker} DB 저장 실패:`, e);
+    return NextResponse.json(
+      { ok: false, message: "관심종목 저장에 실패했어요. 잠시 후 다시 시도해주세요." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ ok: true, warning: realtimeWarning });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
 
-  // 삭제는 실시간 서버가 꺼져있어도 항상 DB에서 지워지도록 함 (사용자가
-  // 명시적으로 지워달라고 한 거니까, 실시간 해제 실패로 막을 이유가 없음).
-  try {
-    await fetch(`${REALTIME_SERVER_URL}/watchlist/${ticker}`, { method: "DELETE" });
-  } catch {
-    // 실시간 서버 연결 실패는 조용히 무시 — DB만 정상적으로 지움.
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, message: "로그인이 필요해요." },
+      { status: 401 },
+    );
   }
 
-  await prisma.watchlist.deleteMany({ where: { ticker } });
+  // 이 유저 row만 지움 — 다른 유저가 같은 종목을 아직 담아뒀을 수 있어서.
+  await prisma.watchlist.deleteMany({ where: { userId: user.id, ticker } });
+
+  // 실시간 구독은 전체 유저가 공유하는 자원이라, 이 유저가 지웠다고 바로
+  // 끊어버리면 그 종목을 아직 보고 있는 다른 유저의 실시간 갱신이 끊겨요.
+  // 아무도 안 담고 있을 때만 Spring에 구독 해제를 요청합니다.
+  const stillWatchedByOthers = await prisma.watchlist.findFirst({ where: { ticker } });
+  if (!stillWatchedByOthers) {
+    try {
+      await fetch(`${REALTIME_SERVER_URL}/watchlist/${ticker}`, { method: "DELETE" });
+    } catch {
+      // 실시간 서버 연결 실패는 조용히 무시 — DB만 정상적으로 지움.
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -6,14 +6,18 @@
 // 이랑 GNB 프로필 드롭다운(`UserMenu`, user-menu.tsx)이 같은 모달을 재사용해요
 // — 로그아웃 확인 UX가 앱 안에서 한 군데(이 파일)에만 있으면 되니까요.
 //
-// ⚠️ 로그인 화면과 마찬가지로 실제 인증이 아닙니다. 세션/쿠키를 지우는 로직
-// 없이 그냥 /login으로 이동만 합니다.
+// 2026-08-18 세션: /api/auth/logout을 호출해서 세션 쿠키를 실제로 지웁니다
+// (그전엔 localStorage만 지우고 끝이었음). 2026-08-20 세션: better-auth
+// 도입하면서 authClient.signOut()으로 교체 — 내부적으로
+// /api/auth/sign-out을 호출해요.
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react";
-import { clearStoredEmail } from "@/lib/session";
+import { authClient } from "@/lib/auth-client";
+import { SESSION_QUERY_KEY } from "@/lib/use-session";
 
 export function LogoutConfirmModal({
   open,
@@ -23,6 +27,7 @@ export function LogoutConfirmModal({
   onCancel: () => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   if (!open) return null;
 
   return (
@@ -44,9 +49,13 @@ export function LogoutConfirmModal({
           </button>
           <button
             className="h-10 flex-1 rounded-lg bg-[#f04452] text-xs font-bold text-white"
-            onClick={() => {
-              clearStoredEmail();
-              router.push("/login");
+            onClick={async () => {
+              try {
+                await authClient.signOut();
+              } finally {
+                queryClient.setQueryData(SESSION_QUERY_KEY, null);
+                router.push("/login");
+              }
             }}
             type="button"
           >

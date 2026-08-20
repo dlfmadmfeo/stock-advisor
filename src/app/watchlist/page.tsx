@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
 import { WatchlistScreen } from "@/components/mobile-screens";
+import { getSessionUser } from "@/lib/auth";
+import { getWatchlistItems } from "@/lib/watchlist-data";
 
 // 이 화면(WatchlistBody)이 useSuspenseQuery로 /api/watchlist를 fetch하는데,
 // 이 라우트는 동적 세그먼트가 없어서 Next.js가 기본적으로 빌드 타임에
@@ -9,6 +12,19 @@ import { WatchlistScreen } from "@/components/mobile-screens";
 // 자체를 끄고 요청마다 렌더링하게 강제합니다.
 export const dynamic = "force-dynamic";
 
-export default function WatchlistPage() {
-  return <WatchlistScreen />;
+// 2026-08-18 세션: 회원가입/로그인 도입하면서 이 페이지도 서버 컴포넌트로
+// 바꿔서 1) 로그인 안 했으면 /login으로 보내고, 2) DB에서 초기 목록을 직접
+// 읽어서 WatchlistScreen에 넘겨줍니다. 예전처럼 클라이언트 쪽
+// useSuspenseQuery가 서버 렌더 패스에서 /api/watchlist를 자기 자신에게
+// fetch하면 쿠키가 안 실려서 401이 났었어요(use-watchlist.ts 주석 참고) —
+// 그 문제를 피하는 방법이기도 합니다.
+export default async function WatchlistPage() {
+  const user = await getSessionUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  const initialItems = await getWatchlistItems(user.id);
+
+  return <WatchlistScreen initialItems={initialItems} />;
 }

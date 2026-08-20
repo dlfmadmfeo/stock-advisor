@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, ChevronRight, Heart, History, LogOut, UserRound } from "lucide-react";
 import { LogoutConfirmModal } from "@/components/logout-button";
-import { getStoredEmail } from "@/lib/session";
+import { useSession } from "@/lib/use-session";
 
 const MENU_ITEMS = [
   { href: "/mypage", icon: UserRound, label: "마이페이지" },
@@ -24,21 +24,13 @@ const MENU_ITEMS = [
   { href: "/history", icon: History, label: "스크리너 이력" },
 ];
 
-const DEFAULT_EMAIL = "kimtuja@example.com";
-
 export function UserMenu() {
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [email, setEmail] = useState(DEFAULT_EMAIL);
+  // 2026-08-18 세션: localStorage 이메일 대신 실제 세션(/api/auth/me)을 읽음.
+  const { data: user } = useSession();
+  const email = user?.email ?? "로그인이 필요해요";
   const rootRef = useRef<HTMLDivElement>(null);
-
-  // 로그인 화면(login-screen.tsx)에서 입력한 이메일을 localStorage에서 읽어와요.
-  // 이 화면은 로그인 성공 후 새로 마운트되는 라우트라 마운트 시점에 한 번만
-  // 읽으면 충분합니다.
-  useEffect(() => {
-    const stored = getStoredEmail();
-    if (stored) setEmail(stored);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -70,7 +62,9 @@ export function UserMenu() {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-[#191f28]">
-                김투자님
+                {/* 아직 별도 닉네임 필드가 없어서 이메일 앞부분으로 대신
+                    표시 — 나중에 User 테이블에 name 컬럼이 생기면 바꾸면 됨. */}
+                {user ? `${user.email.split("@")[0]}님` : "게스트님"}
               </p>
               <p className="truncate text-xs font-medium text-[#8b95a1]">
                 {email}
