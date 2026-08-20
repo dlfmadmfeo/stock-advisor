@@ -1,38 +1,56 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AreaChart,
-  Bell,
   Bookmark,
-  BriefcaseBusiness,
   Building2,
   Check,
   ChevronDown,
   ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
   Cpu,
-  Filter,
   Heart,
   Home,
-  Newspaper,
   Search,
   Settings,
   ArrowDown,
   ArrowUp,
-  ShieldCheck,
   Sparkles,
   Sprout,
   Star,
-  UserRound,
-  WalletCards,
   X,
 } from "lucide-react";
 import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
 import type { NewsArticle } from "@/lib/naver-news";
+import { UserMenu } from "@/components/user-menu";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { useStockNews } from "@/lib/use-stock-news";
+import {
+  useWatchlistQuery,
+  WATCHLIST_QUERY_KEY,
+  type WatchlistItem,
+} from "@/lib/use-watchlist";
+import {
+  Allocation,
+  EmptyState,
+  MetricCard,
+  SectionHeader,
+  SectionTitle,
+  TopBar,
+  type IconComponent,
+} from "@/components/ui-primitives";
 import {
   getRecommendation,
   passesScreener,
@@ -62,8 +80,6 @@ import {
 import { useAdvisorStore } from "@/stores/use-advisor-store";
 import { StatusPill, WsStatusPill } from "@/components/status-pill";
 import { RefreshUniverseButton } from "@/components/refresh-universe-button";
-
-type IconComponent = React.ComponentType<{ className?: string }>;
 
 function usePortfolioTotals() {
   const stocks = useLiveStocks();
@@ -102,9 +118,8 @@ function chartColor(index: number) {
 const navTabs = [
   { href: "/notifications", icon: Home, label: "홈" },
   { href: "/category", icon: Star, label: "추천" },
-  { href: "/mypage", icon: Heart, label: "관심" },
+  { href: "/watchlist", icon: Heart, label: "관심" },
   { href: "/analysis", icon: AreaChart, label: "자산" },
-  { href: "/news", icon: Newspaper, label: "뉴스" },
 ];
 
 const categoryIcons: Record<string, IconComponent> = {
@@ -117,71 +132,8 @@ const categorySectors = ["반도체", "금융", "바이오", "플랫폼"];
 
 const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "투자 성향"];
 
-const newsItems = [
-  {
-    tag: "시장",
-    title: "코스피, 외국인 매수세 유입에 2,650선 돌파",
-    meta: "연합뉴스 | 10분 전",
-    image: "chart",
-  },
-  {
-    tag: "업종",
-    title: "반도체 업종 강세 지속, 관련주 상승 흐름 뚜렷",
-    meta: "한국경제 | 35분 전",
-    image: "chip",
-  },
-  {
-    tag: "기업",
-    title: "나나다, 2분기 실적 시장 예상치 상회",
-    meta: "뉴스1 | 1시간 전",
-    image: "building",
-  },
-  {
-    tag: "경제",
-    title: "소비자물가 상승률 둔화, 금리 동결 가능성 확대",
-    meta: "매일경제 | 2시간 전",
-    image: "macro",
-  },
-];
-
-const history = [
-  [
-    "삼성전자",
-    "전기전자",
-    "2024.05.23",
-    "42,000원",
-    "48,600원",
-    "+15.71%",
-    "진행중",
-  ],
-  [
-    "나나다",
-    "내수 소비재",
-    "2024.05.20",
-    "28,500원",
-    "31,200원",
-    "+9.47%",
-    "진행중",
-  ],
-  [
-    "그린에너지",
-    "친환경 에너지",
-    "2024.05.15",
-    "19,800원",
-    "17,600원",
-    "-11.11%",
-    "완료",
-  ],
-  [
-    "바이오인사이트",
-    "바이오/헬스케어",
-    "2024.05.10",
-    "33,000원",
-    "29,700원",
-    "-10.00%",
-    "완료",
-  ],
-];
+// history 데이터는 src/components/history-content.tsx로 옮겼습니다 (서버
+// 컴포넌트 분리 확장).
 
 export function NotificationsScreen() {
   const stocks = useLiveStocks();
@@ -193,7 +145,7 @@ export function NotificationsScreen() {
       <section className="space-y-5 px-5 pb-8 lg:px-8">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
           <PortfolioSummary />
-          <QuickActions />
+          {/* <QuickActions /> */}
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
@@ -246,15 +198,6 @@ export function NotificationsScreen() {
                 개수입니다.
               </p>
             </section>
-
-            <div className="space-y-3">
-              {/* <SectionHeader title="시장 소식" action="더 보기" href="/news" /> */}
-              <div className="space-y-2">
-                {newsItems.slice(0, 3).map((item) => (
-                  <CompactNewsRow item={item} key={item.title} />
-                ))}
-              </div>
-            </div>
           </aside>
         </div>
       </section>
@@ -466,156 +409,38 @@ function buildDonutGradient(entries: [string, number][], total: number) {
   return `conic-gradient(${stops.join(",")})`;
 }
 
-export function NewsScreen() {
+// ---------------------------------------------------------------------------
+// BackTopBar: "뒤로가기"(useRouter 필요)만 담당하는 작은 클라이언트 조각.
+// 서버 컴포넌트인 page.tsx(예: src/app/history/page.tsx)가 AppShell과 함께
+// 직접 조합해서 씁니다. ("시장 소식" 화면은 2026-08-14 세션에 아예
+// 제거했습니다 — 목업 데이터만 있던 화면이라 정리했어요.)
+// ---------------------------------------------------------------------------
+export function BackTopBar({
+  title,
+  right,
+  rightHref,
+}: {
+  title: string;
+  right?: React.ReactNode;
+  rightHref?: string;
+}) {
   const router = useRouter();
   return (
-    <AppShell>
-      <TopBar
-        title="시장 소식"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-        right={<Search />}
-        rightHref="/search"
-      />
-      <section className="px-5 pb-8 pt-3 lg:px-8">
-        <div className="flex gap-2 overflow-x-auto pb-3">
-          {["전체", "시장", "업종", "기업", "경제"].map((item, index) => (
-            <button
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
-                index === 0
-                  ? "bg-[#191f28] text-white"
-                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-              }`}
-              key={item}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {newsItems.map((item) => (
-            <NewsRow item={item} key={item.title} />
-          ))}
-        </div>
-      </section>
-    </AppShell>
+    <TopBar
+      title={title}
+      left={<ChevronLeft />}
+      onLeftClick={() => router.back()}
+      right={right}
+      rightHref={rightHref}
+    />
   );
 }
 
-export function MyPageScreen() {
-  return (
-    <AppShell>
-      <TopBar title="마이" right={<Settings />} />
-      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 place-items-center rounded-full bg-[#f2f7ff]">
-              <UserRound className="h-8 w-8 text-[#3182f6]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-[22px] font-extrabold tracking-[-0.02em] text-[#191f28]">
-                  김투자님
-                </h1>
-                <span className="rounded-full bg-[#191f28] px-2.5 py-1 text-xs font-bold text-white">
-                  VIP
-                </span>
-              </div>
-              <p className="mt-1 text-sm font-medium text-[#6b7684]">
-                투자 경력 2년 3개월
-              </p>
-              <p className="text-sm font-medium text-[#6b7684]">
-                kimtuja@example.com
-              </p>
-            </div>
-            <ChevronRight className="h-5 w-5 text-[#8b95a1]" />
-          </div>
-        </div>
-
-        <SectionTitle title="포트폴리오 요약" action="자세히" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard label="총 자산" value="32,450,000원" />
-          <MetricCard label="평가 손익" value="+2,530,000원" positive />
-          <MetricCard label="보유 종목" value="24개" />
-          <MetricCard label="현금 비중" value="12.5%" />
-        </div>
-
-        <SectionTitle title="자주 쓰는 메뉴" />
-        <MenuGrid
-          items={[
-            [WalletCards, "거래 내역"],
-            [BriefcaseBusiness, "입출금"],
-            [Bookmark, "추천 이력"],
-            [Heart, "관심 종목"],
-            [Bell, "알림 설정"],
-            [ShieldCheck, "보안 설정"],
-          ]}
-        />
-      </section>
-    </AppShell>
-  );
-}
-
-export function HistoryScreen() {
-  const router = useRouter();
-  return (
-    <AppShell>
-      <TopBar
-        title="스크리너 이력"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-        right={<Filter />}
-      />
-      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <p className="mb-3 rounded-lg bg-[#fff4e8] px-3 py-2 text-[11px] font-semibold leading-5 text-[#9a5b00]">
-          예시 데이터예요. 실제 스크리너 통과/이탈 이력이 쌓이기 전까지 화면
-          구성 참고용으로만 봐주세요.
-        </p>
-        <div className="grid grid-cols-3 rounded-lg bg-[#e5e8eb] p-1 text-sm font-bold">
-          {["전체", "진행중", "완료"].map((item, index) => (
-            <button
-              className={`h-10 rounded-md ${index === 0 ? "bg-white text-[#191f28] shadow-sm" : "text-[#6b7684]"}`}
-              key={item}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 space-y-3">
-          {history.map(([name, sector, date, start, now, rate, status]) => (
-            <article
-              className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]"
-              key={name}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-[#191f28]">{name}</h3>
-                  <p className="mt-1 text-sm font-medium text-[#8b95a1]">
-                    {sector} · {date}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${status === "진행중" ? "bg-[#f2f7ff] text-[#3182f6]" : "bg-[#f2f4f6] text-[#6b7684]"}`}
-                >
-                  {status}
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <HistoryMetric label="추천가" value={start} />
-                <HistoryMetric label="현재가" value={now} />
-                <HistoryMetric
-                  label="수익률"
-                  value={rate}
-                  positive={rate.startsWith("+")}
-                />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-    </AppShell>
-  );
-}
+// MyPageScreen/HistoryScreen 제거됨 (2026-08-14 세션, 서버 컴포넌트 분리
+// 확장). 둘 다 실제로는 정적 목업 콘텐츠라 뉴스 화면과 같은 패턴으로
+// src/app/mypage/page.tsx, src/app/history/page.tsx(둘 다 서버 컴포넌트)에서
+// 직접 조립합니다. `history` 데이터는 src/components/history-content.tsx로
+// 옮겼어요.
 
 function HomeHeader() {
   return (
@@ -624,10 +449,9 @@ function HomeHeader() {
         <div className="min-w-0">
           <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
         </div>
-        <button className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white ring-1 ring-[#e5e8eb]">
-          <Bell className="h-5 w-5 text-[#333d4b]" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#f04452]" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
@@ -653,7 +477,7 @@ function PortfolioSummary() {
           <p className="text-[13px] font-medium text-[#8b95a1]">
             보유 자산 평가액
           </p>
-          <p className="mt-1.5 text-[30px] font-extrabold tracking-[-0.03em] text-white">
+          <p className="mt-1.5 text-[24px] font-extrabold tracking-[-0.03em] text-white">
             {formatKRW(total)}{" "}
             <span className="text-[18px] text-[#c1c9d2]">원</span>
           </p>
@@ -713,7 +537,6 @@ function QuickActions() {
         [AreaChart, "자산", "/analysis"],
         [Star, "추천", "/category"],
         [Bookmark, "관심종목", "/watchlist"],
-        [Newspaper, "뉴스", "/news"],
       ].map(([Icon, label, href]) => {
         const TypedIcon = Icon as IconComponent;
         return (
@@ -736,7 +559,13 @@ function QuickActions() {
 }
 
 // 종목이 많은 리스트(검색 결과, 스크리너 통과 종목 등)를 react-virtuoso로
-function AppShell({ children }: { children: React.ReactNode }) {
+// AppShell은 news/page.tsx 같은 서버 컴포넌트 page.tsx에서 직접 import해서,
+// 서버에서 렌더링한 children(정적 콘텐츠)을 이 클라이언트 셸 안에 끼워
+// 넣는 용도로도 씁니다 (DesktopSidebar/BottomNav가 usePathname을 써서
+// 셸 자체는 클라이언트여야 하지만, children으로 전달되는 내용은 각자의
+// 렌더링 방식을 그대로 유지해요 — React Server Components의 "서버
+// 컴포넌트를 클라이언트 컴포넌트의 children으로 전달" 패턴).
+export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-dvh bg-[#e9edf2] text-[#191f28]">
       <div
@@ -1008,63 +837,8 @@ function DesktopSidebar() {
   );
 }
 
-function TopBar({
-  title,
-  left,
-  right,
-  onLeftClick,
-  rightHref,
-}: {
-  title: string;
-  left?: React.ReactNode;
-  right?: React.ReactNode;
-  onLeftClick?: () => void;
-  rightHref?: string;
-}) {
-  const buttonClass =
-    "grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5";
-  return (
-    <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between bg-[#f7f8fa]/95 px-4 backdrop-blur lg:px-8">
-      <div className="flex w-10 items-center justify-start">
-        {left ? (
-          onLeftClick ? (
-            <button className={buttonClass} onClick={onLeftClick} type="button">
-              {left}
-            </button>
-          ) : (
-            <IconButton>{left}</IconButton>
-          )
-        ) : (
-          <div className="h-10 w-10" />
-        )}
-      </div>
-      <h1 className="text-xl font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h1>
-      <div className="flex w-10 items-center justify-end">
-        {right ? (
-          rightHref ? (
-            <Link className={buttonClass} href={rightHref}>
-              {right}
-            </Link>
-          ) : (
-            <IconButton>{right}</IconButton>
-          )
-        ) : (
-          <div className="h-10 w-10" />
-        )}
-      </div>
-    </header>
-  );
-}
-
-function IconButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5">
-      {children}
-    </button>
-  );
-}
+// TopBar/IconButton은 src/components/ui-primitives.tsx로 옮겼습니다 (서버
+// 컴포넌트 분리 확장 — ui-primitives.tsx 상단 주석 참고).
 
 function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -1166,189 +940,15 @@ const StockRow = memo(function StockRow({
   );
 });
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <p className="rounded-2xl bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
-      {text}
-    </p>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  positive,
-}: {
-  label: string;
-  value: string;
-  positive?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-2 text-xl font-bold tracking-[-0.02em] ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function Allocation({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        <span className="text-sm font-bold text-[#4e5968]">{label}</span>
-      </div>
-      <span className="text-sm font-semibold text-[#191f28]">{value}</span>
-    </div>
-  );
-}
-
-function NewsRow({ item }: { item: (typeof newsItems)[number] }) {
-  return (
-    <article className="grid grid-cols-[92px_1fr_22px] gap-3 rounded-2xl bg-white p-3 ring-1 ring-[#e5e8eb]">
-      <div
-        aria-hidden="true"
-        className="h-[78px] rounded-xl bg-cover"
-        style={thumbnailStyle(item.image)}
-      />
-      <div className="min-w-0">
-        <span className="rounded-md bg-[#f2f7ff] px-2 py-1 text-xs font-bold text-[#3182f6]">
-          {item.tag}
-        </span>
-        <h3 className="mt-2 line-clamp-2 text-[15px] font-bold leading-5 text-[#191f28]">
-          {item.title}
-        </h3>
-        <p className="mt-1 text-xs font-bold text-[#8b95a1]">{item.meta}</p>
-      </div>
-      <Bookmark className="mt-2 h-5 w-5 text-[#8b95a1]" />
-    </article>
-  );
-}
-
-function CompactNewsRow({ item }: { item: (typeof newsItems)[number] }) {
-  return (
-    <Link
-      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-[#e5e8eb]"
-      href="/news"
-    >
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-[#3182f6]">{item.tag}</p>
-        <p className="mt-1 truncate text-sm font-semibold text-[#191f28]">
-          {item.title}
-        </p>
-      </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-[#8b95a1]" />
-    </Link>
-  );
-}
-
-function thumbnailStyle(type: string): React.CSSProperties {
-  const positions: Record<string, string> = {
-    chart: "0% 0%",
-    chip: "100% 0%",
-    building: "0% 100%",
-    macro: "100% 100%",
-  };
-  return {
-    backgroundImage: "url('/news-thumbnails.png')",
-    backgroundPosition: positions[type],
-    backgroundSize: "205% 205%",
-  };
-}
-
-function SectionHeader({
-  title,
-  action,
-  href,
-}: {
-  title: string;
-  action?: string;
-  href?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h2>
-      {action && href ? (
-        <Link className="text-sm font-bold text-[#3182f6]" href={href}>
-          {action}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-function SectionTitle({ title, action }: { title: string; action?: string }) {
-  return (
-    <div className="mb-3 mt-7 flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
-        {title}
-      </h2>
-      {action ? (
-        <button className="text-sm font-bold text-[#3182f6]">{action}</button>
-      ) : null}
-    </div>
-  );
-}
-
-function MenuGrid({ items }: { items: Array<[IconComponent, string]> }) {
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {items.map(([Icon, label]) => (
-        <button
-          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
-          key={label}
-        >
-          <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
-          <p className="mt-2 text-xs font-semibold text-[#333d4b]">{label}</p>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function HistoryMetric({
-  label,
-  value,
-  positive,
-}: {
-  label: string;
-  value: string;
-  positive?: boolean;
-}) {
-  return (
-    <div className="rounded-lg bg-[#f7f8fa] px-3 py-2">
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-1 text-sm font-semibold ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+// EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
+// HistoryMetric은 전부 서버 컴포넌트 분리 작업으로 src/components/
+// ui-primitives.tsx로 옮겼습니다 (위 AppShell 주석 참고).
 
 function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-5 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
         const active =
           pathname === item.href ||
@@ -1361,7 +961,18 @@ function BottomNav() {
             href={item.href}
             key={item.label}
           >
-            <item.icon className="h-5 w-5" />
+            {/* Home(house)/AreaChart(chart-area)는 아이콘 안에 path가 2개예요
+                — 문/축선 같은 "디테일 선"이 첫 번째, 집/차트 영역을 이루는
+                "메인 도형"이 마지막(closed path)입니다. 활성일 때 메인
+                도형(마지막 path)만 파란색으로 채우고, 디테일 선(마지막이
+                아닌 path)은 상태와 상관없이 항상 고정 회색으로 둬서 파란
+                채움 위에서도 안 묻히게 합니다. Star/Heart처럼 path가 1개뿐인
+                아이콘은 그 path가 곧 마지막 path라 그대로 채워집니다. */}
+            <item.icon
+              className={`h-5 w-5 [&>path:not(:last-child)]:stroke-[#8b95a1] ${
+                active ? "[&>path:last-child]:fill-[#3182f6]" : ""
+              }`}
+            />
             {item.label}
             {item.label === "뉴스" ? (
               <span className="absolute right-[27%] top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f04452] px-1 text-[9px] leading-none text-white">
@@ -1437,41 +1048,28 @@ function sortNewsArticles(
   return [...articles].sort(byLatest);
 }
 
+// 뉴스가 로딩 중일 때 <Suspense fallback>으로 보여주는 스켈레톤. 실제
+// 카드(StockNewsCard)랑 바깥 padding/틀이 최대한 비슷해야 로딩→완료 전환이
+// 덜 튀어 보여요.
+function StockNewsCardSkeleton() {
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
+      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+    </div>
+  );
+}
+
 function StockNewsCard({ name }: { name: string }) {
-  const [articles, setArticles] = useState<NewsArticle[] | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // useSuspenseQuery는 데이터가 준비될 때까지 이 컴포넌트 렌더링 자체를
+  // "중단"하고 가장 가까운 <Suspense fallback>을 대신 보여줍니다. 그래서
+  // 여기엔 더 이상 로딩 상태(articles === null)가 없어요 — 이 줄까지
+  // 왔다는 건 이미 데이터가 있다는 뜻.
+  const { data: articles } = useStockNews(name);
   const [sortMode, setSortMode] = useState<NewsSortMode>("latest");
 
-  useEffect(() => {
-    let cancelled = false;
-    setArticles(null);
-    setErrorMessage(null);
-    fetch(`/api/news?name=${encodeURIComponent(name)}`)
-      .then((res) => res.json())
-      .then(
-        (data: { ok: boolean; message: string; articles: NewsArticle[] }) => {
-          if (cancelled) return;
-          if (!data.ok) {
-            setErrorMessage(data.message || "뉴스를 불러오지 못했어요.");
-            setArticles([]);
-            return;
-          }
-          setArticles(data.articles);
-        },
-      )
-      .catch(() => {
-        if (!cancelled) {
-          setErrorMessage("뉴스를 불러오지 못했어요.");
-          setArticles([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [name]);
-
   const sortedArticles = useMemo(
-    () => (articles ? sortNewsArticles(articles, sortMode) : []),
+    () => sortNewsArticles(articles, sortMode),
     [articles, sortMode],
   );
 
@@ -1479,7 +1077,7 @@ function StockNewsCard({ name }: { name: string }) {
     <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
-        {articles && articles.length > 0 ? (
+        {articles.length > 0 ? (
           <div className="flex gap-1">
             {NEWS_SORT_OPTIONS.map((opt) => (
               <button
@@ -1498,13 +1096,7 @@ function StockNewsCard({ name }: { name: string }) {
           </div>
         ) : null}
       </div>
-      {articles === null ? (
-        <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
-      ) : errorMessage ? (
-        <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
-          {errorMessage}
-        </p>
-      ) : articles.length === 0 ? (
+      {articles.length === 0 ? (
         <p className="mt-3 text-[13px] text-[#8b95a1]">
           최근 관련 뉴스가 없어요.
         </p>
@@ -1670,7 +1262,21 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           <MetricCard label="52주 최저" value={`${formatKRW(stock.lo)}원`} />
         </div>
 
-        <StockNewsCard name={stock.name} />
+        <ErrorBoundary
+          fallback={(error) => (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
+              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+                {error.message || "뉴스를 불러오지 못했어요."}
+              </p>
+            </div>
+          )}
+          resetKey={stock.ticker}
+        >
+          <Suspense fallback={<StockNewsCardSkeleton />}>
+            <StockNewsCard name={stock.name} />
+          </Suspense>
+        </ErrorBoundary>
       </section>
     </AppShell>
   );
@@ -1746,43 +1352,84 @@ export function SearchScreen() {
   );
 }
 
-type WatchlistItem = {
-  ticker: string;
-  addedAt: string;
-  name: string | null;
-  sector: string | null;
-  price: number | null;
-  chg: number | null;
-  cap: string | null;
-};
+// 관심종목 목록 로딩 중(useWatchlistQuery의 <Suspense> fallback) 보여주는
+// 스켈레톤. TopBar는 이 아래(WatchlistScreen)에서 항상 먼저 그려지고, 여기
+// 안쪽(검색창~목록)만 로딩 동안 이걸로 대체돼요.
+function WatchlistBodySkeleton() {
+  return (
+    <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+      <EmptyState text="불러오는 중..." />
+    </section>
+  );
+}
 
-export function WatchlistScreen() {
+export function WatchlistScreen({
+  initialItems,
+}: {
+  // 서버 컴포넌트(app/watchlist/page.tsx)가 DB에서 직접 읽어서 넘겨주는
+  // 초기 목록 — SSR 쿠키 문제 피하려고 씀(use-watchlist.ts 주석 참고).
+  initialItems?: WatchlistItem[];
+} = {}) {
   const router = useRouter();
-  const universeStocks = useLiveStocks();
+  return (
+    <AppShell>
+      <TopBar
+        title="관심종목"
+        left={<ChevronLeft />}
+        onLeftClick={() => router.back()}
+      />
+      <ErrorBoundary
+        fallback={(error) => (
+          <section className="px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+            <EmptyState
+              text={error.message || "관심종목을 불러오지 못했어요."}
+            />
+          </section>
+        )}
+      >
+        <Suspense fallback={<WatchlistBodySkeleton />}>
+          <WatchlistBody initialItems={initialItems} />
+        </Suspense>
+      </ErrorBoundary>
+    </AppShell>
+  );
+}
 
-  const [items, setItems] = useState<WatchlistItem[] | null>(null);
+// items 로딩(useWatchlistQuery)이 끝난 뒤에만 마운트되는 실제 화면 내용.
+// TopBar를 이 컴포넌트 밖(WatchlistScreen)으로 뺀 이유는, useSuspenseQuery가
+// 데이터를 기다리는 동안 이 컴포넌트 전체가 <Suspense fallback>으로
+// 대체되기 때문 — TopBar까지 이 안에 있으면 로딩 중엔 뒤로가기 버튼도 같이
+// 사라져버려요.
+function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
+  const queryClient = useQueryClient();
+  const universeStocks = useLiveStocks();
+  const { data: items } = useWatchlistQuery(initialItems);
+
   const [query, setQuery] = useState("");
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
-  const [showAllCandidates, setShowAllCandidates] = useState(false);
+  const [showAllCandidates, setShowAllCandidates] = useState(true);
+  // 종목 추가 버튼(onMouseDown preventDefault) 때문에 브라우저에 따라 탭해도
+  // input이 blur되지 않는 경우가 있어서, 추가가 끝나면 이 ref로 명시적으로
+  // blur()를 걸어 드롭다운을 닫고 모바일 키보드도 내려가게 합니다.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // 추가 요청이 서버 왕복하는 동안(POST → 실시간 구독 → refetch) 화면에
+  // 아무 반응이 없으면 사용자가 버튼이 안 눌린 줄 알 수 있어서, 낙관적으로
+  // 리스트 맨 위에 스켈레톤 카드를 하나 끼워둡니다. Suspense를 다시 태우면
+  // WatchlistBody 전체가 깜빡이니까(전체 로딩용 Suspense와는 별개 문제),
+  // 이건 그냥 로컬 state로 처리합니다.
+  const [pendingAdd, setPendingAdd] = useState<{
+    ticker: string;
+    name: string;
+  } | null>(null);
 
-  const loadWatchlist = useCallback(async () => {
-    try {
-      const res = await fetch("/api/watchlist");
-      const data = await res.json();
-      setItems(data.items ?? []);
-    } catch {
-      setItems([]);
-      setError("관심종목을 불러오지 못했어요.");
-    }
-  }, []);
+  const refetchWatchlist = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY }),
+    [queryClient],
+  );
 
-  useEffect(() => {
-    loadWatchlist();
-  }, [loadWatchlist]);
-
-  const watchedTickers = new Set((items ?? []).map((i) => i.ticker));
+  const watchedTickers = new Set(items.map((i) => i.ticker));
 
   // 추가 후보는 "지금 유니버스(top 200)에 있고, 아직 관심종목이 아닌" 종목만.
   // stock-advisor-server가 DB Stock 테이블에 없는 종목은 실시간 갱신을 못 해서
@@ -1809,14 +1456,15 @@ export function WatchlistScreen() {
       ? candidatePool.slice(0, 20)
       : [];
 
-  async function addTicker(ticker: string) {
+  async function addTicker(ticker: string, name: string) {
     setBusyTicker(ticker);
     setError(null);
+    setPendingAdd({ ticker, name });
     try {
-      const res = await fetch("/api/watchlist", {
+      const res = await fetch(`/api/watchlist/${ticker}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker }),
+        // body: JSON.stringify({ ticker }),
       });
       const data = await res.json();
       if (!data.ok) {
@@ -1824,11 +1472,15 @@ export function WatchlistScreen() {
         return;
       }
       setQuery("");
-      await loadWatchlist();
+      await refetchWatchlist();
+      // 추가 성공 후엔 드롭다운을 닫고 모바일 키보드도 내려가게 함.
+      setInputFocused(false);
+      searchInputRef.current?.blur();
     } catch {
       setError("서버에 연결할 수 없어요.");
     } finally {
       setBusyTicker(null);
+      setPendingAdd(null);
     }
   }
 
@@ -1836,120 +1488,156 @@ export function WatchlistScreen() {
     setBusyTicker(ticker);
     try {
       await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
-      await loadWatchlist();
+      await refetchWatchlist();
     } finally {
       setBusyTicker(null);
     }
   }
 
   return (
-    <AppShell>
-      <TopBar
-        title="관심종목"
-        left={<ChevronLeft />}
-        onLeftClick={() => router.back()}
-      />
-      <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
-        <div className="flex items-center justify-between">
-          <WsStatusPill />
-          <p className="text-sm font-bold text-[#8b95a1]">
-            {items?.length ?? 0}/{WATCHLIST_LIMIT}개
-          </p>
-        </div>
-
-        <div className="relative">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
-            <Search className="h-4 w-4 text-[#8b95a1]" />
-            <input
-              className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
-              onBlur={() => setInputFocused(false)}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setInputFocused(true)}
-              placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
-              value={query}
-            />
-          </div>
-          {candidates.length ? (
-            <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
-              {candidates.map((s) => (
-                <button
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
-                  disabled={busyTicker === s.ticker}
-                  key={s.ticker}
-                  // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
-                  // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
-                  // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
-                  onClick={() => addTicker(s.ticker)}
-                  onMouseDown={(e) => e.preventDefault()}
-                >
-                  <span>
-                    {s.name}{" "}
-                    <span className="text-xs font-medium text-[#8b95a1]">
-                      {s.ticker}
-                    </span>
-                  </span>
-                  <span className="text-xs font-bold text-[#3182f6]">추가</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-              !showAllCandidates
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-            }`}
-            onClick={() => setShowAllCandidates(false)}
-            type="button"
-          >
-            추천종목만
-          </button>
-          <button
-            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-              showAllCandidates
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-            }`}
-            onClick={() => setShowAllCandidates(true)}
-            type="button"
-          >
-            전체 종목
-          </button>
-        </div>
-
-        {error ? (
-          <p className="text-xs font-semibold text-[#f04452]">{error}</p>
-        ) : null}
-
-        <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-          검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
-          종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
-          관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
-          체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
-          {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
+    <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
+      <div className="flex items-center justify-between">
+        <WsStatusPill />
+        <p className="text-sm font-bold text-[#8b95a1]">
+          {items.length}/{WATCHLIST_LIMIT}개
         </p>
+      </div>
 
-        <div className="space-y-2">
-          {items === null ? (
-            <EmptyState text="불러오는 중..." />
-          ) : items.length === 0 ? (
-            <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
-          ) : (
-            items.map((item) => (
+      <div className="relative">
+        <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+          <Search className="h-4 w-4 text-[#8b95a1]" />
+          <input
+            className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
+            onBlur={() => setInputFocused(false)}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setInputFocused(true)}
+            placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
+            ref={searchInputRef}
+            value={query}
+          />
+        </div>
+        {candidates.length ? (
+          <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
+            {candidates.map((s) => (
+              <button
+                className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
+                disabled={busyTicker === s.ticker}
+                key={s.ticker}
+                // input이 blur되기 전에 클릭 이벤트가 씹히지 않도록, mousedown에서
+                // 기본 동작(포커스 이동)을 막아둡니다. 이게 없으면 버튼을 누르는
+                // 순간 input이 먼저 blur되면서 목록이 사라져 클릭이 안 먹혀요.
+                onClick={() => addTicker(s.ticker, s.name)}
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <span>
+                  {s.name}{" "}
+                  <span className="text-xs font-medium text-[#8b95a1]">
+                    {s.ticker}
+                  </span>
+                </span>
+                <span className="text-xs font-bold text-[#3182f6]">추가</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* <div className="flex items-center gap-1.5">
+        <button
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+            !showAllCandidates
+              ? "bg-[#191f28] text-white"
+              : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+          }`}
+          onClick={() => setShowAllCandidates(false)}
+          type="button"
+        >
+          추천종목만
+        </button>
+        <button
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+            showAllCandidates
+              ? "bg-[#191f28] text-white"
+              : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+          }`}
+          onClick={() => setShowAllCandidates(true)}
+          type="button"
+        >
+          전체 종목
+        </button>
+      </div> */}
+
+      {error ? (
+        <p className="text-xs font-semibold text-[#f04452]">{error}</p>
+      ) : null}
+
+      <p className="text-xs font-medium leading-5 text-[#8b95a1]">
+        검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
+        종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
+        관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
+        체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
+        {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
+      </p>
+
+      <div className="space-y-2">
+        {items.length === 0 && !pendingAdd ? (
+          <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
+        ) : (
+          <>
+            {/* 새로 추가 중인 종목은 아직 items(서버 응답)에 없으니 맨 위에
+                낙관적으로 스켈레톤 카드를 하나 끼워둠. refetch가 끝나서
+                items에 실제로 들어오면(watchedTickers에 잡히면) 곧바로 숨겨서
+                실제 카드랑 잠깐이라도 중복으로 안 보이게 함. */}
+            {pendingAdd && !watchedTickers.has(pendingAdd.ticker) ? (
+              <WatchlistRowSkeleton
+                key={`pending-${pendingAdd.ticker}`}
+                name={pendingAdd.name}
+                ticker={pendingAdd.ticker}
+              />
+            ) : null}
+            {items.map((item) => (
               <WatchlistRow
                 busy={busyTicker === item.ticker}
                 item={item}
                 key={item.ticker}
                 onRemove={removeTicker}
               />
-            ))
-          )}
+            ))}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// 추가 요청이 서버 왕복하는 동안 리스트 맨 위에 낙관적으로 보여주는 카드.
+// 이름/코드는 이미 알고 있으니(후보 목록에서 눌렀으니까) 그대로 보여주고,
+// 아직 없는 시세/등락률 자리만 회색 펄스로 채워서 "확인 중" 느낌을 줍니다.
+function WatchlistRowSkeleton({
+  name,
+  ticker,
+}: {
+  name: string;
+  ticker: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb]">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-base font-bold text-[#191f28]">
+            {name}
+          </h3>
+          <span className="shrink-0 text-xs font-medium text-[#8b95a1]">
+            {ticker}
+          </span>
         </div>
-      </section>
-    </AppShell>
+        <div className="mt-2 h-3 w-24 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
+      <div className="shrink-0 space-y-2 text-right">
+        <div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#eef0f2]" />
+        <div className="ml-auto h-3 w-10 animate-pulse rounded-full bg-[#f2f4f6]" />
+      </div>
+    </div>
   );
 }
 
@@ -1990,7 +1678,18 @@ function WatchlistRow({
 
   return (
     <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
-      <Link className="min-w-0 flex-1" href={`/stock/${stock.ticker}`}>
+      <Link
+        aria-disabled={busy}
+        className={`min-w-0 flex-1 ${busy ? "pointer-events-none opacity-60" : ""}`}
+        href={`/stock/${stock.ticker}`}
+        // 삭제 요청이 나간 동안(busy)엔 카드를 눌러도 상세 화면으로 안 가게
+        // 막습니다 — pointer-events-none만으로는 키보드/스크린리더 접근이나
+        // 혹시 남아있는 클릭 이벤트를 완전히 못 막을 수 있어서 onClick에서도
+        // 한 번 더 막아둡니다.
+        onClick={(e) => {
+          if (busy) e.preventDefault();
+        }}
+      >
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">
             {stock.name}

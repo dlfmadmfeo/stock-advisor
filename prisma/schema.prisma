@@ -40,10 +40,90 @@ model Stock {
   @@index([screenerScore])
 }
 
-// 사용자가 화면에서 추가/삭제하는 관심종목. stock-advisor-server(Spring)가
-// 시작할 때 이 테이블을 읽어 KIS 웹소켓 실시간 구독 목록을 만듭니다.
-// (Spring은 이 테이블의 스키마를 건드리지 않고 읽기/쓰기만 함 — ddl-auto: none)
+// 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식(auth.ts)을
+// better-auth 라이브러리로 교체하면서, User/Session/Account/Verification
+// 4개 모델 구성을 better-auth의 Prisma 어댑터가 기대하는 표준 스키마
+// 그대로 맞췄습니다(필드명/타입 임의로 바꾸면 어댑터가 못 찾음).
+// 비밀번호 해시는 이제 여기 User.passwordHash가 아니라 Account.password에
+// better-auth가 알아서 저장해요 — 그래서 기존 passwordHash 컬럼은 제거.
+// 주의: 이 스키마로 바뀌면서 예전 방식(scrypt:salt:hash)으로 저장돼 있던
+// 비밀번호는 호환이 안 돼서, 이미 가입했던 계정이 있다면 다시 가입해야 해요.
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions  Session[]
+  accounts  Account[]
+  watchlist Watchlist[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  // 2026-08-20 세션: better-auth 1.7에서 새로 추가된 필드(설치된 버전이
+  // 1.7.1이라 바로 이 스키마를 요구함). "이 계정이 어떤 방식/기관으로
+  // 인증됐는지" 식별자 — 이메일+비밀번호 로그인은 better-auth가 자동으로
+  // "local:credential"을 넣어줍니다. 우리는 신규 프로젝트라 기존 row
+  // 백필 걱정 없이 그냥 필수 컬럼으로 추가하면 됨.
+  issuer                String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+// 사용자가 화면에서 추가/삭제하는 관심종목. 이제 유저별로 분리되어 있어서
+// (userId, ticker) 조합이 유니크 — 같은 종목이라도 유저마다 별도 row예요.
+// stock-advisor-server(Spring)가 시작할 때 이 테이블을 distinct ticker로
+// 읽어서 KIS 웹소켓 실시간 구독 목록을 만듭니다(유저별이 아니라 전체 공유 —
+// 여러 유저가 같은 종목을 담아도 구독은 하나로 합쳐짐). Spring은 이 테이블에
+// 더 이상 쓰지 않고 읽기만 합니다(ddl-auto: none) — userId를 모르는
+// Spring이 직접 INSERT하면 어느 유저 것인지 알 수 없어서, DB 쓰기는
+// Next.js/Prisma 쪽에서만 함.
 model Watchlist {
-  ticker  String   @id
+  id      String   @id @default(cuid())
+  userId  String
+  ticker  String
   addedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ticker])
+  @@index([ticker])
 }
