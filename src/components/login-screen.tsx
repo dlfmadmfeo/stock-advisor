@@ -183,7 +183,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
         data-testid="login-webview"
       >
         <form
-          className="flex h-full flex-col overflow-y-auto px-6 pb-8 pt-10"
+          className="animate-auth-mode-in flex h-full flex-col overflow-y-auto px-6 pb-8 pt-10"
           onSubmit={handleSubmit}
         >
           {/* 브랜딩 */}

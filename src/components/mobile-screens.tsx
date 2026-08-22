@@ -443,6 +443,7 @@ export function BackTopBar({
 // 옮겼어요.
 
 function HomeHeader() {
+  const router = useRouter();
   return (
     <header className="px-5 pb-2 pt-5 lg:px-8 lg:pt-8">
       <div className="flex items-center justify-between gap-4">
@@ -450,6 +451,14 @@ function HomeHeader() {
           <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            aria-label="종목 검색"
+            className="rounded-full p-2 text-[#333d4b] transition hover:bg-[#f2f4f6] active:scale-[0.95]"
+            onClick={() => router.push("/search")}
+            type="button"
+          >
+            <Search className="h-5 w-5" />
+          </button>
           <UserMenu />
         </div>
       </div>
@@ -1319,6 +1328,7 @@ export function SearchScreen() {
         <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
           <Search className="h-4 w-4 text-[#8b95a1]" />
           <input
+            autoFocus
             className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
             onChange={(e) => setQuery(e.target.value)}
             placeholder="종목명 또는 코드 검색"

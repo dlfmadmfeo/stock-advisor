@@ -96,6 +96,25 @@ body {
   animation: donut-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+/* 로그인 <-> 회원가입은 서로 다른 라우트(별도 새로고침이 필요해서)라
+   페이지가 전환 없이 순간적으로 통째로 바뀜 — 카드 레이아웃이 거의
+   똑같아서 뭐가 바뀌었는지 잘 안 보이는 문제가 있었음(2026-08-22 세션).
+   컴포넌트가 마운트될 때마다(=탭 전환마다) 재생되는 짧은 진입 애니메이션. */
+@keyframes auth-mode-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-auth-mode-in {
+  animation: auth-mode-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 [type="button"]:not(:disabled),
