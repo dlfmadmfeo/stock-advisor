@@ -54,6 +54,19 @@ interface AdvisorState {
   universeStatus: UniverseStatus;
   universeUpdatedAt: string | null;
   setUniverse: (stocks: Stock[], status: UniverseStatus, updatedAt?: string | null) => void;
+
+  // "유니버스 새로고침" 버튼의 진행 상태. RefreshUniverseButton의 로컬
+  // useState였던 걸 여기로 옮겼어요(2026-08-22 세션) — 홈 화면을 벗어났다
+  // 돌아오면 그 컴포넌트가 언마운트/재마운트되면서 로컬 state가 idle로
+  // 리셋돼서, 서버에서는 갱신이 계속 진행 중인데도 로딩 표시가 사라지는
+  // 문제가 있었음. 스토어는 컴포넌트 마운트 여부와 무관하게 유지되니
+  // 화면을 오가도 진행 상태가 그대로 보임.
+  universeRefreshState: "idle" | "loading" | "done" | "error";
+  universeRefreshMessage: string | null;
+  setUniverseRefreshState: (
+    state: "idle" | "loading" | "done" | "error",
+    message?: string | null,
+  ) => void;
 }
 
 export const useAdvisorStore = create<AdvisorState>((set) => ({
@@ -77,4 +90,9 @@ export const useAdvisorStore = create<AdvisorState>((set) => ({
   universeUpdatedAt: null,
   setUniverse: (universeStocks, universeStatus, universeUpdatedAt = null) =>
     set({ universeStocks, universeStatus, universeUpdatedAt }),
+
+  universeRefreshState: "idle",
+  universeRefreshMessage: null,
+  setUniverseRefreshState: (universeRefreshState, universeRefreshMessage = null) =>
+    set({ universeRefreshState, universeRefreshMessage }),
 }));

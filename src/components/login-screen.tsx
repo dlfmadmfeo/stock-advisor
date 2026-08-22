@@ -440,6 +440,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
 
           {/* 소셜 로그인 + 하단 */}
           <div className="mt-auto space-y-5 pt-8">
+            {/* 카카오/Apple 로그인 실연동 전까지 비노출 (2026-08-22 세션)
             <div className="relative flex items-center justify-center">
               <div className="h-px w-full bg-[#f2f4f6]" />
               <span className="absolute bg-white px-3 text-[11px] font-semibold text-[#8b95a1]">
@@ -475,6 +476,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 Apple
               </button>
             </div>
+            */}
 
             <p className="text-center text-xs text-[#6b7684]">
               {mode === "login" ? (

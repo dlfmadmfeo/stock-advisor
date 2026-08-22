@@ -1440,6 +1440,11 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
   // focus만 하면 해당 풀의 상위 종목이 최대 20개, 검색어를 치면 그 풀 안에서
   // 이름/코드 일치하는 것만 최대 8개 보여줍니다.
   const trimmedQuery = query.trim();
+  // 홈 "종목 검색"(서버 Prisma `contains`)은 MySQL 기본 컬레이션 덕에
+  // 대소문자 구분 없이 검색되는데, 여긴 순수 JS .includes()라 원래
+  // 대소문자를 구분했음(예: "sk" 쳐도 "SK이노베이션"이 안 걸림) — 두 검색창
+  // 동작을 맞추려고 toLowerCase 비교로 통일 (2026-08-22 세션).
+  const lowerQuery = trimmedQuery.toLowerCase();
   const notWatched = universeStocks.filter(
     (s) => !watchedTickers.has(s.ticker),
   );
@@ -1449,7 +1454,8 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
     ? candidatePool
         .filter(
           (s) =>
-            s.name.includes(trimmedQuery) || s.ticker.includes(trimmedQuery),
+            s.name.toLowerCase().includes(lowerQuery) ||
+            s.ticker.toLowerCase().includes(lowerQuery),
         )
         .slice(0, 8)
     : inputFocused
