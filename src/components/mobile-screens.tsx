@@ -71,6 +71,7 @@ import {
 } from "@/lib/live-stock";
 import { usePagedStocks } from "@/lib/use-paged-stocks";
 import {
+  RESPONSIVE_TEXT,
   UNIVERSE_PAGE_SIZE,
   UNIVERSE_SORT_FIELDS,
   WATCHLIST_LIMIT,
@@ -332,13 +333,13 @@ export function AnalysisScreen() {
           <MetricCard
             label="총 평가액"
             value={`${formatKRW(total)}원`}
-            valueClassName="text-lg"
+            valueClassName={RESPONSIVE_TEXT.metricValue}
           />
           <MetricCard
             label="매입가 대비 손익"
             value={`${returnAmount >= 0 ? "+" : ""}${formatKRW(returnAmount)}원 (${returnPct >= 0 ? "+" : ""}${returnPct}%)`}
             positive={returnAmount >= 0}
-            valueClassName="text-lg"
+            valueClassName={RESPONSIVE_TEXT.metricValue}
           />
         </div>
 
