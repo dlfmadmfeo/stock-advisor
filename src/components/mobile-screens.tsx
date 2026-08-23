@@ -942,7 +942,7 @@ const StockRow = memo(function StockRow({
           </span>
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
-          {stock.sector} · {stock.ticker}
+          {stock.sector} · {stock.ticker} · {stock.cap}
         </p>
       </div>
       <div className="shrink-0 text-right">
