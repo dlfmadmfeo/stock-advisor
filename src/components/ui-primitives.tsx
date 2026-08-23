@@ -83,16 +83,22 @@ export function MetricCard({
   label,
   value,
   positive,
+  valueClassName,
 }: {
   label: string;
   value: string;
   positive?: boolean;
+  // 기본은 text-xl. 금액이 커서(예: "20,467,000원") 좁은 2컬럼 카드에서
+  // "원"이 다음 줄로 밀려나던 화면(자산 화면 피드백, 2026-08-23 세션)처럼
+  // 더 작은 크기가 필요한 곳에서만 넘겨서 씀 — 다른 MetricCard(종목 상세의
+  // PER/PBR 등, 값이 짧음)는 기존 크기 그대로 유지.
+  valueClassName?: string;
 }) {
   return (
     <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
       <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
       <p
-        className={`mt-2 text-xl font-bold tracking-[-0.02em] ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
+        className={`mt-2 font-bold tracking-[-0.02em] ${valueClassName ?? "text-xl"} ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
       >
         {value}
       </p>

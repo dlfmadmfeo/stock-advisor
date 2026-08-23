@@ -1,31 +1,35 @@
 "use client";
 
-import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useAdvisorStore } from "@/stores/use-advisor-store";
 
 // 홈 화면 버튼. 누르면 /api/universe/refresh(=배치 스크립트와 같은 로직)를
 // 실행해서 DB를 실제로 다시 채우고, 끝나면 /api/universe를 다시 불러와
 // store를 갱신합니다. 종목 30개 x KIS 호출이라 15~30초 정도 걸려요.
+//
+// 진행 상태(state/message)는 이 컴포넌트의 로컬 state가 아니라
+// useAdvisorStore에 둡니다 — 로컬 useState였을 땐 다른 화면으로 이동했다가
+// 돌아오면 이 컴포넌트가 언마운트/재마운트되면서 idle로 리셋돼서, 서버
+// 갱신이 실제로는 계속 진행 중인데도 로딩 표시가 사라져버렸어요
+// (2026-08-22 세션에 발견). store는 컴포넌트 마운트 여부와 무관하게
+// 값이 유지되니 화면을 오가도 진행 상태가 그대로 보입니다.
 export function RefreshUniverseButton() {
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
+  const state = useAdvisorStore((s) => s.universeRefreshState);
+  const message = useAdvisorStore((s) => s.universeRefreshMessage);
+  const setRefreshState = useAdvisorStore((s) => s.setUniverseRefreshState);
   const setUniverse = useAdvisorStore((s) => s.setUniverse);
 
   async function handleClick() {
-    if (state === "loading") return;
-    setState("loading");
-    setMessage(null);
+    if (useAdvisorStore.getState().universeRefreshState === "loading") return;
+    setRefreshState("loading", null);
     try {
       const res = await fetch("/api/universe/refresh", { method: "POST" });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setState("error");
-        setMessage(data.message ?? "갱신에 실패했어요.");
+        setRefreshState("error", data.message ?? "갱신에 실패했어요.");
         return;
       }
-      setMessage(data.message ?? "갱신 완료");
-      setState("done");
+      setRefreshState("done", data.message ?? "갱신 완료");
 
       // 갱신된 DB를 다시 읽어와 화면에 반영
       const universeRes = await fetch("/api/universe");
@@ -34,12 +38,14 @@ export function RefreshUniverseButton() {
         setUniverse(universeData.stocks, universeData.status ?? "db", universeData.updatedAt ?? null);
       }
     } catch (e) {
-      setState("error");
-      setMessage(e instanceof Error ? e.message : "갱신 중 오류가 발생했어요.");
+      setRefreshState("error", e instanceof Error ? e.message : "갱신 중 오류가 발생했어요.");
     } finally {
       setTimeout(() => {
-        setState((s) => (s === "loading" ? s : "idle"));
-        setMessage(null);
+        // 타임아웃이 실행될 때 기준으로 최신 상태를 다시 읽어야 함 — 그
+        // 사이에 사용자가 다시 눌러서 새 요청이 loading 중일 수 있음.
+        if (useAdvisorStore.getState().universeRefreshState !== "loading") {
+          setRefreshState("idle", null);
+        }
       }, 4000);
     }
   }

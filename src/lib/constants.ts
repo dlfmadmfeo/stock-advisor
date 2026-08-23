@@ -8,7 +8,7 @@ export const UNIVERSE_PAGE_SIZE = 50;
 
 // 정렬 기준 필드. 별도로 아무것도 선택 안 하면(= null) "기본 순서"(capEok
 // 내림차순, 배치가 원래 채워넣는 순서)를 씁니다.
-export type SortField = "screener" | "name" | "price" | "chg";
+export type SortField = "screener" | "name" | "price" | "chg" | "cap";
 export type SortDirection = "asc" | "desc";
 
 // 필드를 처음 선택했을 때(=1번 클릭) 적용되는 "자연스러운" 방향. 이름은
@@ -24,7 +24,21 @@ export const UNIVERSE_SORT_FIELDS: {
   { value: "name", label: "이름", naturalDirection: "asc" },
   { value: "price", label: "주가", naturalDirection: "desc" },
   { value: "chg", label: "상승률", naturalDirection: "desc" },
+  { value: "cap", label: "시가총액", naturalDirection: "desc" },
 ];
+
+// 화면 너비대별 폰트 크기 "토큰". Tailwind 브레이크포인트 클래스 문자열을
+// 화면마다 따로 적어두면 나중에 값 하나 바꿀 때 여러 파일을 뒤져야 해서,
+// 용도별로 이름 붙여 여기 모아둡니다(2026-08-23 세션, 자산 화면 큰 금액
+// 숫자가 좁은 화면에서 줄바꿈되던 피드백에서 시작). "기종별"이라고 부르긴
+// 하지만 실제로는 기기 모델이 아니라 CSS 너비(sm=640px 이상/미만)로
+// 나뉩니다 — 웹에서 "이 기기가 갤럭시 S26인지"를 직접 알아낼 방법은 없고,
+// 화면 너비가 사실상 그 역할을 대신합니다.
+export const RESPONSIVE_TEXT = {
+  // 자산 화면의 총 평가액/손익처럼 자릿수 많은 금액. 좁은 화면(기본,
+  // <640px)에선 한 단계 작게, sm 이상 넓은 화면에선 원래 크기(text-xl)로.
+  metricValue: "text-base sm:text-lg lg:text-xl",
+} as const;
 
 // 관심종목에 담을 수 있는 최대 개수. stock-advisor-server(Spring)의
 // KisWebSocketClient.MAX_SUBSCRIPTIONS(KIS 웹소켓 세션당 구독 한도)와 같은

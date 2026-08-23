@@ -37,6 +37,17 @@ export type DailyBar = {
 // 서버리스 환경(Vercel 등)에서는 콜드스타트마다 새로 발급되니 참고하세요.
 // ---------------------------------------------------------------------------
 let cachedToken: { token: string; expiresAt: number } | null = null;
+// 진행 중인 토큰 발급 요청. refresh-universe가 종목을 CONCURRENCY(4)개씩
+// 병렬 처리하고, 종목 하나당 daily/weekly/quote 3건을 또 동시에 부르다 보니
+// (processTicker 참고) 캐시가 비어있는 상태(서버리스 콜드스타트 직후 등)에서
+// 최대 12개 호출이 한꺼번에 getAccessToken()에 들어올 수 있었음. 그런데 이
+// 함수가 매번 cachedToken만 보고 없으면 각자 /oauth2/tokenP를 따로 쐈어서,
+// "분당 1회 수준"인 KIS 토큰 발급 제한에 걸려 그 중 1건만 성공하고 나머지는
+// 실패 — 하필 유니버스 맨 앞(시총 최상위, 즉 삼성전자/SK하이닉스)이 첫
+// 배치라 계속 스킵되는 원인이었음(2026-08-22 세션, 새로고침해도 삼성전자가
+// DB에 안 들어오는 문제를 추적하다 발견). 진행 중인 요청을 여기 공유해서
+// 동시 호출이 몰려도 실제 HTTP 요청은 1건만 나가게 함.
+let inFlightTokenRequest: Promise<string> | null = null;
 
 async function getAccessToken(): Promise<string> {
   if (!APP_KEY || !APP_SECRET) {
@@ -47,35 +58,44 @@ async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.token;
   }
+  if (inFlightTokenRequest) return inFlightTokenRequest;
 
-  const res = await fetch(`${BASE_URL}/oauth2/tokenP`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      appkey: APP_KEY,
-      appsecret: APP_SECRET,
-    }),
-    cache: "no-store",
-  });
+  inFlightTokenRequest = (async () => {
+    const res = await fetch(`${BASE_URL}/oauth2/tokenP`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        appkey: APP_KEY,
+        appsecret: APP_SECRET,
+      }),
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `KIS 토큰 발급 실패 (${res.status}): ${text.slice(0, 300)}`,
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        `KIS 토큰 발급 실패 (${res.status}): ${text.slice(0, 300)}`,
+      );
+    }
+
+    const json = await res.json();
+    const token = json?.access_token;
+    const expiresIn = Number(json?.expires_in ?? 86400); // 초 단위, 보통 24시간
+    if (!token) throw new Error("KIS 토큰 응답에 access_token이 없어요");
+
+    cachedToken = { token, expiresAt: Date.now() + expiresIn * 1000 };
+    console.log(
+      `KIS 토큰 발급 완료 (만료: ${new Date(cachedToken.expiresAt).toISOString()})`,
     );
+    return token;
+  })();
+
+  try {
+    return await inFlightTokenRequest;
+  } finally {
+    inFlightTokenRequest = null;
   }
-
-  const json = await res.json();
-  const token = json?.access_token;
-  const expiresIn = Number(json?.expires_in ?? 86400); // 초 단위, 보통 24시간
-  if (!token) throw new Error("KIS 토큰 응답에 access_token이 없어요");
-
-  cachedToken = { token, expiresAt: Date.now() + expiresIn * 1000 };
-  console.log(
-    `KIS 토큰 발급 완료 (만료: ${new Date(cachedToken.expiresAt).toISOString()})`,
-  );
-  return token;
 }
 
 function sleep(ms: number) {

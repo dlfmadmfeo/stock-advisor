@@ -71,6 +71,7 @@ import {
 } from "@/lib/live-stock";
 import { usePagedStocks } from "@/lib/use-paged-stocks";
 import {
+  RESPONSIVE_TEXT,
   UNIVERSE_PAGE_SIZE,
   UNIVERSE_SORT_FIELDS,
   WATCHLIST_LIMIT,
@@ -143,13 +144,13 @@ export function NotificationsScreen() {
     <AppShell>
       <HomeHeader />
       <section className="space-y-5 px-5 pb-8 lg:px-8">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
           <PortfolioSummary />
           {/* <QuickActions /> */}
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+          <div className="min-w-0 space-y-3 lg:order-1">
             {/* SectionHeader를 다른 요소랑 같은 flex 줄에 욱여넣으면 내부의
                 justify-between이 펼쳐질 공간을 못 받아서 제목이랑 "전체 보기"가
                 딱 붙어버리는 문제가 있었음. 그래서 SectionHeader는 단독으로 한
@@ -177,7 +178,12 @@ export function NotificationsScreen() {
             />
           </div>
 
-          <aside className="space-y-5">
+          {/* 모바일에서는 이 요약 카드가 전체 종목 리스트보다 먼저 보여야
+              스크롤 안 해도 "몇 개 통과했는지"부터 바로 보임 — 예전엔 리스트
+              DOM 뒤에 있어서 화면 맨 아래로 밀렸음(피드백으로 발견,
+              2026-08-23 세션). 데스크톱(lg:)에서는 원래 의도대로 오른쪽
+              사이드바 자리를 유지하도록 order로 되돌림. */}
+          <aside className="order-first space-y-5 lg:order-2">
             {/* 참고: 이 숫자는 store에 이미 로드된 전체 목록(stocks, 웹소켓 실시간
                 병합 포함)에서 클라이언트가 직접 계산한 값이고, 바로 아래 리스트는
                 PagedStockList가 DB의 screenerOk 스냅샷을 페이지 단위로 서버에서
@@ -324,11 +330,16 @@ export function AnalysisScreen() {
         <StatusPill />
 
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard label="총 평가액" value={`${formatKRW(total)}원`} />
+          <MetricCard
+            label="총 평가액"
+            value={`${formatKRW(total)}원`}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
+          />
           <MetricCard
             label="매입가 대비 손익"
             value={`${returnAmount >= 0 ? "+" : ""}${formatKRW(returnAmount)}원 (${returnPct >= 0 ? "+" : ""}${returnPct}%)`}
             positive={returnAmount >= 0}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
           />
         </div>
 
@@ -443,6 +454,7 @@ export function BackTopBar({
 // 옮겼어요.
 
 function HomeHeader() {
+  const router = useRouter();
   return (
     <header className="px-5 pb-2 pt-5 lg:px-8 lg:pt-8">
       <div className="flex items-center justify-between gap-4">
@@ -450,6 +462,14 @@ function HomeHeader() {
           <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            aria-label="종목 검색"
+            className="rounded-full p-2 text-[#333d4b] transition hover:bg-[#f2f4f6] active:scale-[0.95]"
+            onClick={() => router.push("/search")}
+            type="button"
+          >
+            <Search className="h-5 w-5" />
+          </button>
           <UserMenu />
         </div>
       </div>
@@ -922,7 +942,7 @@ const StockRow = memo(function StockRow({
           </span>
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
-          {stock.sector} · {stock.ticker}
+          {stock.sector} · {stock.ticker} · {stock.cap}
         </p>
       </div>
       <div className="shrink-0 text-right">
@@ -1319,6 +1339,7 @@ export function SearchScreen() {
         <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
           <Search className="h-4 w-4 text-[#8b95a1]" />
           <input
+            autoFocus
             className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
             onChange={(e) => setQuery(e.target.value)}
             placeholder="종목명 또는 코드 검색"
@@ -1440,6 +1461,11 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
   // focus만 하면 해당 풀의 상위 종목이 최대 20개, 검색어를 치면 그 풀 안에서
   // 이름/코드 일치하는 것만 최대 8개 보여줍니다.
   const trimmedQuery = query.trim();
+  // 홈 "종목 검색"(서버 Prisma `contains`)은 MySQL 기본 컬레이션 덕에
+  // 대소문자 구분 없이 검색되는데, 여긴 순수 JS .includes()라 원래
+  // 대소문자를 구분했음(예: "sk" 쳐도 "SK이노베이션"이 안 걸림) — 두 검색창
+  // 동작을 맞추려고 toLowerCase 비교로 통일 (2026-08-22 세션).
+  const lowerQuery = trimmedQuery.toLowerCase();
   const notWatched = universeStocks.filter(
     (s) => !watchedTickers.has(s.ticker),
   );
@@ -1449,7 +1475,8 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
     ? candidatePool
         .filter(
           (s) =>
-            s.name.includes(trimmedQuery) || s.ticker.includes(trimmedQuery),
+            s.name.toLowerCase().includes(lowerQuery) ||
+            s.ticker.toLowerCase().includes(lowerQuery),
         )
         .slice(0, 8)
     : inputFocused

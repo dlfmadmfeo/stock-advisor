@@ -90,13 +90,23 @@ export async function fetchKospiMaster(): Promise<MasterRow[]> {
 
   const raw = mstEntry.getData(); // cp949(EUC-KR 확장) 인코딩 원문
   const text = iconv.decode(raw, "cp949");
+  // KIS 공식 예제(kis_kospi_code_mst.py)는 줄바꿈 문자를 포함한 상태에서
+  // row[-228:]로 뒤에서 228자를 잘라내는데, 그 228번째 문자는 실제로는
+  // '\n'이라 진짜 고정폭 데이터는 227자입니다(field_specs 합계도 227).
+  // 여기선 split(/\r?\n/)로 줄바꿈을 미리 제거해서 line에 '\n'이 없으니,
+  // 뒤에서 228자를 자르면 실제 데이터보다 1자 더 왼쪽(이름 필드 쪽)을
+  // 침범해서 이후 모든 필드(특히 시가총액)가 한 칸씩 밀려 파싱됐었습니다
+  // — 그 결과 삼성전자 같은 초대형주가 시가총액 상위권에서 통째로
+  // 빠졌었어요(2026-08-22 세션에 발견, capEok가 삼성전자 랭킹 542위로
+  // 나오는 걸로 확인). 227자 기준으로 고치면 삼성전자/SK하이닉스가
+  // 정확히 1/2위로 나옵니다.
   const lines = text.split(/\r?\n/).filter((l) => l.length > 200);
 
   const rows: MasterRow[] = [];
   for (const line of lines) {
-    if (line.length < 228) continue;
-    const part2 = line.slice(-228);
-    const part1 = line.slice(0, line.length - 228);
+    if (line.length < 227) continue;
+    const part2 = line.slice(-227);
+    const part1 = line.slice(0, line.length - 227);
     const ticker = part1.slice(0, 9).trim();
     const name = part1.slice(21).trim();
     if (!ticker || !name) continue;
