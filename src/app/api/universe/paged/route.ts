@@ -128,7 +128,11 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q")?.trim() || null;
   const sortParam = searchParams.get("sort");
   const sort: SortField | null =
-    sortParam === "screener" || sortParam === "name" || sortParam === "price" || sortParam === "chg"
+    sortParam === "screener" ||
+    sortParam === "name" ||
+    sortParam === "price" ||
+    sortParam === "chg" ||
+    sortParam === "cap"
       ? sortParam
       : null;
   const dirParam = searchParams.get("dir");
