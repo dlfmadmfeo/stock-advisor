@@ -143,13 +143,13 @@ export function NotificationsScreen() {
     <AppShell>
       <HomeHeader />
       <section className="space-y-5 px-5 pb-8 lg:px-8">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
           <PortfolioSummary />
           {/* <QuickActions /> */}
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+          <div className="min-w-0 space-y-3">
             {/* SectionHeader를 다른 요소랑 같은 flex 줄에 욱여넣으면 내부의
                 justify-between이 펼쳐질 공간을 못 받아서 제목이랑 "전체 보기"가
                 딱 붙어버리는 문제가 있었음. 그래서 SectionHeader는 단독으로 한
