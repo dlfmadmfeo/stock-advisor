@@ -54,6 +54,11 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  // "유니버스 새로고침"처럼 KIS API 배치를 실제로 트리거하는 관리자 전용
+  // 기능을 가릴 때 씀 (2026-08-23 세션). 지금은 관리 기능이 이거 하나뿐이라
+  // role 문자열 대신 boolean으로 충분 — 나중에 역할이 여러 개 필요해지면
+  // 그때 role 필드로 바꾸면 됨.
+  isAdmin       Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

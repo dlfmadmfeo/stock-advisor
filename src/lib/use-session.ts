@@ -11,12 +11,12 @@ import { authClient } from "@/lib/auth-client";
 // 손 안 대도 되게 했어요 — 내부 구현만 authClient.getSession()으로 교체.
 // ---------------------------------------------------------------------------
 
-export type SessionUser = { id: string; email: string } | null;
+export type SessionUser = { id: string; email: string; isAdmin: boolean } | null;
 
 async function fetchSession(): Promise<SessionUser> {
   const { data } = await authClient.getSession();
   if (!data?.user) return null;
-  return { id: data.user.id, email: data.user.email };
+  return { id: data.user.id, email: data.user.email, isAdmin: data.user.isAdmin };
 }
 
 export const SESSION_QUERY_KEY = ["session"] as const;

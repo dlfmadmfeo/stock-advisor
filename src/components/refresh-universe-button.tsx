@@ -2,6 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { useAdvisorStore } from "@/stores/use-advisor-store";
+import { useSession } from "@/lib/use-session";
 
 // 홈 화면 버튼. 누르면 /api/universe/refresh(=배치 스크립트와 같은 로직)를
 // 실행해서 DB를 실제로 다시 채우고, 끝나면 /api/universe를 다시 불러와
@@ -13,7 +14,13 @@ import { useAdvisorStore } from "@/stores/use-advisor-store";
 // 갱신이 실제로는 계속 진행 중인데도 로딩 표시가 사라져버렸어요
 // (2026-08-22 세션에 발견). store는 컴포넌트 마운트 여부와 무관하게
 // 값이 유지되니 화면을 오가도 진행 상태가 그대로 보입니다.
+//
+// 2026-08-23 세션: 서버(/api/universe/refresh)가 이제 관리자만 허용하도록
+// 막혀있어서, 관리자가 아니면 이 버튼 자체를 안 보여줍니다. 이건 UX용
+// 숨김일 뿐이고 실제 차단은 서버가 함 — 클라이언트 체크만 믿으면 안 되니까
+// (누구나 개발자 도구로 우회 가능) 서버 쪽 403이 진짜 방어선입니다.
 export function RefreshUniverseButton() {
+  const { data: session } = useSession();
   const state = useAdvisorStore((s) => s.universeRefreshState);
   const message = useAdvisorStore((s) => s.universeRefreshMessage);
   const setRefreshState = useAdvisorStore((s) => s.setUniverseRefreshState);
@@ -51,6 +58,8 @@ export function RefreshUniverseButton() {
   }
 
   const loading = state === "loading";
+
+  if (!session?.isAdmin) return null;
 
   return (
     <div className="relative">

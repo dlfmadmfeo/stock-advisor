@@ -44,14 +44,26 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30일 — 예전 SESSION_MAX_AGE_SECONDS와 동일
   },
+  // Prisma User.isAdmin 컬럼을 better-auth 세션에도 실어옵니다(2026-08-23
+  // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요
+  // — DB에서 직접 켜야만 관리자가 됨(스스로 관리자 체크박스를 켜는 걸 막음).
+  user: {
+    additionalFields: {
+      isAdmin: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+      },
+    },
+  },
 });
 
 // 서버 컴포넌트/라우트 핸들러에서 로그인한 유저(민감 정보 제외)를 조회.
 // 예전 auth.ts의 getSessionUser()와 같은 이름/반환 형태를 유지해서, 이 함수를
 // 쓰던 watchlist/page.tsx, api/watchlist/route.ts, api/watchlist/[ticker]/
 // route.ts는 그대로 두고 이 함수 내부 구현만 better-auth로 바꿨어요.
-export async function getSessionUser(): Promise<{ id: string; email: string } | null> {
+export async function getSessionUser(): Promise<{ id: string; email: string; isAdmin: boolean } | null> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return null;
-  return { id: session.user.id, email: session.user.email };
+  return { id: session.user.id, email: session.user.email, isAdmin: session.user.isAdmin };
 }
