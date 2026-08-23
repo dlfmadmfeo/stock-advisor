@@ -56,7 +56,6 @@ import {
   passesScreener,
   screenerChecks,
   screenerScore,
-  type RecommendationSignal,
 } from "@/lib/screener";
 import {
   SCREENER_PASS_THRESHOLD,
@@ -876,11 +875,25 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
 // stock 참조가 안 바뀌면(=이 종목 시세가 이번 틱에 안 바뀌었으면) 리렌더를
 // 건너뜁니다. 위쪽 useMergedStocksWithLive/useLiveStocks가 티커별로 참조를
 // 안정적으로 유지해주기 때문에 memo가 실제로 의미가 있어요.
-const RECOMMENDATION_STYLE: Record<RecommendationSignal, string> = {
-  buy: "bg-[#fdecec] text-[#f04452]",
-  sell: "bg-[#eaf1fd] text-[#3182f6]",
-  hold: "bg-[#f2f4f6] text-[#8b95a1]",
-};
+//
+// 예전엔 signal(buy/sell/hold) 3가지에 각각 다른 색(빨강/파랑/회색)을
+// 입혔는데, 그 색이 "빨강=상승/매수, 파랑=하락/매도"라는 이 앱의 등락률
+// 색 관례(StockRow의 up ? 빨강 : 파랑)랑 겹쳐서 은연중에 "매수/매도" 방향성을
+// 계속 암시하고 있었어요. 라벨을 완전충족/조건충족/보류/주의 4단계로 바꾸면서
+// (2026-08-23 세션) 색도 등락 방향과 무관한, 순서만 있는 중립 팔레트로
+// 다시 짰습니다 — 초록(완전충족) > 인디고(조건충족) > 회색(보류) > 주황(주의).
+function recommendationStyle(label: string): string {
+  switch (label) {
+    case "완전충족":
+      return "bg-[#e6f9f1] text-[#00a878]";
+    case "조건충족":
+      return "bg-[#eef2ff] text-[#4f46e5]";
+    case "주의":
+      return "bg-[#fff7ed] text-[#c2410c]";
+    default: // 보류
+      return "bg-[#f2f4f6] text-[#8b95a1]";
+  }
+}
 
 function RecommendationBadge({
   stock,
@@ -896,7 +909,7 @@ function RecommendationBadge({
   const rec = getRecommendation(stock, sectorAvgPer, sectorAvgPbr);
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${RECOMMENDATION_STYLE[rec.signal]} ${className ?? ""}`}
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${recommendationStyle(rec.label)} ${className ?? ""}`}
     >
       {rec.label}
     </span>
@@ -1210,9 +1223,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
         <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#191f28]">매매 판단</h2>
+            <h2 className="text-base font-bold text-[#191f28]">조건 충족 현황</h2>
             <span
-              className={`rounded-full px-3 py-1 text-sm font-extrabold ${RECOMMENDATION_STYLE[rec.signal]}`}
+              className={`rounded-full px-3 py-1 text-sm font-extrabold ${recommendationStyle(rec.label)}`}
             >
               {rec.label}
             </span>
