@@ -30,9 +30,20 @@ function toOrderBy(sort: SortField | null, dir: SortDirection): Prisma.StockOrde
       return [{ price: dir }];
     case "chg":
       return [{ chg: dir }];
+    case "cap":
+      return [{ capEok: dir }];
     default:
       return [{ capEok: "desc" }]; // 정렬 안 한 기본값 = 지금까지의 유니버스 순서
   }
+}
+
+// STOCKS 샘플 데이터엔 capEok(숫자) 필드가 없고 표시용 문자열(cap, 예:
+// "2,069조원")만 있어서, 정렬하려면 숫자를 다시 뽑아내야 함. DB 경로(위
+// toOrderBy)는 capEok 컬럼을 직접 쓰니 이 파싱이 필요 없음 — 샘플 폴백
+// (DB가 비어있을 때)에서만 씀.
+function parseCapEok(cap: string): number {
+  const n = Number(cap.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
 }
 
 function sortSample(stocks: Stock[], sort: SortField | null, dir: SortDirection): Stock[] {
@@ -47,6 +58,8 @@ function sortSample(stocks: Stock[], sort: SortField | null, dir: SortDirection)
       return copy.sort((a, b) => mul * (a.price - b.price));
     case "chg":
       return copy.sort((a, b) => mul * (a.chg - b.chg));
+    case "cap":
+      return copy.sort((a, b) => mul * (parseCapEok(a.cap) - parseCapEok(b.cap)));
     default:
       return copy;
   }

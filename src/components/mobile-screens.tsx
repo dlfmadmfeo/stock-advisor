@@ -149,7 +149,7 @@ export function NotificationsScreen() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 space-y-3 lg:order-1">
             {/* SectionHeader를 다른 요소랑 같은 flex 줄에 욱여넣으면 내부의
                 justify-between이 펼쳐질 공간을 못 받아서 제목이랑 "전체 보기"가
                 딱 붙어버리는 문제가 있었음. 그래서 SectionHeader는 단독으로 한
@@ -177,7 +177,12 @@ export function NotificationsScreen() {
             />
           </div>
 
-          <aside className="space-y-5">
+          {/* 모바일에서는 이 요약 카드가 전체 종목 리스트보다 먼저 보여야
+              스크롤 안 해도 "몇 개 통과했는지"부터 바로 보임 — 예전엔 리스트
+              DOM 뒤에 있어서 화면 맨 아래로 밀렸음(피드백으로 발견,
+              2026-08-23 세션). 데스크톱(lg:)에서는 원래 의도대로 오른쪽
+              사이드바 자리를 유지하도록 order로 되돌림. */}
+          <aside className="order-first space-y-5 lg:order-2">
             {/* 참고: 이 숫자는 store에 이미 로드된 전체 목록(stocks, 웹소켓 실시간
                 병합 포함)에서 클라이언트가 직접 계산한 값이고, 바로 아래 리스트는
                 PagedStockList가 DB의 screenerOk 스냅샷을 페이지 단위로 서버에서
@@ -324,11 +329,16 @@ export function AnalysisScreen() {
         <StatusPill />
 
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard label="총 평가액" value={`${formatKRW(total)}원`} />
+          <MetricCard
+            label="총 평가액"
+            value={`${formatKRW(total)}원`}
+            valueClassName="text-lg"
+          />
           <MetricCard
             label="매입가 대비 손익"
             value={`${returnAmount >= 0 ? "+" : ""}${formatKRW(returnAmount)}원 (${returnPct >= 0 ? "+" : ""}${returnPct}%)`}
             positive={returnAmount >= 0}
+            valueClassName="text-lg"
           />
         </div>
 

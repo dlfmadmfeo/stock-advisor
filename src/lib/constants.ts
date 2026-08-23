@@ -8,7 +8,7 @@ export const UNIVERSE_PAGE_SIZE = 50;
 
 // 정렬 기준 필드. 별도로 아무것도 선택 안 하면(= null) "기본 순서"(capEok
 // 내림차순, 배치가 원래 채워넣는 순서)를 씁니다.
-export type SortField = "screener" | "name" | "price" | "chg";
+export type SortField = "screener" | "name" | "price" | "chg" | "cap";
 export type SortDirection = "asc" | "desc";
 
 // 필드를 처음 선택했을 때(=1번 클릭) 적용되는 "자연스러운" 방향. 이름은
@@ -24,6 +24,7 @@ export const UNIVERSE_SORT_FIELDS: {
   { value: "name", label: "이름", naturalDirection: "asc" },
   { value: "price", label: "주가", naturalDirection: "desc" },
   { value: "chg", label: "상승률", naturalDirection: "desc" },
+  { value: "cap", label: "시가총액", naturalDirection: "desc" },
 ];
 
 // 관심종목에 담을 수 있는 최대 개수. stock-advisor-server(Spring)의
