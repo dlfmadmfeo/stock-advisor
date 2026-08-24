@@ -17,8 +17,14 @@ import { prisma } from "./db";
 import { kisConfigured, fetchDailyBars, fetchWeeklyBars, fetchQuoteDetail } from "./kis";
 import { fetchKospiMaster } from "./kospi-master";
 import { computeScreenerInputs } from "./indicators";
-import { formatMarketCapEok } from "./stocks";
-import { passesScreener, screenerScore } from "./screener";
+import { formatMarketCapEok, type Stock } from "./stocks";
+import {
+  passesScreener,
+  screenerScore,
+  getRecommendation,
+  sectorAveragePer,
+  sectorAveragePbr,
+} from "./screener";
 
 const UNIVERSE_SIZE = 200;
 // kis.ts 내부에 전역 rate limiter(초당 6건)가 있어서 여기 동시성은 그렇게
@@ -28,6 +34,62 @@ const DEFAULT_SECTOR = "기타";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// screener.ts의 getRecommendation label -> DB에 저장할 숫자 등급.
+// 높을수록 좋음(완전충족=3)으로 둬서 screenerScore("높을수록 많이 통과")랑
+// 같은 관례를 따름 — desc 정렬하면 완전충족이 먼저 나옴.
+export function labelToRank(label: string): number {
+  switch (label) {
+    case "완전충족":
+      return 3;
+    case "조건충족":
+      return 2;
+    case "주의":
+      return 0;
+    default: // 보류
+      return 1;
+  }
+}
+
+// 2단계 패스: 200종목을 다 저장한 "다음"에 업종 평균 PER/PBR을 계산해서
+// 각 종목의 완전충족/조건충족/보류/주의 등급을 다시 매기고 recommendationRank로
+// 저장합니다(2026-08-23 세션, "등급순 정렬" 추가하면서 도입). getRecommendation이
+// sectorAvgPer/sectorAvgPbr을 요구하는데, 그건 "같은 업종의 다른 종목들" 데이터가
+// 있어야 계산되는 값이라 processTicker() 안에서(종목 하나씩 저장하는 시점에는)
+// 는 아직 못 구함 — 그래서 screenerScore와 달리 배치 안에서 별도 후처리 단계로
+// 뺐습니다. KIS API를 추가로 부르지 않고(DB에 이미 저장된 값만 읽음) 순수
+// 계산 + DB 업데이트라 몇 초 안에 끝나요.
+async function updateRecommendationRanks(): Promise<void> {
+  const rows = await prisma.stock.findMany();
+  const stocks: Stock[] = rows.map((r) => ({
+    ticker: r.ticker,
+    name: r.name,
+    sector: r.sector,
+    price: r.price,
+    chg: r.chg,
+    cap: r.cap,
+    per: r.per ?? 0,
+    pbr: r.pbr,
+    hi: r.hi,
+    lo: r.lo,
+    ma5over20: r.ma5over20,
+    volRatio: r.volRatio,
+    rsi: r.rsi,
+  }));
+
+  const avgPer = sectorAveragePer(stocks);
+  const avgPbr = sectorAveragePbr(stocks);
+
+  await Promise.all(
+    stocks.map((s) => {
+      const rec = getRecommendation(s, avgPer[s.sector], avgPbr[s.sector]);
+      return prisma.stock.update({
+        where: { ticker: s.ticker },
+        data: { recommendationRank: labelToRank(rec.label) },
+      });
+    }),
+  );
 }
 
 async function processTicker(ticker: string, name: string, rank: number): Promise<string | null> {
@@ -184,6 +246,9 @@ export async function refreshUniverse(): Promise<RefreshResult> {
       where: { ticker: { notIn: succeeded } },
     });
     removedCount = removed.count;
+
+    console.log("업종 평균 대비 등급(완전충족/조건충족/보류/주의) 계산 중...");
+    await updateRecommendationRanks();
   }
 
   return {

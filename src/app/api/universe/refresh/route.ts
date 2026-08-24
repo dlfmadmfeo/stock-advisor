@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { refreshUniverse } from "@/lib/refresh-universe";
+import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 // 200종목 x KIS 호출 3건 = 최대 600건, rate limiter(초당 6건) 감안하면
@@ -17,6 +18,18 @@ export const maxDuration = 300;
 let isRunning = false;
 
 export async function POST() {
+  // 2026-08-23 세션: 로그인 체크가 아예 없었어서, 로그인 안 한 아무나 이
+  // URL에 POST만 쏘면 KIS API로 200종목 배치 조회가 실행됐음(앱을 배포한
+  // 뒤로는 진짜 위험 — API 호출 한도 낭비/악의적 반복 호출 가능). 관리자만
+  // 누를 수 있게 막음.
+  const user = await getSessionUser();
+  if (!user?.isAdmin) {
+    return NextResponse.json(
+      { ok: false, message: "관리자만 유니버스를 새로고침할 수 있어요." },
+      { status: 403 },
+    );
+  }
+
   if (isRunning) {
     return NextResponse.json(
       { ok: false, message: "이미 갱신이 진행 중이에요. 잠시 후 다시 시도해주세요." },

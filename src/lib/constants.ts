@@ -8,7 +8,7 @@ export const UNIVERSE_PAGE_SIZE = 50;
 
 // 정렬 기준 필드. 별도로 아무것도 선택 안 하면(= null) "기본 순서"(capEok
 // 내림차순, 배치가 원래 채워넣는 순서)를 씁니다.
-export type SortField = "screener" | "name" | "price" | "chg" | "cap";
+export type SortField = "screener" | "name" | "price" | "chg" | "cap" | "recommendation";
 export type SortDirection = "asc" | "desc";
 
 // 필드를 처음 선택했을 때(=1번 클릭) 적용되는 "자연스러운" 방향. 이름은
@@ -25,6 +25,7 @@ export const UNIVERSE_SORT_FIELDS: {
   { value: "price", label: "주가", naturalDirection: "desc" },
   { value: "chg", label: "상승률", naturalDirection: "desc" },
   { value: "cap", label: "시가총액", naturalDirection: "desc" },
+  { value: "recommendation", label: "등급", naturalDirection: "desc" },
 ];
 
 // 화면 너비대별 폰트 크기 "토큰". Tailwind 브레이크포인트 클래스 문자열을
