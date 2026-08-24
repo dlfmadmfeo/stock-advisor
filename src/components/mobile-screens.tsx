@@ -37,6 +37,14 @@ import type { NewsArticle } from "@/lib/naver-news";
 import { UserMenu } from "@/components/user-menu";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useStockNews } from "@/lib/use-stock-news";
+import { useInvestorTrend } from "@/lib/use-investor-trend";
+import {
+  aggregateInvestorTrend,
+  formatNetAmountEok,
+  INVESTOR_TREND_PERIODS,
+  type InvestorTrendPeriod,
+  type InvestorTrendPoint,
+} from "@/lib/investor-trend";
 import {
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
@@ -1169,6 +1177,223 @@ function StockNewsCard({ name }: { name: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// 투자자 매매동향(외국인/기관/개인 순매수 추이) — 종목 상세 화면.
+// StockNewsCard와 같은 Suspense 패턴(useSuspenseQuery + <Suspense>)이라
+// 로딩/에러 처리는 그쪽 주석 참고. 이 섹션에서만 필요한 건: 기간(일/주/달/연)
+// 선택 + 보기 모드(차트/테이블) 선택 — 둘 다 이 컴포넌트의 로컬 state로
+// 충분해요(다른 화면으로 안 옮겨가니 useAdvisorStore로 뺄 필요 없음, 새로고침
+// 버튼 로딩 상태 때와는 다른 케이스).
+// ---------------------------------------------------------------------------
+type InvestorViewMode = "chart" | "table";
+
+const INVESTOR_SERIES: {
+  label: string;
+  color: string;
+  value: (p: InvestorTrendPoint) => number;
+}[] = [
+  { label: "외국인", color: "#4f46e5", value: (p) => p.frgnNetAmount },
+  { label: "기관", color: "#00a878", value: (p) => p.orgnNetAmount },
+  { label: "개인", color: "#c2410c", value: (p) => p.prsnNetAmount },
+];
+
+// 차트/테이블에 한 번에 너무 많은 점을 넣으면 안 보이니, 최근 이만큼만.
+const INVESTOR_TREND_DISPLAY_LIMIT = 30;
+
+function InvestorTrendCardSkeleton() {
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">투자자 매매동향</h2>
+      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+    </div>
+  );
+}
+
+function InvestorTrendChart({ points }: { points: InvestorTrendPoint[] }) {
+  const width = 600;
+  const height = 160;
+  const padX = 6;
+  const padY = 14;
+  const maxAbs = Math.max(
+    1,
+    ...points.flatMap((p) => INVESTOR_SERIES.map((s) => Math.abs(s.value(p)))),
+  );
+  const xStep =
+    points.length > 1 ? (width - padX * 2) / (points.length - 1) : 0;
+  const yMid = height / 2;
+  const xAt = (i: number) => padX + i * xStep;
+  const yAt = (v: number) => yMid - (v / maxAbs) * (yMid - padY);
+
+  function pathFor(getValue: (p: InvestorTrendPoint) => number) {
+    return points
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(getValue(p)).toFixed(1)}`,
+      )
+      .join(" ");
+  }
+
+  return (
+    <div className="mt-3">
+      <svg
+        className="w-full"
+        height={height}
+        preserveAspectRatio="none"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        {/* 0 기준선 — 이 위는 순매수(+), 아래는 순매도(-) */}
+        <line
+          stroke="#e5e8eb"
+          strokeWidth={1}
+          x1={padX}
+          x2={width - padX}
+          y1={yMid}
+          y2={yMid}
+        />
+        {INVESTOR_SERIES.map((s) => (
+          <path
+            d={pathFor(s.value)}
+            fill="none"
+            key={s.label}
+            stroke={s.color}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+          />
+        ))}
+      </svg>
+      <div className="mt-2 flex flex-wrap gap-3">
+        {INVESTOR_SERIES.map((s) => (
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]"
+            key={s.label}
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ background: s.color }}
+            />
+            {s.label}
+          </span>
+        ))}
+      </div>
+      {points.length > 0 ? (
+        <div className="mt-1 flex justify-between text-[10px] text-[#8b95a1]">
+          <span>{points[0].label}</span>
+          <span>{points[points.length - 1].label}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function InvestorTrendTable({ points }: { points: InvestorTrendPoint[] }) {
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <table className="w-full min-w-[420px] text-[12px]">
+        <thead>
+          <tr className="text-left text-[#8b95a1]">
+            <th className="py-1.5 font-semibold">기간</th>
+            <th className="py-1.5 text-right font-semibold">종가</th>
+            {INVESTOR_SERIES.map((s) => (
+              <th className="py-1.5 text-right font-semibold" key={s.label}>
+                {s.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[...points].reverse().map((p) => (
+            <tr className="border-t border-[#f2f4f6]" key={p.key}>
+              <td className="py-1.5 font-semibold text-[#191f28]">{p.label}</td>
+              <td className="py-1.5 text-right text-[#4e5968]">
+                {formatKRW(p.close)}
+              </td>
+              {INVESTOR_SERIES.map((s) => {
+                const v = s.value(p);
+                return (
+                  <td
+                    className={`py-1.5 text-right font-semibold ${v >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+                    key={s.label}
+                  >
+                    {formatNetAmountEok(v)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function InvestorTrendCard({ ticker }: { ticker: string }) {
+  // useSuspenseQuery라 여기 온 시점엔 이미 데이터가 있음(StockNewsCard와 동일).
+  const { data: days } = useInvestorTrend(ticker);
+  const [period, setPeriod] = useState<InvestorTrendPeriod>("day");
+  const [viewMode, setViewMode] = useState<InvestorViewMode>("chart");
+
+  const points = useMemo(
+    () =>
+      aggregateInvestorTrend(days, period).slice(-INVESTOR_TREND_DISPLAY_LIMIT),
+    [days, period],
+  );
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-[#191f28]">투자자 매매동향</h2>
+        <div className="flex gap-1">
+          {(["chart", "table"] as const).map((mode) => (
+            <button
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                viewMode === mode
+                  ? "bg-[#191f28] text-white"
+                  : "bg-[#f2f4f6] text-[#8b95a1]"
+              }`}
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              type="button"
+            >
+              {mode === "chart" ? "차트" : "테이블"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {INVESTOR_TREND_PERIODS.map((p) => (
+          <button
+            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+              period === p.value
+                ? "bg-[#191f28] text-white"
+                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+            }`}
+            key={p.value}
+            onClick={() => setPeriod(p.value)}
+            type="button"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {points.length === 0 ? (
+        <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 없어요.</p>
+      ) : viewMode === "chart" ? (
+        <InvestorTrendChart points={points} />
+      ) : (
+        <InvestorTrendTable points={points} />
+      )}
+
+      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+        KIS 종목별 투자자매매동향(일별) 기준 순매수 거래대금이에요. 당일
+        데이터는 장 종료 후 반영됩니다.
+      </p>
+    </div>
+  );
+}
+
 export function StockDetailScreen({ ticker }: { ticker: string }) {
   const router = useRouter();
   const stock = useLiveStock(ticker);
@@ -1227,7 +1452,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
         <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#191f28]">조건 충족 현황</h2>
+            <h2 className="text-base font-bold text-[#191f28]">
+              조건 충족 현황
+            </h2>
             <span
               className={`rounded-full px-3 py-1 text-sm font-extrabold ${recommendationStyle(rec.label)}`}
             >
@@ -1290,14 +1517,57 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
         <div
           className={`grid gap-3 ${stock.pbr ? "grid-cols-3" : "grid-cols-2"}`}
         >
-          <MetricCard label="시가총액" value={stock.cap} />
-          <MetricCard label="PER" value={`${stock.per}배`} />
+          <MetricCard
+            compact
+            label="시가총액"
+            value={stock.cap}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
+          />
+          <MetricCard
+            compact
+            label="PER"
+            value={`${stock.per}배`}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
+          />
           {stock.pbr ? (
-            <MetricCard label="PBR" value={`${stock.pbr}배`} />
+            <MetricCard
+              compact
+              label="PBR"
+              value={`${stock.pbr}배`}
+              valueClassName={RESPONSIVE_TEXT.metricValue}
+            />
           ) : null}
-          <MetricCard label="52주 최고" value={`${formatKRW(stock.hi)}원`} />
-          <MetricCard label="52주 최저" value={`${formatKRW(stock.lo)}원`} />
+          <MetricCard
+            compact
+            label="52주 최고"
+            value={`${formatKRW(stock.hi)}원`}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
+          />
+          <MetricCard
+            compact
+            label="52주 최저"
+            value={`${formatKRW(stock.lo)}원`}
+            valueClassName={RESPONSIVE_TEXT.metricValue}
+          />
         </div>
+
+        <ErrorBoundary
+          fallback={(error) => (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <h2 className="text-base font-bold text-[#191f28]">
+                투자자 매매동향
+              </h2>
+              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+                {error.message || "투자자매매동향을 불러오지 못했어요."}
+              </p>
+            </div>
+          )}
+          resetKey={stock.ticker}
+        >
+          <Suspense fallback={<InvestorTrendCardSkeleton />}>
+            <InvestorTrendCard ticker={stock.ticker} />
+          </Suspense>
+        </ErrorBoundary>
 
         <ErrorBoundary
           fallback={(error) => (

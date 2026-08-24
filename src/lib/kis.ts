@@ -523,3 +523,91 @@ export async function fetchMarketCapRanking(
 
   return results.slice(0, maxCount);
 }
+
+// ---------------------------------------------------------------------------
+// 종목별 투자자매매동향(일별) — 외국인/기관/개인 순매수 추이.
+//
+// KIS 공식 예제(examples_llm/domestic_stock/investor_trade_by_stock_daily)
+// 기준 tr_id/필드명을 그대로 옮겼습니다.
+//
+// ⚠️ 이 엔드포인트는 tr_cont continuation을 지원하지 않아요(응답 헤더
+// tr_cont가 항상 빈 문자열 — 실측 확인, 2026-08-24). 대신 FID_INPUT_DATE_1에
+// 다른 날짜를 넣으면 "그 날짜를 마지막으로 하는 최근 30거래일" 구간을 매번
+// 새로 줘요(실측 확인: 20260824 기준 → 20260710~20260824, 20260630 기준 →
+// 20260518~20260630, 겹치는 구간 없이 딱 이어짐). 그래서 매 호출마다 받은
+// 구간의 "가장 오래된 날짜"를 다음 호출의 FID_INPUT_DATE_1으로 써서 뒤로
+// 계속 넘어가는 방식으로 페이지네이션합니다(다른 continuation 기반
+// 엔드포인트들과는 다른 패턴).
+// ---------------------------------------------------------------------------
+export type InvestorTrendDay = {
+  date: string; // yyyymmdd
+  close: number;
+  frgnNetAmount: number; // 외국인 순매수 거래대금(원)
+  orgnNetAmount: number; // 기관계 순매수 거래대금(원)
+  prsnNetAmount: number; // 개인 순매수 거래대금(원)
+  frgnNetQty: number; // 외국인 순매수 수량
+  orgnNetQty: number; // 기관계 순매수 수량
+  prsnNetQty: number; // 개인 순매수 수량
+};
+
+// 한 번 호출에 30거래일씩 오니, 500행을 채우려면 최대 17번 정도 호출.
+// 약 2년치 거래일 — 일/주/달 뷰는 넉넉히 커버하고, 연도별 뷰는 최근~작년
+// 정도까지만 의미 있게 나옵니다(더 과거는 이 함수 범위 밖).
+const INVESTOR_TREND_TARGET_ROWS = 500;
+const INVESTOR_TREND_MAX_PAGES = 20;
+
+export async function fetchInvestorTrend(ticker: string): Promise<InvestorTrendDay[] | null> {
+  try {
+    const rows: InvestorTrendDay[] = [];
+    const seenDates = new Set<string>();
+    let anchorDate = yyyymmdd(new Date());
+
+    for (let page = 0; page < INVESTOR_TREND_MAX_PAGES && rows.length < INVESTOR_TREND_TARGET_ROWS; page++) {
+      const { json } = await kisGetRaw(
+        "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
+        "FHPTJ04160001",
+        {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_DATE_1: anchorDate,
+          FID_ORG_ADJ_PRC: "",
+          FID_ETC_CLS_CODE: "",
+        },
+      );
+
+      const daily = json?.output2;
+      if (!Array.isArray(daily) || daily.length === 0) break;
+
+      let newCount = 0;
+      let oldestInBatch: string | null = null;
+      for (const r of daily) {
+        const date = String(r.stck_bsop_date ?? "").trim();
+        if (!date) continue;
+        if (!oldestInBatch || date < oldestInBatch) oldestInBatch = date;
+        if (seenDates.has(date)) continue;
+        seenDates.add(date);
+        newCount += 1;
+        rows.push({
+          date,
+          close: Number(r.stck_clpr) || 0,
+          frgnNetAmount: Number(r.frgn_ntby_tr_pbmn) || 0,
+          orgnNetAmount: Number(r.orgn_ntby_tr_pbmn) || 0,
+          prsnNetAmount: Number(r.prsn_ntby_tr_pbmn) || 0,
+          frgnNetQty: Number(r.frgn_ntby_qty) || 0,
+          orgnNetQty: Number(r.orgn_ntby_qty) || 0,
+          prsnNetQty: Number(r.prsn_ntby_qty) || 0,
+        });
+      }
+
+      // 새 날짜가 하나도 없으면(같은 구간 반복 = 더 과거 데이터가 없음) 중단.
+      if (newCount === 0 || !oldestInBatch) break;
+      anchorDate = oldestInBatch;
+    }
+
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+    return rows.length ? rows : null;
+  } catch (e) {
+    console.error(`[KIS] ${ticker} 투자자매매동향 조회 실패:`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}

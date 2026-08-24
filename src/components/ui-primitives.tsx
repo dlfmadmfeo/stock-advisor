@@ -84,6 +84,7 @@ export function MetricCard({
   value,
   positive,
   valueClassName,
+  compact,
 }: {
   label: string;
   value: string;
@@ -93,9 +94,14 @@ export function MetricCard({
   // 더 작은 크기가 필요한 곳에서만 넘겨서 씀 — 다른 MetricCard(종목 상세의
   // PER/PBR 등, 값이 짧음)는 기존 크기 그대로 유지.
   valueClassName?: string;
+  // 종목 상세 화면처럼 카드가 한 줄에 3~5개씩 붙는 곳은 지금 패딩(p-4)이
+  // 과하다는 피드백(2026-08-24 세션)으로 추가 — true면 패딩을 한 단계 줄임.
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div
+      className={`rounded-2xl bg-white ring-1 ring-[#e5e8eb] ${compact ? "p-3" : "p-4"}`}
+    >
       <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
       <p
         className={`mt-2 font-bold tracking-[-0.02em] ${valueClassName ?? "text-xl"} ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
