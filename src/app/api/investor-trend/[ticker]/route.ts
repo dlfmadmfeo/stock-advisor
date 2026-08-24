@@ -13,8 +13,15 @@ const TICKER_RE = /^\d{6}$/;
 // 페이지네이션 주석 참고) 매번 새로 부르면 느리고 낭비라, 5분 캐시를 둡니다.
 //
 // 사용법: GET /api/investor-trend/005930
+//
+// ⚠️ 종목 하나당 KIS를 최대 20번 순차 호출해야 해서(kis.ts 페이지네이션
+// 주석 참고) 실측 8~9초 정도 걸려요 — Vercel 서버리스 함수 기본 제한시간
+// (Hobby 기준 10초)에 거의 걸쳐있어서, 살짝만 느려져도 타임아웃으로
+// 실패했어요(2026-08-24 세션, 프로덕션에서 "불러오지 못했다"는 제보로
+// 발견). refresh-universe route처럼 maxDuration을 명시해서 여유를 둡니다.
 // ---------------------------------------------------------------------------
 export const revalidate = 300;
+export const maxDuration = 60;
 
 export async function GET(
   _req: Request,
