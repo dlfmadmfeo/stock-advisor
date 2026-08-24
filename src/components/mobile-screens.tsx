@@ -881,13 +881,17 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
 // 색 관례(StockRow의 up ? 빨강 : 파랑)랑 겹쳐서 은연중에 "매수/매도" 방향성을
 // 계속 암시하고 있었어요. 라벨을 완전충족/조건충족/보류/주의 4단계로 바꾸면서
 // (2026-08-23 세션) 색도 등락 방향과 무관한, 순서만 있는 중립 팔레트로
-// 다시 짰습니다 — 초록(완전충족) > 인디고(조건충족) > 회색(보류) > 주황(주의).
+// 다시 짰습니다 — 인디고(완전충족) > 골드(조건충족) > 회색(보류) > 주황(주의).
+// "완전충족"은 처음에 스크리너 통과 배지랑 같은 초록을 썼는데, 같은 카드 안에
+// "스크리너 4/4 통과"(초록) 배지랑 나란히 붙어있으면 색이 겹쳐 보인다는
+// 피드백으로 골드로 바꿨다가, 완전충족/조건충족끼리 색을 서로 바꿔서 지금은
+// 완전충족=인디고, 조건충족=골드예요.
 function recommendationStyle(label: string): string {
   switch (label) {
     case "완전충족":
-      return "bg-[#e6f9f1] text-[#00a878]";
-    case "조건충족":
       return "bg-[#eef2ff] text-[#4f46e5]";
+    case "조건충족":
+      return "bg-[#fef9c3] text-[#a16207]";
     case "주의":
       return "bg-[#fff7ed] text-[#c2410c]";
     default: // 보류

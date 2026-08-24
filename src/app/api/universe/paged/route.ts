@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { STOCKS, type Stock } from "@/lib/stocks";
-import { passesScreener, screenerScore } from "@/lib/screener";
+import {
+  passesScreener,
+  screenerScore,
+  getRecommendation,
+  sectorAveragePer,
+  sectorAveragePbr,
+} from "@/lib/screener";
 import { UNIVERSE_PAGE_SIZE, type SortDirection, type SortField } from "@/lib/constants";
+import { labelToRank } from "@/lib/refresh-universe";
 import type { Prisma } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +39,11 @@ function toOrderBy(sort: SortField | null, dir: SortDirection): Prisma.StockOrde
       return [{ chg: dir }];
     case "cap":
       return [{ capEok: dir }];
+    case "recommendation":
+      // 등급이 같으면(예: 보류끼리) 스크리너 점수로 한 번 더 갈라줌 — 안
+      // 그러면 같은 등급 안에서 순서가 뒤죽박죽으로 보임(DB 정렬은 동점일 때
+      // 순서를 보장 안 함).
+      return [{ recommendationRank: dir }, { screenerScore: dir }];
     default:
       return [{ capEok: "desc" }]; // 정렬 안 한 기본값 = 지금까지의 유니버스 순서
   }
@@ -60,6 +72,13 @@ function sortSample(stocks: Stock[], sort: SortField | null, dir: SortDirection)
       return copy.sort((a, b) => mul * (a.chg - b.chg));
     case "cap":
       return copy.sort((a, b) => mul * (parseCapEok(a.cap) - parseCapEok(b.cap)));
+    case "recommendation": {
+      const avgPer = sectorAveragePer(copy);
+      const avgPbr = sectorAveragePbr(copy);
+      const rankOf = (s: Stock) =>
+        labelToRank(getRecommendation(s, avgPer[s.sector], avgPbr[s.sector]).label);
+      return copy.sort((a, b) => mul * (rankOf(a) - rankOf(b)));
+    }
     default:
       return copy;
   }
@@ -132,7 +151,8 @@ export async function GET(req: NextRequest) {
     sortParam === "name" ||
     sortParam === "price" ||
     sortParam === "chg" ||
-    sortParam === "cap"
+    sortParam === "cap" ||
+    sortParam === "recommendation"
       ? sortParam
       : null;
   const dirParam = searchParams.get("dir");

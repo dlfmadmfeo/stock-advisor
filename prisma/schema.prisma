@@ -30,14 +30,24 @@ model Stock {
   rsi        Float
   screenerOk    Boolean // score >= 3 캐시 (조회 편의용)
   screenerScore Int      @default(0) // 4개 규칙 중 몇 개 통과했는지(0~4). "스크리너 많이 통과한 순" 정렬용.
-  // 기본값 0을 준 이유: 이미 있는 150개 row에 새 NOT NULL 컬럼을 추가하는
-  // 거라 기본값이 없으면 prisma db push가 거부함. 0으로 채워두고 다음
-  // 배치("새로고침" 버튼)나 실시간 틱이 오면 진짜 값으로 갱신됩니다.
+  // 완전충족/조건충족/보류/주의(screener.ts getRecommendation) 등급을 숫자로
+  // 캐시한 값. 3=완전충족, 2=조건충족, 1=보류, 0=주의 — 높을수록 좋음(desc
+  // 정렬하면 완전충족이 먼저 나오게, screenerScore랑 같은 관례). 업종 평균
+  // PER/PBR이 있어야 계산되는 값이라(다른 종목들 데이터가 다 있어야 함)
+  // refreshUniverse()가 200종목을 전부 저장한 "다음" 2차 패스에서 한 번에
+  // 채웁니다(2026-08-23 세션) — screenerScore처럼 종목 하나만 보고 그 자리에서
+  // 못 정함. 화면에 보이는 배지 자체는 이 컬럼을 안 쓰고 여전히 클라이언트가
+  // 실시간 데이터로 즉석 계산함(관심종목은 웹소켓으로 계속 갱신되니까 그게 더
+  // 정확함) — 이 컬럼은 오직 "등급순 정렬"(서버 페이지네이션)에만 씀. 그래서
+  // screenerScore와 마찬가지로 "마지막 새로고침 시점 기준" 스냅샷이라는 한계는
+  // 그대로 있음.
+  recommendationRank Int @default(0)
   updatedAt     DateTime @updatedAt
 
   @@index([sector])
   @@index([screenerOk])
   @@index([screenerScore])
+  @@index([recommendationRank])
 }
 
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식(auth.ts)을
