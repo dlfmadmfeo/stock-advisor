@@ -50,6 +50,21 @@ model Stock {
   @@index([recommendationRank])
 }
 
+// "유니버스 새로고침"이 동시에 두 번 안 돌게 막는 락. 예전엔 route.ts의
+// 메모리 변수(let isRunning)로 했는데, 이건 Vercel 서버리스 인스턴스마다
+// 따로 놀아서(같은 요청이 다른 인스턴스로 가면 그쪽은 isRunning=false로
+// 시작함) 실제로 동시 실행을 못 막았어요 — 진짜로 두 refreshUniverse()가
+// 같은 Stock 테이블에 동시에 upsert하면서 MySQL "Lock wait timeout" 에러가
+// 났던 게 이 문제 때문(2026-08-24 세션, 프로덕션에서 "다시 시도해달라는
+// 에러" 제보로 발견). 여러 인스턴스가 공유하는 건 DB뿐이라, 락도 DB에 둬야
+// 진짜로 막을 수 있음 — 싱글턴 row 하나(id=1)를 조건부 UPDATE로 원자적으로
+// 뺏어오는 방식(refresh-universe.ts의 acquireRefreshLock 참고).
+model RefreshLock {
+  id        Int      @id @default(1)
+  isRunning Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식(auth.ts)을
 // better-auth 라이브러리로 교체하면서, User/Session/Account/Verification
 // 4개 모델 구성을 better-auth의 Prisma 어댑터가 기대하는 표준 스키마
