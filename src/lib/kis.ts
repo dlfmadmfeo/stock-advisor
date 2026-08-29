@@ -607,13 +607,31 @@ export type InvestorTrendDay = {
 const INVESTOR_TREND_TARGET_ROWS = 500;
 const INVESTOR_TREND_MAX_PAGES = 20;
 
+function shiftYyyymmdd(dateStr: string, days: number): string {
+  const d = new Date(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(4, 6)) - 1,
+    Number(dateStr.slice(6, 8)),
+  );
+  d.setDate(d.getDate() + days);
+  return yyyymmdd(d);
+}
+
+// 기준일이 주말/공휴일이면(=그날 거래가 없었으면) 이 엔드포인트가 빈
+// output2 대신 에러("TIME LIMIT 00:00 ~ 15:40")를 줘요(2026-08-29 세션,
+// 토요일에 실측 — 시스템 날짜를 그대로 기준일로 쓰다가 항상 실패하던
+// 원인). 하루 전으로 물러나며 최대 이만큼 재시도해서 가장 최근 거래일을 찾음.
+const MAX_ANCHOR_BACKTRACK_DAYS = 7;
+
 export async function fetchInvestorTrend(ticker: string): Promise<InvestorTrendDay[] | null> {
   try {
     const rows: InvestorTrendDay[] = [];
     const seenDates = new Set<string>();
     let anchorDate = yyyymmdd(new Date());
+    let backtrackAttempts = 0;
+    let pageCount = 0;
 
-    for (let page = 0; page < INVESTOR_TREND_MAX_PAGES && rows.length < INVESTOR_TREND_TARGET_ROWS; page++) {
+    while (pageCount < INVESTOR_TREND_MAX_PAGES && rows.length < INVESTOR_TREND_TARGET_ROWS) {
       const { json } = await kisGetRaw(
         "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
         "FHPTJ04160001",
@@ -627,8 +645,20 @@ export async function fetchInvestorTrend(ticker: string): Promise<InvestorTrendD
       );
 
       const daily = json?.output2;
-      if (!Array.isArray(daily) || daily.length === 0) break;
+      if (!Array.isArray(daily) || daily.length === 0) {
+        // 아직 한 건도 못 모은 상태(=첫 시도)에서 비어있으면, "더 과거
+        // 데이터가 없다"가 아니라 "기준일 자체가 휴장일"일 가능성이 커요.
+        // 하루 전으로 물러나서 다시 시도 — 페이지 카운트는 안 씀(진짜
+        // 페이지가 아니니까).
+        if (rows.length === 0 && backtrackAttempts < MAX_ANCHOR_BACKTRACK_DAYS) {
+          backtrackAttempts += 1;
+          anchorDate = shiftYyyymmdd(anchorDate, -1);
+          continue;
+        }
+        break;
+      }
 
+      pageCount += 1;
       let newCount = 0;
       let oldestInBatch: string | null = null;
       for (const r of daily) {
