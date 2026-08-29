@@ -49,6 +49,7 @@ import { useDailyBars } from "@/lib/use-daily-bars";
 import { computeMacdSeries, type MacdPoint } from "@/lib/indicators";
 import type { DailyBar } from "@/lib/kis";
 import {
+  useWatchlistHeart,
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
   type WatchlistItem,
@@ -940,15 +941,16 @@ const StockRow = memo(function StockRow({
   sectorAvgPer?: number;
   sectorAvgPbr?: number;
 }) {
+  const router = useRouter();
   const score = screenerScore(stock);
   const pass = score >= SCREENER_PASS_THRESHOLD;
   const up = stock.chg >= 0;
   return (
-    <Link
-      href={`/stock/${stock.ticker}`}
-      className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99] active:bg-[#f7f8fa]"
-    >
-      <div className="min-w-0">
+    <div className="flex items-center gap-2 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
+      <Link
+        href={`/stock/${stock.ticker}`}
+        className="min-w-0 flex-1 active:opacity-80"
+      >
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">
             {stock.name}
@@ -972,21 +974,61 @@ const StockRow = memo(function StockRow({
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
           {stock.sector} · {stock.ticker} · {stock.cap}
         </p>
-      </div>
-      <div className="shrink-0 text-right">
+      </Link>
+      {/* 하트를 <Link> 밖으로 뺐어요(2026-08-29 세션) — <a> 안에 <button>을
+          중첩하면 안 되고(무효 HTML), 하트를 가격 옆에 나란히 두면 그 폭만큼
+          이름이 더 잘려서(좁은 화면에서 "삼성전자"가 "삼..."으로 잘리는
+          회귀 발견) 등락률 줄 안으로 넣어 세로로 쌓았어요 — 이러면 우측
+          칼럼 너비가 여전히 가격 텍스트 폭으로 정해져서 이름 잘림이
+          거의 안 늘어남. 대신 이 블록은 더 이상 Link가 아니라서, 탭해도
+          상세화면으로 가게 onClick으로 직접 router.push 해줍니다(WatchlistRow와
+          같은 패턴) — 하트 버튼 클릭은 자기 handler에서 stopPropagation. */}
+      <div
+        className="shrink-0 text-right"
+        onClick={() => router.push(`/stock/${stock.ticker}`)}
+      >
         <p className="text-sm font-bold text-[#191f28]">
           {formatKRW(stock.price)}
         </p>
-        <p
-          className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
-        >
-          {up ? "+" : ""}
-          {stock.chg}%
-        </p>
+        <div className="mt-0.5 flex items-center justify-end gap-1.5">
+          <p
+            className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+          >
+            {up ? "+" : ""}
+            {stock.chg}%
+          </p>
+          <WatchlistHeartButton ticker={stock.ticker} />
+        </div>
       </div>
-    </Link>
+    </div>
   );
 });
+
+// 홈/검색 리스트 행, 종목 상세 상단바에서 공용으로 쓰는 관심종목 토글 하트.
+// 실제 상태/요청 로직은 useWatchlistHeart(use-watchlist.ts)에 있고, 여기는
+// WatchlistRow의 DeleteWatchlistButton과 같은 "고스트" 버튼 스타일만 담당.
+function WatchlistHeartButton({ ticker }: { ticker: string }) {
+  const { watched, pending, toggle } = useWatchlistHeart(ticker);
+  return (
+    <button
+      aria-label={watched ? "관심종목에서 삭제" : "관심종목에 추가"}
+      className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition active:scale-90 disabled:opacity-50 ${
+        watched ? "text-[#f04452]" : "text-[#c3c9d1]"
+      }`}
+      disabled={pending}
+      // 이 버튼은 가격 블록(부모 div, 클릭 시 상세화면으로 이동) 안에
+      // 있어서, 클릭이 부모까지 버블링되면 하트를 누른 건데 상세화면으로도
+      // 같이 넘어가버려요 — stopPropagation으로 막습니다.
+      onClick={(e) => {
+        e.stopPropagation();
+        toggle();
+      }}
+      type="button"
+    >
+      <Heart className="h-[15px] w-[15px]" fill={watched ? "currentColor" : "none"} />
+    </button>
+  );
+}
 
 // EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
 // HistoryMetric은 전부 서버 컴포넌트 분리 작업으로 src/components/
@@ -1598,6 +1640,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
   // (React Hooks 규칙) 아래 early return보다 먼저 호출합니다.
   const sectorAvgPer = useSectorAvgPer();
   const sectorAvgPbr = useSectorAvgPbr();
+  // 훅 호출 순서를 지키려고 stock 유무와 무관하게 항상 호출(ticker prop
+  // 기준이라 stock이 아직 null이어도 문제 없음).
+  const heart = useWatchlistHeart(ticker);
 
   if (!stock) {
     return (
@@ -1629,6 +1674,13 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
         title={stock.name}
         left={<ChevronLeft />}
         onLeftClick={() => router.back()}
+        right={
+          <Heart
+            className={`h-5 w-5 ${heart.watched ? "text-[#f04452]" : ""}`}
+            fill={heart.watched ? "currentColor" : "none"}
+          />
+        }
+        onRightClick={() => heart.toggle()}
       />
       <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
         <StatusPill />
@@ -1645,6 +1697,11 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           >
             {up ? "▲" : "▼"} {Math.abs(stock.chg)}% 오늘
           </p>
+          {heart.error ? (
+            <p className="mt-1 text-xs font-semibold text-[#f04452]">
+              {heart.error}
+            </p>
+          ) : null}
         </div>
 
         <ErrorBoundary
