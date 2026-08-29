@@ -254,6 +254,20 @@ async function releaseRefreshLock(): Promise<void> {
   });
 }
 
+// 새로고침 버튼(클라이언트)이 "지금 진짜로 갱신 중인지" 물어볼 때 씀.
+// 예전엔 이 진행 상태를 클라이언트 store에만 들고 있어서, 앱을 껐다 켜면
+// (WebView 프로세스가 죽으니 store도 초기화됨) 서버는 계속 돌고 있어도
+// 버튼은 그냥 "새로고침" 상태로 돌아왔었어요(2026-08-24 세션, 제보로
+// 발견) — 클라이언트가 자기 기억이 아니라 서버(DB 락)한테 직접 물어보게
+// 바꿔서 고침. acquireRefreshLock과 같은 stale 기준을 씀 — 10분 넘게
+// isRunning=true인 락은 크래시로 못 푼 걸로 보고 "실행 중 아님"으로 취급.
+export async function isRefreshRunning(): Promise<boolean> {
+  const lock = await prisma.refreshLock.findUnique({ where: { id: 1 } });
+  if (!lock?.isRunning) return false;
+  const staleThreshold = new Date(Date.now() - STALE_LOCK_MS);
+  return lock.updatedAt >= staleThreshold;
+}
+
 export async function refreshUniverse(): Promise<RefreshResult> {
   if (!kisConfigured()) {
     return {

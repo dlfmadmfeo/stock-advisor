@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { refreshUniverse } from "@/lib/refresh-universe";
+import { refreshUniverse, isRefreshRunning } from "@/lib/refresh-universe";
 import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,14 @@ export const maxDuration = 300;
 // 갈 수 있어서 인스턴스마다 메모리가 따로 놀아 실제 동시 실행을 못 막았고,
 // 그 결과 두 실행이 진짜 동시에 같은 테이블에 upsert하다가 MySQL "Lock wait
 // timeout" 에러로 실패했었어요(2026-08-24 세션, 프로덕션 제보로 발견).
+// RefreshUniverseButton이 마운트될 때(홈 화면 진입/앱 재시작 등) 호출해서
+// "지금 진짜로 서버에서 갱신 중인지" 물어보는 용도. 사이드이펙트 없는
+// 조회라 관리자 체크는 안 둠(관리자만 보이는 버튼에서만 어차피 호출됨).
+export async function GET() {
+  const running = await isRefreshRunning();
+  return NextResponse.json({ isRunning: running });
+}
+
 export async function POST() {
   // 2026-08-23 세션: 로그인 체크가 아예 없었어서, 로그인 안 한 아무나 이
   // URL에 POST만 쏘면 KIS API로 200종목 배치 조회가 실행됐음(앱을 배포한
