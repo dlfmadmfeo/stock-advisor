@@ -45,6 +45,9 @@ import {
   type InvestorTrendPeriod,
   type InvestorTrendPoint,
 } from "@/lib/investor-trend";
+import { useDailyBars } from "@/lib/use-daily-bars";
+import { computeMacdSeries, type MacdPoint } from "@/lib/indicators";
+import type { DailyBar } from "@/lib/kis";
 import {
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
@@ -1178,6 +1181,200 @@ function StockNewsCard({ name }: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// 주가 라인차트 + MACD — 종목 상세 화면. 둘 다 같은 일봉 데이터(useDailyBars)
+// 하나로 그려서 API 호출을 두 번 안 하게 묶었어요. StockNewsCard와 같은
+// Suspense 패턴(로딩/에러 처리는 그쪽 주석 참고).
+//
+// 2026-08-24 세션: MACD는 "5일선 > 20일선" 스크리너 규칙이랑 개념이 겹치는
+// 이동평균 교차 지표라, 화면에 매매 판단을 또 하나 얹는 게 아니라 — 지금
+// 있는 배지들처럼 완전충족/조건충족 같은 "판정"을 내리지 않고, 계산된 값을
+// 차트로 그대로 보여주기만 해요(스스로 해석하시라는 뜻). 투자자 매매동향
+// 카드처럼 일/주/월 기간 토글도 고려했는데, MACD는 원래 일봉 기준이 제일
+// 흔하고(주봉/월봉 MACD는 그 자체로 봉을 다시 만들어야 하는 별도 계산이라
+// 지금 범위 밖) 데이터도 하루 단위로만 있어서 토글 없이 일봉 고정으로
+// 갔습니다.
+function PriceLineChart({ bars }: { bars: DailyBar[] }) {
+  const width = 340;
+  const height = 110;
+  const padX = 2;
+  const closes = bars.map((b) => b.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const xStep = bars.length > 1 ? (width - padX * 2) / (bars.length - 1) : 0;
+  const xAt = (i: number) => padX + i * xStep;
+  const yAt = (v: number) => height - ((v - min) / range) * (height - 10) - 5;
+
+  const linePath = bars
+    .map((b, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(b.close).toFixed(1)}`)
+    .join(" ");
+  const areaPath = `${linePath} L${xAt(bars.length - 1).toFixed(1)},${height} L${xAt(0).toFixed(1)},${height} Z`;
+  const gradientId = "price-fill-gradient";
+
+  return (
+    <svg
+      className="mt-2 w-full"
+      height={height}
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3182f6" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="#3182f6" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke="#3182f6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+      />
+    </svg>
+  );
+}
+
+function MacdChart({ points }: { points: MacdPoint[] }) {
+  const width = 340;
+  const height = 90;
+  const padX = 2;
+  const maxAbs = Math.max(
+    1,
+    ...points.flatMap((p) => [Math.abs(p.macd), Math.abs(p.signal), Math.abs(p.histogram)]),
+  );
+  const xStep = points.length > 1 ? (width - padX * 2) / (points.length - 1) : 0;
+  const yMid = height / 2;
+  const xAt = (i: number) => padX + i * xStep;
+  const yAt = (v: number) => yMid - (v / maxAbs) * (yMid - 6);
+  const barWidth = Math.max(1.5, xStep * 0.6);
+
+  function pathFor(getValue: (p: MacdPoint) => number) {
+    return points
+      .map((p, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(getValue(p)).toFixed(1)}`)
+      .join(" ");
+  }
+
+  return (
+    <svg
+      className="mt-2 w-full"
+      height={height}
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <line stroke="#e5e8eb" strokeWidth={1} x1={padX} x2={width - padX} y1={yMid} y2={yMid} />
+      {points.map((p, i) => {
+        const y = yAt(p.histogram);
+        const barHeight = Math.abs(y - yMid);
+        return (
+          <rect
+            fill={p.histogram >= 0 ? "#f04452" : "#3182f6"}
+            height={barHeight}
+            key={p.date}
+            width={barWidth}
+            x={xAt(i) - barWidth / 2}
+            y={Math.min(y, yMid)}
+          />
+        );
+      })}
+      <path
+        d={pathFor((p) => p.macd)}
+        fill="none"
+        stroke="#3182f6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+      />
+      <path
+        d={pathFor((p) => p.signal)}
+        fill="none"
+        stroke="#a16207"
+        strokeDasharray="4 3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+      />
+    </svg>
+  );
+}
+
+const CHARTS_DISPLAY_DAYS = 60;
+
+function StockChartsCardSkeleton() {
+  return (
+    <>
+      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <h2 className="text-base font-bold text-[#191f28]">주가</h2>
+        <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+      </div>
+    </>
+  );
+}
+
+function StockChartsCard({ ticker }: { ticker: string }) {
+  const { data: bars } = useDailyBars(ticker);
+  const macdPoints = useMemo(() => computeMacdSeries(bars), [bars]);
+  const displayBars = bars.slice(-CHARTS_DISPLAY_DAYS);
+  const displayMacd = macdPoints.slice(-CHARTS_DISPLAY_DAYS);
+
+  return (
+    <>
+      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-[#191f28]">주가</h2>
+          <span className="text-[11px] font-semibold text-[#8b95a1]">
+            최근 {displayBars.length}거래일
+          </span>
+        </div>
+        {displayBars.length < 2 ? (
+          <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 부족해요.</p>
+        ) : (
+          <PriceLineChart bars={displayBars} />
+        )}
+      </div>
+
+      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
+          <span className="text-[11px] font-semibold text-[#8b95a1]">12·26·9</span>
+        </div>
+        {displayMacd.length < 2 ? (
+          <p className="mt-3 text-[13px] text-[#8b95a1]">
+            데이터가 부족해요. (MACD는 최소 35거래일치 데이터가 필요해요)
+          </p>
+        ) : (
+          <>
+            <MacdChart points={displayMacd} />
+            <div className="mt-2 flex flex-wrap gap-3">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+                <span className="h-2 w-2 rounded-full" style={{ background: "#3182f6" }} />
+                MACD선
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+                <span className="h-2 w-2 rounded-full" style={{ background: "#a16207" }} />
+                시그널선
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+                <span className="h-2 w-2 rounded-full" style={{ background: "#f04452" }} />
+                모멘텀 +
+              </span>
+            </div>
+          </>
+        )}
+        <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+          단기(12일)·장기(26일) 지수이동평균의 차이(MACD선)와 그 9일
+          이동평균(시그널선)이에요. MACD선이 시그널선을 위로 뚫으면 흔히
+          "골든크로스", 아래로 뚫으면 "데드크로스"라고 부르지만, 이 화면은
+          계산된 값을 그대로 보여줄 뿐 매매 판단을 내리지 않아요.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 투자자 매매동향(외국인/기관/개인 순매수 추이) — 종목 상세 화면.
 // StockNewsCard와 같은 Suspense 패턴(useSuspenseQuery + <Suspense>)이라
 // 로딩/에러 처리는 그쪽 주석 참고. 이 섹션에서만 필요한 건: 기간(일/주/달/연)
@@ -1449,6 +1646,22 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
             {up ? "▲" : "▼"} {Math.abs(stock.chg)}% 오늘
           </p>
         </div>
+
+        <ErrorBoundary
+          fallback={(error) => (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <h2 className="text-base font-bold text-[#191f28]">주가</h2>
+              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+                {error.message || "일봉 데이터를 불러오지 못했어요."}
+              </p>
+            </div>
+          )}
+          resetKey={stock.ticker}
+        >
+          <Suspense fallback={<StockChartsCardSkeleton />}>
+            <StockChartsCard ticker={stock.ticker} />
+          </Suspense>
+        </ErrorBoundary>
 
         <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
