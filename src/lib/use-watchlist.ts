@@ -71,6 +71,16 @@ function useWatchlistSet() {
   );
 }
 
+// 홈 리스트처럼 "누를 수는 없고 상태만 보여주는" 하트용 (2026-08-29 세션 —
+// 토글은 종목 상세 화면에만 남기고 홈 리스트는 표시 전용으로 바꿈). 클릭
+// 핸들러/pending/error가 필요 없어서 useWatchlistHeart 전체를 안 쓰고 이
+// 훅만 씀 — 한 화면에 종목이 50개씩 렌더될 수 있어서 불필요한 상태를
+// 최대한 줄임.
+export function useIsWatched(ticker: string): boolean {
+  const tickers = useWatchlistSet();
+  return tickers.has(ticker);
+}
+
 // 하트 버튼 하나가 필요로 하는 상태/동작을 전부 묶은 훅. 비로그인 상태에서
 // 누르면 로그인 화면으로 보내고(서버도 401을 주긴 하지만, 미리 안내하는 게
 // 나아서), 로그인 상태면 POST/DELETE 후 WATCHLIST_QUERY_KEY를

@@ -49,6 +49,7 @@ import { useDailyBars } from "@/lib/use-daily-bars";
 import { computeMacdSeries, type MacdPoint } from "@/lib/indicators";
 import type { DailyBar } from "@/lib/kis";
 import {
+  useIsWatched,
   useWatchlistHeart,
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
@@ -941,16 +942,15 @@ const StockRow = memo(function StockRow({
   sectorAvgPer?: number;
   sectorAvgPbr?: number;
 }) {
-  const router = useRouter();
   const score = screenerScore(stock);
   const pass = score >= SCREENER_PASS_THRESHOLD;
   const up = stock.chg >= 0;
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
-      <Link
-        href={`/stock/${stock.ticker}`}
-        className="min-w-0 flex-1 active:opacity-80"
-      >
+    <Link
+      href={`/stock/${stock.ticker}`}
+      className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99] active:bg-[#f7f8fa]"
+    >
+      <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="truncate text-base font-bold text-[#191f28]">
             {stock.name}
@@ -974,19 +974,8 @@ const StockRow = memo(function StockRow({
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
           {stock.sector} · {stock.ticker} · {stock.cap}
         </p>
-      </Link>
-      {/* 하트를 <Link> 밖으로 뺐어요(2026-08-29 세션) — <a> 안에 <button>을
-          중첩하면 안 되고(무효 HTML), 하트를 가격 옆에 나란히 두면 그 폭만큼
-          이름이 더 잘려서(좁은 화면에서 "삼성전자"가 "삼..."으로 잘리는
-          회귀 발견) 등락률 줄 안으로 넣어 세로로 쌓았어요 — 이러면 우측
-          칼럼 너비가 여전히 가격 텍스트 폭으로 정해져서 이름 잘림이
-          거의 안 늘어남. 대신 이 블록은 더 이상 Link가 아니라서, 탭해도
-          상세화면으로 가게 onClick으로 직접 router.push 해줍니다(WatchlistRow와
-          같은 패턴) — 하트 버튼 클릭은 자기 handler에서 stopPropagation. */}
-      <div
-        className="shrink-0 text-right"
-        onClick={() => router.push(`/stock/${stock.ticker}`)}
-      >
+      </div>
+      <div className="shrink-0 text-right">
         <p className="text-sm font-bold text-[#191f28]">
           {formatKRW(stock.price)}
         </p>
@@ -997,36 +986,25 @@ const StockRow = memo(function StockRow({
             {up ? "+" : ""}
             {stock.chg}%
           </p>
-          <WatchlistHeartButton ticker={stock.ticker} />
+          <WatchlistHeartIndicator ticker={stock.ticker} />
         </div>
       </div>
-    </div>
+    </Link>
   );
 });
 
-// 홈/검색 리스트 행, 종목 상세 상단바에서 공용으로 쓰는 관심종목 토글 하트.
-// 실제 상태/요청 로직은 useWatchlistHeart(use-watchlist.ts)에 있고, 여기는
-// WatchlistRow의 DeleteWatchlistButton과 같은 "고스트" 버튼 스타일만 담당.
-function WatchlistHeartButton({ ticker }: { ticker: string }) {
-  const { watched, pending, toggle } = useWatchlistHeart(ticker);
+// 홈/검색 리스트 행에서 관심종목 여부만 보여주는 표시 전용 하트(2026-08-29
+// 세션 — 토글 기능은 종목 상세 화면에만 남기고 홈 리스트는 누를 수 없는
+// 상태 표시로 바꿈). 버튼이 아니라서 <Link> 안에 그냥 둬도 무효 HTML
+// 문제가 없음 — 그래서 StockRow도 다시 통짜 <Link> 하나로 되돌렸어요.
+function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
+  const watched = useIsWatched(ticker);
   return (
-    <button
-      aria-label={watched ? "관심종목에서 삭제" : "관심종목에 추가"}
-      className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition active:scale-90 disabled:opacity-50 ${
-        watched ? "text-[#f04452]" : "text-[#c3c9d1]"
-      }`}
-      disabled={pending}
-      // 이 버튼은 가격 블록(부모 div, 클릭 시 상세화면으로 이동) 안에
-      // 있어서, 클릭이 부모까지 버블링되면 하트를 누른 건데 상세화면으로도
-      // 같이 넘어가버려요 — stopPropagation으로 막습니다.
-      onClick={(e) => {
-        e.stopPropagation();
-        toggle();
-      }}
-      type="button"
-    >
-      <Heart className="h-[15px] w-[15px]" fill={watched ? "currentColor" : "none"} />
-    </button>
+    <Heart
+      aria-hidden="true"
+      className={`h-[15px] w-[15px] shrink-0 ${watched ? "text-[#f04452]" : "text-[#c3c9d1]"}`}
+      fill={watched ? "currentColor" : "none"}
+    />
   );
 }
 
