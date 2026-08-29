@@ -10,6 +10,8 @@
 //   KIS_APP_KEY, KIS_APP_SECRET, KIS_ENV ("real" | "virtual")
 // ---------------------------------------------------------------------------
 
+import { prisma } from "./db";
+
 const BASE_URL =
   process.env.KIS_ENV === "virtual"
     ? "https://openapivts.koreainvestment.com:29443"
@@ -33,21 +35,53 @@ export type DailyBar = {
 
 // ---------------------------------------------------------------------------
 // OAuth 토큰 발급 + 캐싱
-// KIS는 토큰 발급 빈도 제한이 있어서(분당 1회 수준) 프로세스 메모리에 캐싱합니다.
-// 서버리스 환경(Vercel 등)에서는 콜드스타트마다 새로 발급되니 참고하세요.
-// ---------------------------------------------------------------------------
+//
+// 2026-08-24 세션: 프로세스 메모리 캐싱(cachedToken)만으로는 부족하다는 걸
+// 발견했어요 — Vercel 서버리스는 콜드스타트마다 새 인스턴스라 메모리가
+// 매번 비어있어서, 인스턴스가 여러 개 뜨면 각자 토큰을 새로 발급받으려
+// 했음. KIS는 토큰 발급을 "분당 1회"로 제한해서(EGW00133 에러) 이게 자주
+// 겹치면 발급 자체가 실패했어요(투자자매매동향이 "자꾸 실패한다"는 제보로
+// 추적하다 발견 — RefreshLock 때와 같은 유형의 문제). 그래서 KisToken
+// 테이블(DB)을 추가해서, 인스턴스 메모리보다 먼저 DB를 확인하게 함 —
+// 토큰 유효기간이 보통 24시간이라 DB 캐싱해두면 인스턴스가 몇 개든 하루에
+// 한 번 정도만 진짜로 KIS에 발급받으면 됩니다. 3단계 우선순위:
+//   1. 이 프로세스 메모리(cachedToken) — 가장 빠름, DB 왕복도 없음
+//   2. DB(KisToken 테이블) — 다른 인스턴스가 최근에 발급해둔 걸 재사용
+//   3. KIS에 진짜로 새로 발급 요청 — 위 둘 다 없을 때만
 let cachedToken: { token: string; expiresAt: number } | null = null;
 // 진행 중인 토큰 발급 요청. refresh-universe가 종목을 CONCURRENCY(4)개씩
 // 병렬 처리하고, 종목 하나당 daily/weekly/quote 3건을 또 동시에 부르다 보니
-// (processTicker 참고) 캐시가 비어있는 상태(서버리스 콜드스타트 직후 등)에서
-// 최대 12개 호출이 한꺼번에 getAccessToken()에 들어올 수 있었음. 그런데 이
-// 함수가 매번 cachedToken만 보고 없으면 각자 /oauth2/tokenP를 따로 쐈어서,
-// "분당 1회 수준"인 KIS 토큰 발급 제한에 걸려 그 중 1건만 성공하고 나머지는
-// 실패 — 하필 유니버스 맨 앞(시총 최상위, 즉 삼성전자/SK하이닉스)이 첫
-// 배치라 계속 스킵되는 원인이었음(2026-08-22 세션, 새로고침해도 삼성전자가
-// DB에 안 들어오는 문제를 추적하다 발견). 진행 중인 요청을 여기 공유해서
-// 동시 호출이 몰려도 실제 HTTP 요청은 1건만 나가게 함.
+// (processTicker 참고) 캐시가 비어있는 상태에서 최대 12개 호출이 한꺼번에
+// getAccessToken()에 들어올 수 있었음(2026-08-22 세션에 발견) — 이 안에서만
+// 이라도 실제 HTTP 요청이 1건만 나가게 공유합니다.
 let inFlightTokenRequest: Promise<string> | null = null;
+
+async function readCachedTokenFromDb(): Promise<{ token: string; expiresAt: number } | null> {
+  try {
+    const row = await prisma.kisToken.findUnique({ where: { id: 1 } });
+    if (!row) return null;
+    const expiresAt = row.expiresAt.getTime();
+    if (expiresAt <= Date.now() + 60_000) return null; // 곧 만료면 새로 받는 쪽이 안전
+    return { token: row.token, expiresAt };
+  } catch (e) {
+    console.error("[KIS] DB 토큰 캐시 조회 실패:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function writeTokenToDb(token: string, expiresAt: number): Promise<void> {
+  try {
+    await prisma.kisToken.upsert({
+      where: { id: 1 },
+      create: { id: 1, token, expiresAt: new Date(expiresAt) },
+      update: { token, expiresAt: new Date(expiresAt) },
+    });
+  } catch (e) {
+    // DB 저장이 실패해도 이번 요청은 이미 받은 토큰으로 계속 진행 —
+    // 다음 콜드스타트 때 다시 KIS에 발급받게 되는 정도의 손해라 치명적이지 않음.
+    console.error("[KIS] DB 토큰 캐시 저장 실패:", e instanceof Error ? e.message : e);
+  }
+}
 
 async function getAccessToken(): Promise<string> {
   if (!APP_KEY || !APP_SECRET) {
@@ -61,6 +95,12 @@ async function getAccessToken(): Promise<string> {
   if (inFlightTokenRequest) return inFlightTokenRequest;
 
   inFlightTokenRequest = (async () => {
+    const dbToken = await readCachedTokenFromDb();
+    if (dbToken) {
+      cachedToken = dbToken;
+      return dbToken.token;
+    }
+
     const res = await fetch(`${BASE_URL}/oauth2/tokenP`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -74,6 +114,16 @@ async function getAccessToken(): Promise<string> {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      // "분당 1회" 제한(EGW00133)에 걸렸다면, 이 요청이 오가는 사이에 다른
+      // 인스턴스가 막 발급받아 DB에 써놨을 수 있어요 — 포기하기 전에 한 번 더 확인.
+      if (text.includes("EGW00133")) {
+        await sleep(2000);
+        const retryDbToken = await readCachedTokenFromDb();
+        if (retryDbToken) {
+          cachedToken = retryDbToken;
+          return retryDbToken.token;
+        }
+      }
       throw new Error(
         `KIS 토큰 발급 실패 (${res.status}): ${text.slice(0, 300)}`,
       );
@@ -85,6 +135,7 @@ async function getAccessToken(): Promise<string> {
     if (!token) throw new Error("KIS 토큰 응답에 access_token이 없어요");
 
     cachedToken = { token, expiresAt: Date.now() + expiresIn * 1000 };
+    await writeTokenToDb(token, cachedToken.expiresAt);
     console.log(
       `KIS 토큰 발급 완료 (만료: ${new Date(cachedToken.expiresAt).toISOString()})`,
     );
