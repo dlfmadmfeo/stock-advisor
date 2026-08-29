@@ -76,6 +76,14 @@ function useWatchlistSet() {
 // 나아서), 로그인 상태면 POST/DELETE 후 WATCHLIST_QUERY_KEY를
 // invalidate해서 이 훅을 쓰는 모든 곳(하트들 + 관심종목 화면)이 한 번에
 // 최신 상태로 갱신되게 합니다.
+//
+// 2026-08-29 세션 추가: 처음엔 캐시를 낙관적으로 안 바꾸고 fetch 응답을
+// 기다린 뒤에야 하트가 채워졌는데, POST가 서버에서 실시간 구독
+// 요청(stock-advisor-server 왕복)까지 끝나야 응답이 와서 체감 지연이
+// 있었어요("하트 누를 때마다 API 호출돼서 지연되는 것 같다"는 피드백). 그래서
+// 요청을 보내기 전에 캐시를 먼저 바꿔서 하트가 즉시 반응하게 하고, 실패하면
+// 그때 원래 캐시로 되돌립니다 — 실시간 구독 왕복은 백그라운드에서 계속
+// 진행되고 화면은 안 기다려요.
 export function useWatchlistHeart(ticker: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -90,19 +98,43 @@ export function useWatchlistHeart(ticker: string) {
       router.push("/login");
       return;
     }
-    setPending(true);
     setError(null);
+
+    const previous = queryClient.getQueryData<WatchlistItem[]>(WATCHLIST_QUERY_KEY);
+    queryClient.setQueryData<WatchlistItem[]>(WATCHLIST_QUERY_KEY, (old) => {
+      const list = old ?? [];
+      if (watched) return list.filter((i) => i.ticker !== ticker);
+      if (list.some((i) => i.ticker === ticker)) return list;
+      return [
+        {
+          ticker,
+          addedAt: new Date().toISOString(),
+          name: null,
+          sector: null,
+          price: null,
+          chg: null,
+          cap: null,
+        },
+        ...list,
+      ];
+    });
+
+    setPending(true);
     try {
       const res = await fetch(resolveApiUrl(`/api/watchlist/${ticker}`), {
         method: watched ? "DELETE" : "POST",
       });
       if (!res.ok) {
+        queryClient.setQueryData(WATCHLIST_QUERY_KEY, previous);
         const data = await res.json().catch(() => null);
         setError(data?.message ?? "요청에 실패했어요.");
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY });
+      // 진짜 서버 상태(정확한 addedAt, 유니버스 밖 종목이면 name 등)로
+      // 조용히 맞춰줍니다 — 위에서 이미 낙관적으로 반영해서 화면은 안 기다림.
+      queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY });
     } catch {
+      queryClient.setQueryData(WATCHLIST_QUERY_KEY, previous);
       setError("서버에 연결할 수 없어요.");
     } finally {
       setPending(false);
