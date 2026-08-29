@@ -84,6 +84,15 @@ function useWatchlistSet() {
 // 요청을 보내기 전에 캐시를 먼저 바꿔서 하트가 즉시 반응하게 하고, 실패하면
 // 그때 원래 캐시로 되돌립니다 — 실시간 구독 왕복은 백그라운드에서 계속
 // 진행되고 화면은 안 기다려요.
+//
+// 이 버전엔 롤백을 "요청 시작 전 전체 리스트 스냅샷"으로 통째로 되돌리는
+// 버그가 있었어요 — 하트 여러 개를 연달아 누르면, 먼저 누른 하트의 요청이
+// 실패해서 롤백될 때 그 스냅샷이 "나중에 누른 다른 하트"의 낙관적 반영보다
+// 오래된 상태라, 그 다른 하트의 변경까지 같이 지워져버렸어요(빨갛게
+// 채워졌다가 다시 빈 하트로 돌아가는 걸로 보임, 2026-08-29 세션 제보). 그래서
+// "전체 스냅샷 저장/복원" 대신, add/remove를 함수형 업데이터로만 표현해서
+// 낙관적 반영이든 롤백이든 항상 "그 순간의 최신 캐시" 위에서 이 티커 하나만
+// 건드리게 바꿨습니다 — 다른 하트가 그 사이에 넣은 변경은 안 건드림.
 export function useWatchlistHeart(ticker: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -100,32 +109,36 @@ export function useWatchlistHeart(ticker: string) {
     }
     setError(null);
 
-    const previous = queryClient.getQueryData<WatchlistItem[]>(WATCHLIST_QUERY_KEY);
-    queryClient.setQueryData<WatchlistItem[]>(WATCHLIST_QUERY_KEY, (old) => {
-      const list = old ?? [];
-      if (watched) return list.filter((i) => i.ticker !== ticker);
-      if (list.some((i) => i.ticker === ticker)) return list;
-      return [
-        {
-          ticker,
-          addedAt: new Date().toISOString(),
-          name: null,
-          sector: null,
-          price: null,
-          chg: null,
-          cap: null,
-        },
-        ...list,
-      ];
-    });
+    const wasWatched = watched;
+    const setPresence = (present: boolean) => {
+      queryClient.setQueryData<WatchlistItem[]>(WATCHLIST_QUERY_KEY, (old) => {
+        const list = old ?? [];
+        if (!present) return list.filter((i) => i.ticker !== ticker);
+        if (list.some((i) => i.ticker === ticker)) return list;
+        return [
+          {
+            ticker,
+            addedAt: new Date().toISOString(),
+            name: null,
+            sector: null,
+            price: null,
+            chg: null,
+            cap: null,
+          },
+          ...list,
+        ];
+      });
+    };
+
+    setPresence(!wasWatched);
 
     setPending(true);
     try {
       const res = await fetch(resolveApiUrl(`/api/watchlist/${ticker}`), {
-        method: watched ? "DELETE" : "POST",
+        method: wasWatched ? "DELETE" : "POST",
       });
       if (!res.ok) {
-        queryClient.setQueryData(WATCHLIST_QUERY_KEY, previous);
+        setPresence(wasWatched);
         const data = await res.json().catch(() => null);
         setError(data?.message ?? "요청에 실패했어요.");
         return;
@@ -134,7 +147,7 @@ export function useWatchlistHeart(ticker: string) {
       // 조용히 맞춰줍니다 — 위에서 이미 낙관적으로 반영해서 화면은 안 기다림.
       queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY });
     } catch {
-      queryClient.setQueryData(WATCHLIST_QUERY_KEY, previous);
+      setPresence(wasWatched);
       setError("서버에 연결할 수 없어요.");
     } finally {
       setPending(false);
