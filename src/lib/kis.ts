@@ -10,6 +10,8 @@
 //   KIS_APP_KEY, KIS_APP_SECRET, KIS_ENV ("real" | "virtual")
 // ---------------------------------------------------------------------------
 
+import { prisma } from "./db";
+
 const BASE_URL =
   process.env.KIS_ENV === "virtual"
     ? "https://openapivts.koreainvestment.com:29443"
@@ -33,21 +35,53 @@ export type DailyBar = {
 
 // ---------------------------------------------------------------------------
 // OAuth 토큰 발급 + 캐싱
-// KIS는 토큰 발급 빈도 제한이 있어서(분당 1회 수준) 프로세스 메모리에 캐싱합니다.
-// 서버리스 환경(Vercel 등)에서는 콜드스타트마다 새로 발급되니 참고하세요.
-// ---------------------------------------------------------------------------
+//
+// 2026-08-24 세션: 프로세스 메모리 캐싱(cachedToken)만으로는 부족하다는 걸
+// 발견했어요 — Vercel 서버리스는 콜드스타트마다 새 인스턴스라 메모리가
+// 매번 비어있어서, 인스턴스가 여러 개 뜨면 각자 토큰을 새로 발급받으려
+// 했음. KIS는 토큰 발급을 "분당 1회"로 제한해서(EGW00133 에러) 이게 자주
+// 겹치면 발급 자체가 실패했어요(투자자매매동향이 "자꾸 실패한다"는 제보로
+// 추적하다 발견 — RefreshLock 때와 같은 유형의 문제). 그래서 KisToken
+// 테이블(DB)을 추가해서, 인스턴스 메모리보다 먼저 DB를 확인하게 함 —
+// 토큰 유효기간이 보통 24시간이라 DB 캐싱해두면 인스턴스가 몇 개든 하루에
+// 한 번 정도만 진짜로 KIS에 발급받으면 됩니다. 3단계 우선순위:
+//   1. 이 프로세스 메모리(cachedToken) — 가장 빠름, DB 왕복도 없음
+//   2. DB(KisToken 테이블) — 다른 인스턴스가 최근에 발급해둔 걸 재사용
+//   3. KIS에 진짜로 새로 발급 요청 — 위 둘 다 없을 때만
 let cachedToken: { token: string; expiresAt: number } | null = null;
 // 진행 중인 토큰 발급 요청. refresh-universe가 종목을 CONCURRENCY(4)개씩
 // 병렬 처리하고, 종목 하나당 daily/weekly/quote 3건을 또 동시에 부르다 보니
-// (processTicker 참고) 캐시가 비어있는 상태(서버리스 콜드스타트 직후 등)에서
-// 최대 12개 호출이 한꺼번에 getAccessToken()에 들어올 수 있었음. 그런데 이
-// 함수가 매번 cachedToken만 보고 없으면 각자 /oauth2/tokenP를 따로 쐈어서,
-// "분당 1회 수준"인 KIS 토큰 발급 제한에 걸려 그 중 1건만 성공하고 나머지는
-// 실패 — 하필 유니버스 맨 앞(시총 최상위, 즉 삼성전자/SK하이닉스)이 첫
-// 배치라 계속 스킵되는 원인이었음(2026-08-22 세션, 새로고침해도 삼성전자가
-// DB에 안 들어오는 문제를 추적하다 발견). 진행 중인 요청을 여기 공유해서
-// 동시 호출이 몰려도 실제 HTTP 요청은 1건만 나가게 함.
+// (processTicker 참고) 캐시가 비어있는 상태에서 최대 12개 호출이 한꺼번에
+// getAccessToken()에 들어올 수 있었음(2026-08-22 세션에 발견) — 이 안에서만
+// 이라도 실제 HTTP 요청이 1건만 나가게 공유합니다.
 let inFlightTokenRequest: Promise<string> | null = null;
+
+async function readCachedTokenFromDb(): Promise<{ token: string; expiresAt: number } | null> {
+  try {
+    const row = await prisma.kisToken.findUnique({ where: { id: 1 } });
+    if (!row) return null;
+    const expiresAt = row.expiresAt.getTime();
+    if (expiresAt <= Date.now() + 60_000) return null; // 곧 만료면 새로 받는 쪽이 안전
+    return { token: row.token, expiresAt };
+  } catch (e) {
+    console.error("[KIS] DB 토큰 캐시 조회 실패:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function writeTokenToDb(token: string, expiresAt: number): Promise<void> {
+  try {
+    await prisma.kisToken.upsert({
+      where: { id: 1 },
+      create: { id: 1, token, expiresAt: new Date(expiresAt) },
+      update: { token, expiresAt: new Date(expiresAt) },
+    });
+  } catch (e) {
+    // DB 저장이 실패해도 이번 요청은 이미 받은 토큰으로 계속 진행 —
+    // 다음 콜드스타트 때 다시 KIS에 발급받게 되는 정도의 손해라 치명적이지 않음.
+    console.error("[KIS] DB 토큰 캐시 저장 실패:", e instanceof Error ? e.message : e);
+  }
+}
 
 async function getAccessToken(): Promise<string> {
   if (!APP_KEY || !APP_SECRET) {
@@ -61,6 +95,12 @@ async function getAccessToken(): Promise<string> {
   if (inFlightTokenRequest) return inFlightTokenRequest;
 
   inFlightTokenRequest = (async () => {
+    const dbToken = await readCachedTokenFromDb();
+    if (dbToken) {
+      cachedToken = dbToken;
+      return dbToken.token;
+    }
+
     const res = await fetch(`${BASE_URL}/oauth2/tokenP`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -74,6 +114,16 @@ async function getAccessToken(): Promise<string> {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      // "분당 1회" 제한(EGW00133)에 걸렸다면, 이 요청이 오가는 사이에 다른
+      // 인스턴스가 막 발급받아 DB에 써놨을 수 있어요 — 포기하기 전에 한 번 더 확인.
+      if (text.includes("EGW00133")) {
+        await sleep(2000);
+        const retryDbToken = await readCachedTokenFromDb();
+        if (retryDbToken) {
+          cachedToken = retryDbToken;
+          return retryDbToken.token;
+        }
+      }
       throw new Error(
         `KIS 토큰 발급 실패 (${res.status}): ${text.slice(0, 300)}`,
       );
@@ -85,6 +135,7 @@ async function getAccessToken(): Promise<string> {
     if (!token) throw new Error("KIS 토큰 응답에 access_token이 없어요");
 
     cachedToken = { token, expiresAt: Date.now() + expiresIn * 1000 };
+    await writeTokenToDb(token, cachedToken.expiresAt);
     console.log(
       `KIS 토큰 발급 완료 (만료: ${new Date(cachedToken.expiresAt).toISOString()})`,
     );
@@ -522,4 +573,122 @@ export async function fetchMarketCapRanking(
   }
 
   return results.slice(0, maxCount);
+}
+
+// ---------------------------------------------------------------------------
+// 종목별 투자자매매동향(일별) — 외국인/기관/개인 순매수 추이.
+//
+// KIS 공식 예제(examples_llm/domestic_stock/investor_trade_by_stock_daily)
+// 기준 tr_id/필드명을 그대로 옮겼습니다.
+//
+// ⚠️ 이 엔드포인트는 tr_cont continuation을 지원하지 않아요(응답 헤더
+// tr_cont가 항상 빈 문자열 — 실측 확인, 2026-08-24). 대신 FID_INPUT_DATE_1에
+// 다른 날짜를 넣으면 "그 날짜를 마지막으로 하는 최근 30거래일" 구간을 매번
+// 새로 줘요(실측 확인: 20260824 기준 → 20260710~20260824, 20260630 기준 →
+// 20260518~20260630, 겹치는 구간 없이 딱 이어짐). 그래서 매 호출마다 받은
+// 구간의 "가장 오래된 날짜"를 다음 호출의 FID_INPUT_DATE_1으로 써서 뒤로
+// 계속 넘어가는 방식으로 페이지네이션합니다(다른 continuation 기반
+// 엔드포인트들과는 다른 패턴).
+// ---------------------------------------------------------------------------
+export type InvestorTrendDay = {
+  date: string; // yyyymmdd
+  close: number;
+  frgnNetAmount: number; // 외국인 순매수 거래대금(원)
+  orgnNetAmount: number; // 기관계 순매수 거래대금(원)
+  prsnNetAmount: number; // 개인 순매수 거래대금(원)
+  frgnNetQty: number; // 외국인 순매수 수량
+  orgnNetQty: number; // 기관계 순매수 수량
+  prsnNetQty: number; // 개인 순매수 수량
+};
+
+// 한 번 호출에 30거래일씩 오니, 500행을 채우려면 최대 17번 정도 호출.
+// 약 2년치 거래일 — 일/주/달 뷰는 넉넉히 커버하고, 연도별 뷰는 최근~작년
+// 정도까지만 의미 있게 나옵니다(더 과거는 이 함수 범위 밖).
+const INVESTOR_TREND_TARGET_ROWS = 500;
+const INVESTOR_TREND_MAX_PAGES = 20;
+
+function shiftYyyymmdd(dateStr: string, days: number): string {
+  const d = new Date(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(4, 6)) - 1,
+    Number(dateStr.slice(6, 8)),
+  );
+  d.setDate(d.getDate() + days);
+  return yyyymmdd(d);
+}
+
+// 기준일이 주말/공휴일이면(=그날 거래가 없었으면) 이 엔드포인트가 빈
+// output2 대신 에러("TIME LIMIT 00:00 ~ 15:40")를 줘요(2026-08-29 세션,
+// 토요일에 실측 — 시스템 날짜를 그대로 기준일로 쓰다가 항상 실패하던
+// 원인). 하루 전으로 물러나며 최대 이만큼 재시도해서 가장 최근 거래일을 찾음.
+const MAX_ANCHOR_BACKTRACK_DAYS = 7;
+
+export async function fetchInvestorTrend(ticker: string): Promise<InvestorTrendDay[] | null> {
+  try {
+    const rows: InvestorTrendDay[] = [];
+    const seenDates = new Set<string>();
+    let anchorDate = yyyymmdd(new Date());
+    let backtrackAttempts = 0;
+    let pageCount = 0;
+
+    while (pageCount < INVESTOR_TREND_MAX_PAGES && rows.length < INVESTOR_TREND_TARGET_ROWS) {
+      const { json } = await kisGetRaw(
+        "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
+        "FHPTJ04160001",
+        {
+          FID_COND_MRKT_DIV_CODE: "J",
+          FID_INPUT_ISCD: ticker,
+          FID_INPUT_DATE_1: anchorDate,
+          FID_ORG_ADJ_PRC: "",
+          FID_ETC_CLS_CODE: "",
+        },
+      );
+
+      const daily = json?.output2;
+      if (!Array.isArray(daily) || daily.length === 0) {
+        // 아직 한 건도 못 모은 상태(=첫 시도)에서 비어있으면, "더 과거
+        // 데이터가 없다"가 아니라 "기준일 자체가 휴장일"일 가능성이 커요.
+        // 하루 전으로 물러나서 다시 시도 — 페이지 카운트는 안 씀(진짜
+        // 페이지가 아니니까).
+        if (rows.length === 0 && backtrackAttempts < MAX_ANCHOR_BACKTRACK_DAYS) {
+          backtrackAttempts += 1;
+          anchorDate = shiftYyyymmdd(anchorDate, -1);
+          continue;
+        }
+        break;
+      }
+
+      pageCount += 1;
+      let newCount = 0;
+      let oldestInBatch: string | null = null;
+      for (const r of daily) {
+        const date = String(r.stck_bsop_date ?? "").trim();
+        if (!date) continue;
+        if (!oldestInBatch || date < oldestInBatch) oldestInBatch = date;
+        if (seenDates.has(date)) continue;
+        seenDates.add(date);
+        newCount += 1;
+        rows.push({
+          date,
+          close: Number(r.stck_clpr) || 0,
+          frgnNetAmount: Number(r.frgn_ntby_tr_pbmn) || 0,
+          orgnNetAmount: Number(r.orgn_ntby_tr_pbmn) || 0,
+          prsnNetAmount: Number(r.prsn_ntby_tr_pbmn) || 0,
+          frgnNetQty: Number(r.frgn_ntby_qty) || 0,
+          orgnNetQty: Number(r.orgn_ntby_qty) || 0,
+          prsnNetQty: Number(r.prsn_ntby_qty) || 0,
+        });
+      }
+
+      // 새 날짜가 하나도 없으면(같은 구간 반복 = 더 과거 데이터가 없음) 중단.
+      if (newCount === 0 || !oldestInBatch) break;
+      anchorDate = oldestInBatch;
+    }
+
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+    return rows.length ? rows : null;
+  } catch (e) {
+    console.error(`[KIS] ${ticker} 투자자매매동향 조회 실패:`, e instanceof Error ? e.message : e);
+    return null;
+  }
 }

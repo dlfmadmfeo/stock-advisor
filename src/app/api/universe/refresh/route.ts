@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { refreshUniverse } from "@/lib/refresh-universe";
+import { refreshUniverse, isRefreshRunning } from "@/lib/refresh-universe";
 import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -8,14 +8,23 @@ export const dynamic = "force-dynamic";
 // (Vercel 같은 서버리스 배포 기준으로) 넉넉히 잡아둡니다.
 export const maxDuration = 300;
 
-// 홈 화면의 "유니버스 새로고침" 버튼이 호출하는 라우트입니다. 종목 30개 x
-// KIS 호출 3건이라 kis.ts의 rate limiter(초당 6건) 때문에 완료까지 대략
-// 15~30초 걸려요 — 버튼 쪽에서 로딩 상태를 보여줍니다.
+// 홈 화면의 "유니버스 새로고침" 버튼이 호출하는 라우트입니다. 종목 200개 x
+// KIS 호출 3건이라 kis.ts의 rate limiter(초당 6건) 때문에 완료까지 보통
+// 2~4분 걸려요 — 버튼 쪽에서 로딩 상태를 보여줍니다.
 //
-// 같은 서버 프로세스 안에서 동시에 두 번 실행되지 않도록 아주 단순한
-// in-memory 락만 둡니다 (여러 인스턴스로 스케일하면 이 정도로는 부족하지만,
-// 지금은 로컬 1인 사용 앱이라 충분해요).
-let isRunning = false;
+// 동시 실행 방지 락은 여기(라우트의 메모리 변수)가 아니라 refreshUniverse()
+// 안에서 DB row로 관리합니다(refresh-universe.ts 참고). 예전엔 여기 메모리
+// 변수(let isRunning)로 막았는데, Vercel은 요청마다 다른 서버리스 인스턴스로
+// 갈 수 있어서 인스턴스마다 메모리가 따로 놀아 실제 동시 실행을 못 막았고,
+// 그 결과 두 실행이 진짜 동시에 같은 테이블에 upsert하다가 MySQL "Lock wait
+// timeout" 에러로 실패했었어요(2026-08-24 세션, 프로덕션 제보로 발견).
+// RefreshUniverseButton이 마운트될 때(홈 화면 진입/앱 재시작 등) 호출해서
+// "지금 진짜로 서버에서 갱신 중인지" 물어보는 용도. 사이드이펙트 없는
+// 조회라 관리자 체크는 안 둠(관리자만 보이는 버튼에서만 어차피 호출됨).
+export async function GET() {
+  const running = await isRefreshRunning();
+  return NextResponse.json({ isRunning: running });
+}
 
 export async function POST() {
   // 2026-08-23 세션: 로그인 체크가 아예 없었어서, 로그인 안 한 아무나 이
@@ -30,23 +39,16 @@ export async function POST() {
     );
   }
 
-  if (isRunning) {
-    return NextResponse.json(
-      { ok: false, message: "이미 갱신이 진행 중이에요. 잠시 후 다시 시도해주세요." },
-      { status: 429 },
-    );
-  }
-
-  isRunning = true;
   try {
     const result = await refreshUniverse();
-    return NextResponse.json(result, { status: result.ok ? 200 : 502 });
+    const alreadyRunning = !result.ok && result.message.includes("이미 갱신이 진행 중");
+    return NextResponse.json(result, {
+      status: result.ok ? 200 : alreadyRunning ? 429 : 502,
+    });
   } catch (e) {
     return NextResponse.json(
       { ok: false, message: e instanceof Error ? e.message : String(e) },
       { status: 500 },
     );
-  } finally {
-    isRunning = false;
   }
 }

@@ -50,6 +50,36 @@ model Stock {
   @@index([recommendationRank])
 }
 
+// "유니버스 새로고침"이 동시에 두 번 안 돌게 막는 락. 예전엔 route.ts의
+// 메모리 변수(let isRunning)로 했는데, 이건 Vercel 서버리스 인스턴스마다
+// 따로 놀아서(같은 요청이 다른 인스턴스로 가면 그쪽은 isRunning=false로
+// 시작함) 실제로 동시 실행을 못 막았어요 — 진짜로 두 refreshUniverse()가
+// 같은 Stock 테이블에 동시에 upsert하면서 MySQL "Lock wait timeout" 에러가
+// 났던 게 이 문제 때문(2026-08-24 세션, 프로덕션에서 "다시 시도해달라는
+// 에러" 제보로 발견). 여러 인스턴스가 공유하는 건 DB뿐이라, 락도 DB에 둬야
+// 진짜로 막을 수 있음 — 싱글턴 row 하나(id=1)를 조건부 UPDATE로 원자적으로
+// 뺏어오는 방식(refresh-universe.ts의 acquireRefreshLock 참고).
+model RefreshLock {
+  id        Int      @id @default(1)
+  isRunning Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+// KIS 접근토큰(OAuth) 캐시. RefreshLock과 같은 이유로 DB에 둡니다 — kis.ts가
+// 예전엔 이 토큰을 서버 프로세스 메모리(cachedToken)에만 캐싱했는데, Vercel
+// 서버리스는 콜드스타트마다 새 인스턴스라 메모리가 매번 비어있어서 요청마다
+// 토큰을 새로 발급받으려 했어요. 근데 KIS는 토큰 발급을 "분당 1회"로
+// 제한해서(EGW00133 에러), 여러 인스턴스가 짧은 시간에 겹치면 발급 자체가
+// 실패했어요(2026-08-24 세션, 투자자매매동향이 "자꾸 실패한다"는 제보로
+// 발견 — 근본 원인이 이거였음). 토큰 유효기간이 보통 24시간이라 DB에
+// 캐싱해두면 인스턴스가 몇 개든 하루에 한 번 정도만 실제로 발급받으면 됨.
+model KisToken {
+  id        Int      @id @default(1)
+  token     String   @db.Text
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식(auth.ts)을
 // better-auth 라이브러리로 교체하면서, User/Session/Account/Verification
 // 4개 모델 구성을 better-auth의 Prisma 어댑터가 기대하는 표준 스키마

@@ -56,6 +56,73 @@ export function ma5over20(closes: number[]): boolean | null {
   return ma5 > ma20;
 }
 
+// 지수이동평균의 "전체 시계열"을 반환합니다 (sma()는 마지막 한 값만 주는 것과
+// 다름 — MACD는 매일의 EMA 값이 다 필요해서 시계열로 계산해야 함). 앞쪽
+// period-1개는 아직 시드(SMA)가 안 채워진 구간이라 null.
+function emaSeries(values: number[], period: number): (number | null)[] {
+  const result: (number | null)[] = new Array(values.length).fill(null);
+  if (values.length < period) return result;
+  const k = 2 / (period + 1);
+  const seed = sma(values.slice(0, period), period);
+  if (seed === null) return result;
+  result[period - 1] = seed;
+  for (let i = period; i < values.length; i++) {
+    const prev = result[i - 1] as number;
+    result[i] = values[i] * k + prev * (1 - k);
+  }
+  return result;
+}
+
+export type MacdPoint = {
+  date: string;
+  close: number;
+  macd: number;
+  signal: number;
+  histogram: number;
+};
+
+// MACD(12,26,9) — 가장 흔히 쓰는 기본 설정. EMA12에서 EMA26을 뺀 게
+// MACD선, 그 MACD선의 EMA9가 시그널선, 둘의 차이가 히스토그램(모멘텀).
+// bars는 오래된 날짜 -> 최신 날짜 순이어야 합니다.
+export function computeMacdSeries(bars: DailyBar[]): MacdPoint[] {
+  const closes = bars.map((b) => b.close);
+  const emaFast = emaSeries(closes, 12);
+  const emaSlow = emaSeries(closes, 26);
+  const macdLine: (number | null)[] = closes.map((_, i) => {
+    const fast = emaFast[i];
+    const slow = emaSlow[i];
+    return fast === null || slow === null ? null : fast - slow;
+  });
+
+  // 시그널선(=MACD선의 EMA9)은 MACD선 자체가 null이 아닌 구간부터만
+  // 의미가 있어서, null을 뺀 값들만 따로 모아 EMA를 돌리고 원래 인덱스에
+  // 다시 끼워 넣습니다.
+  const firstValidIdx = macdLine.findIndex((v) => v !== null);
+  const signalLine: (number | null)[] = new Array(closes.length).fill(null);
+  if (firstValidIdx !== -1) {
+    const macdOnly = macdLine.slice(firstValidIdx) as number[];
+    const signalOnly = emaSeries(macdOnly, 9);
+    for (let i = 0; i < signalOnly.length; i++) {
+      signalLine[firstValidIdx + i] = signalOnly[i];
+    }
+  }
+
+  const points: MacdPoint[] = [];
+  for (let i = 0; i < bars.length; i++) {
+    const macd = macdLine[i];
+    const signal = signalLine[i];
+    if (macd === null || signal === null) continue;
+    points.push({
+      date: bars[i].date,
+      close: bars[i].close,
+      macd: +macd.toFixed(1),
+      signal: +signal.toFixed(1),
+      histogram: +(macd - signal).toFixed(1),
+    });
+  }
+  return points;
+}
+
 export type ScreenerInputs = {
   price: number;
   chg: number;
