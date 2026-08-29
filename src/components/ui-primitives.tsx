@@ -26,12 +26,17 @@ export function TopBar({
   left,
   right,
   onLeftClick,
+  onRightClick,
   rightHref,
 }: {
   title: string;
   left?: React.ReactNode;
   right?: React.ReactNode;
   onLeftClick?: () => void;
+  // 관심종목 하트처럼 우측에 클릭 가능한 아이콘이 필요한 화면용
+  // (2026-08-29 세션). onLeftClick과 대칭되는 패턴 — rightHref(링크)와는
+  // 달리 클릭 시 페이지 이동 없이 동작만 실행해야 하는 경우에 씁니다.
+  onRightClick?: () => void;
   rightHref?: string;
 }) {
   const buttonClass =
@@ -56,7 +61,11 @@ export function TopBar({
       </h1>
       <div className="flex w-10 items-center justify-end">
         {right ? (
-          rightHref ? (
+          onRightClick ? (
+            <button className={buttonClass} onClick={onRightClick} type="button">
+              {right}
+            </button>
+          ) : rightHref ? (
             <Link className={buttonClass} href={rightHref}>
               {right}
             </Link>

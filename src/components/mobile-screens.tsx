@@ -49,6 +49,8 @@ import { useDailyBars } from "@/lib/use-daily-bars";
 import { computeMacdSeries, type MacdPoint } from "@/lib/indicators";
 import type { DailyBar } from "@/lib/kis";
 import {
+  useIsWatched,
+  useWatchlistHeart,
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
   type WatchlistItem,
@@ -977,16 +979,34 @@ const StockRow = memo(function StockRow({
         <p className="text-sm font-bold text-[#191f28]">
           {formatKRW(stock.price)}
         </p>
-        <p
-          className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
-        >
-          {up ? "+" : ""}
-          {stock.chg}%
-        </p>
+        <div className="mt-0.5 flex items-center justify-end gap-1.5">
+          <p
+            className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+          >
+            {up ? "+" : ""}
+            {stock.chg}%
+          </p>
+          <WatchlistHeartIndicator ticker={stock.ticker} />
+        </div>
       </div>
     </Link>
   );
 });
+
+// 홈/검색 리스트 행에서 관심종목 여부만 보여주는 표시 전용 하트(2026-08-29
+// 세션 — 토글 기능은 종목 상세 화면에만 남기고 홈 리스트는 누를 수 없는
+// 상태 표시로 바꿈). 버튼이 아니라서 <Link> 안에 그냥 둬도 무효 HTML
+// 문제가 없음 — 그래서 StockRow도 다시 통짜 <Link> 하나로 되돌렸어요.
+function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
+  const watched = useIsWatched(ticker);
+  return (
+    <Heart
+      aria-hidden="true"
+      className={`h-[15px] w-[15px] shrink-0 ${watched ? "text-[#f04452]" : "text-[#c3c9d1]"}`}
+      fill={watched ? "currentColor" : "none"}
+    />
+  );
+}
 
 // EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
 // HistoryMetric은 전부 서버 컴포넌트 분리 작업으로 src/components/
@@ -1598,6 +1618,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
   // (React Hooks 규칙) 아래 early return보다 먼저 호출합니다.
   const sectorAvgPer = useSectorAvgPer();
   const sectorAvgPbr = useSectorAvgPbr();
+  // 훅 호출 순서를 지키려고 stock 유무와 무관하게 항상 호출(ticker prop
+  // 기준이라 stock이 아직 null이어도 문제 없음).
+  const heart = useWatchlistHeart(ticker);
 
   if (!stock) {
     return (
@@ -1629,6 +1652,13 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
         title={stock.name}
         left={<ChevronLeft />}
         onLeftClick={() => router.back()}
+        right={
+          <Heart
+            className={`h-5 w-5 ${heart.watched ? "text-[#f04452]" : ""}`}
+            fill={heart.watched ? "currentColor" : "none"}
+          />
+        }
+        onRightClick={() => heart.toggle()}
       />
       <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
         <StatusPill />
@@ -1645,6 +1675,11 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           >
             {up ? "▲" : "▼"} {Math.abs(stock.chg)}% 오늘
           </p>
+          {heart.error ? (
+            <p className="mt-1 text-xs font-semibold text-[#f04452]">
+              {heart.error}
+            </p>
+          ) : null}
         </div>
 
         <ErrorBoundary
