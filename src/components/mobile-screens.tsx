@@ -2209,6 +2209,28 @@ export function AlertSettingsScreen() {
     }
   }
 
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // DART 공시를 기다리지 않고 지금 바로 내 기기로 푸시가 오는지 확인하는
+  // 버튼 (2026-08-31 세션, "테스트 버튼 누르면 바로 알림 오게 안 되냐"는
+  // 요청). 실제 공시 감지 로직(dart-poll.ts)과는 무관하고, 순수하게
+  // "이 계정에 등록된 토큰으로 sendPush()가 도달하는지"만 확인해요.
+  async function sendTestPush() {
+    if (testing) return;
+    setTesting(true);
+    setTestStatus(null);
+    try {
+      const res = await fetch("/api/notification-settings/test", { method: "POST" });
+      const data = await res.json();
+      setTestStatus({ ok: data.ok, message: data.message ?? "" });
+    } catch {
+      setTestStatus({ ok: false, message: "서버에 연결할 수 없어요." });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <AppShell>
       <TopBar title="알림" left={<ChevronLeft />} onLeftClick={() => router.back()} />
@@ -2231,8 +2253,8 @@ export function AlertSettingsScreen() {
               type="button"
             >
               <span
-                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                  enabled ? "translate-x-[22px]" : "translate-x-0.5"
+                className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  enabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -2245,6 +2267,24 @@ export function AlertSettingsScreen() {
           휴대폰 자체 알림 권한이 꺼져있으면 이 설정과 무관하게 알림이 안 와요
           — 기기 설정에서도 알림 권한을 확인해주세요.
         </p>
+
+        <button
+          className="mt-4 w-full rounded-lg bg-[#191f28] py-3 text-sm font-bold text-white disabled:opacity-50"
+          disabled={testing}
+          onClick={sendTestPush}
+          type="button"
+        >
+          {testing ? "보내는 중..." : "테스트 알림 보내기"}
+        </button>
+        {testStatus ? (
+          <p
+            className={`mt-2 text-[13px] font-semibold ${
+              testStatus.ok ? "text-[#00a878]" : "text-[#f04452]"
+            }`}
+          >
+            {testStatus.message}
+          </p>
+        ) : null}
       </section>
     </AppShell>
   );
