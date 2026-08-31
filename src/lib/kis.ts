@@ -692,3 +692,105 @@ export async function fetchInvestorTrend(ticker: string): Promise<InvestorTrendD
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// 종목별 재무 정보(연도별) — 손익계산서 + 재무비율 두 엔드포인트를 합쳐서
+// 하나의 연도별 레코드로 만듭니다. KIS 공식 예제(examples_llm/domestic_stock/
+// finance_income_statement, finance_financial_ratio) 기준 tr_id/필드명을
+// 그대로 옮겼습니다. 재무비율 쪽에 ROE/부채비율/증가율(%)/EPS/BPS가 전부
+// 들어있어서 성장성·안정성·수익성 비율 엔드포인트는 따로 안 부릅니다 —
+// 영업이익률도 별도 API 없이 아래에서 손익계산서 값으로 직접 계산.
+// ---------------------------------------------------------------------------
+export type FinancialYear = {
+  year: string; // 결산 년월 (stac_yymm, 예: "202412")
+  // 매출액/영업이익/당기순이익 전부 억원 단위 — 실측 확인(2026-08-31, 005930
+  // 2024년 매출 3,008,709 → 약 300.9조원, 실제 삼성전자 2024년 매출과 일치).
+  // formatMarketCapEok(stocks.ts)로 그대로 조원 단위 표시 가능.
+  revenue: number | null;
+  operatingProfit: number | null;
+  netIncome: number | null;
+  opMarginPct: number | null; // 영업이익률(%) = operatingProfit/revenue*100, 클라이언트 계산
+  roe: number | null; // ROE(%)
+  debtRatio: number | null; // 부채비율(%)
+  eps: number | null;
+  bps: number | null;
+  revenueGrowthPct: number | null; // 매출액증가율(%, 전년 대비 — KIS가 이미 계산해서 줌)
+  opGrowthPct: number | null; // 영업이익증가율(%)
+  netIncomeGrowthPct: number | null; // 순이익증가율(%)
+};
+
+export async function fetchFinancials(ticker: string): Promise<FinancialYear[] | null> {
+  try {
+    const params = {
+      FID_DIV_CLS_CODE: "0", // 0: 년, 1: 분기
+      FID_COND_MRKT_DIV_CODE: "J",
+      FID_INPUT_ISCD: ticker,
+    };
+
+    const [incomeJson, ratioJson] = await Promise.all([
+      kisGet(
+        "/uapi/domestic-stock/v1/finance/income-statement",
+        "FHKST66430200",
+        params,
+      ),
+      kisGet(
+        "/uapi/domestic-stock/v1/finance/financial-ratio",
+        "FHKST66430300",
+        params,
+      ),
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const incomeRows: any[] = Array.isArray(incomeJson?.output) ? incomeJson.output : [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ratioRows: any[] = Array.isArray(ratioJson?.output) ? ratioJson.output : [];
+    const ratioByYear = new Map(ratioRows.map((r) => [String(r.stac_yymm), r]));
+
+    const num = (v: unknown): number | null => {
+      if (v === undefined || v === null || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const years: FinancialYear[] = incomeRows
+      .map((row) => {
+        const year = String(row.stac_yymm ?? "");
+        const ratio = ratioByYear.get(year);
+        const revenue = num(row.sale_account);
+        const operatingProfit = num(row.bsop_prti);
+        return {
+          year,
+          revenue,
+          operatingProfit,
+          netIncome: num(row.thtr_ntin),
+          opMarginPct:
+            revenue && operatingProfit !== null && revenue !== 0
+              ? Math.round((operatingProfit / revenue) * 1000) / 10
+              : null,
+          roe: num(ratio?.roe_val),
+          debtRatio: num(ratio?.lblt_rate),
+          eps: num(ratio?.eps),
+          bps: num(ratio?.bps),
+          revenueGrowthPct: num(ratio?.grs),
+          opGrowthPct: num(ratio?.bsop_prfi_inrt),
+          netIncomeGrowthPct: num(ratio?.ntin_inrt),
+        };
+      })
+      .filter(
+        (y) =>
+          // stac_yymm이 "12"로 안 끝나면 아직 결산 안 된 진행 중 회계연도의
+          // 중간 누적치예요(실측: 005930 기준 최신 행이 "202606"으로 찍힘 —
+          // 전년 동기 대비가 아니라 전년 "전체" 대비라 증가율이 900%대로
+          // 튀는 등 왜곡됨, 2026-08-31 세션 확인). "사실만 보여준다"는
+          // 원칙상 이런 오해 소지 있는 값은 아예 뺍니다 — 완결된 회계연도만.
+          y.year.endsWith("12") &&
+          (y.revenue !== null || y.operatingProfit !== null || y.netIncome !== null),
+      )
+      .sort((a, b) => a.year.localeCompare(b.year));
+
+    return years.length ? years : null;
+  } catch (e) {
+    console.error(`[KIS] ${ticker} 재무정보 조회 실패:`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}
