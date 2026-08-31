@@ -14,6 +14,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AreaChart,
+  Bell,
   Bookmark,
   Building2,
   Check,
@@ -142,6 +143,7 @@ const navTabs = [
   // { href: "/category", icon: Star, label: "추천" },
   { href: "/watchlist", icon: Heart, label: "관심" },
   // { href: "/analysis", icon: AreaChart, label: "자산" },
+  { href: "/alerts", icon: Bell, label: "알림" },
 ];
 
 const categoryIcons: Record<string, IconComponent> = {
@@ -1024,11 +1026,11 @@ function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
 function BottomNav() {
   const pathname = usePathname();
 
-  // grid-cols-4가 아니라 navTabs 개수(지금 2개)에 맞춘 grid-cols-2 —
-  // 위 navTabs 주석을 풀어서 4개로 되돌리면 여기도 grid-cols-4로 같이
-  // 되돌려야 칸이 안 남아요.
+  // grid-cols-4가 아니라 navTabs 개수(지금 3개: 홈/관심/알림)에 맞춘
+  // grid-cols-3 — 위 navTabs의 추천/자산 주석을 풀면 여기도 grid-cols-5로
+  // 같이 맞춰야 칸이 안 남아요.
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-2 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-3 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
         const active =
           pathname === item.href ||
@@ -2157,6 +2159,94 @@ function WatchlistBodySkeleton() {
     <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
       <EmptyState text="불러오는 중..." />
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// "알림" 탭 — 공시 알림 온/오프 설정 (2026-08-31 세션). 값이 하나뿐이라
+// react-query 없이 간단히 useState+fetch로 처리 — 낙관적 업데이트는
+// useWatchlistHeart(use-watchlist.ts)와 같은 패턴(먼저 바꾸고, 실패하면
+// 되돌림)이라 토글이 즉시 반응합니다.
+// ---------------------------------------------------------------------------
+export function AlertSettingsScreen() {
+  const router = useRouter();
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/notification-settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) setEnabled(data.enabled);
+        else setError(data.message ?? "불러오지 못했어요.");
+      })
+      .catch(() => setError("서버에 연결할 수 없어요."));
+  }, []);
+
+  async function toggle() {
+    if (enabled === null || saving) return;
+    const next = !enabled;
+    setEnabled(next);
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/notification-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setEnabled(!next);
+        setError(data.message ?? "저장하지 못했어요.");
+      }
+    } catch {
+      setEnabled(!next);
+      setError("서버에 연결할 수 없어요.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AppShell>
+      <TopBar title="알림" left={<ChevronLeft />} onLeftClick={() => router.back()} />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-[#191f28]">공시 알림</h2>
+              <p className="mt-1 text-[13px] leading-5 text-[#8b95a1]">
+                관심종목에 새 공시가 등록되면 휴대폰 알림으로 알려드려요.
+              </p>
+            </div>
+            <button
+              aria-label={enabled ? "알림 끄기" : "알림 켜기"}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${
+                enabled ? "bg-[#3182f6]" : "bg-[#e5e8eb]"
+              }`}
+              disabled={enabled === null || saving}
+              onClick={toggle}
+              type="button"
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  enabled ? "translate-x-[22px]" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+          {error ? (
+            <p className="mt-3 text-[13px] font-semibold text-[#f04452]">{error}</p>
+          ) : null}
+        </div>
+        <p className="mt-3 text-[11px] leading-5 text-[#8b95a1]">
+          휴대폰 자체 알림 권한이 꺼져있으면 이 설정과 무관하게 알림이 안 와요
+          — 기기 설정에서도 알림 권한을 확인해주세요.
+        </p>
+      </section>
+    </AppShell>
   );
 }
 

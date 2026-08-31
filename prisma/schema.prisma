@@ -99,6 +99,11 @@ model User {
   // role 문자열 대신 boolean으로 충분 — 나중에 역할이 여러 개 필요해지면
   // 그때 role 필드로 바꾸면 됨.
   isAdmin       Boolean   @default(false)
+  // DART 공시 → 관심종목 보유 유저 푸시 알림을 이 유저가 받을지(2026-08-31
+  // 세션, "알림" 탭 설정). 꺼두면 dart-poll.ts가 이 유저의 PushToken을
+  // 발송 대상에서 아예 빼요 — 토큰 자체는 지우지 않고 서버에서 걸러서
+  // 보내는 방식이라, 다시 켜면 바로 재개됨.
+  notificationsEnabled Boolean @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

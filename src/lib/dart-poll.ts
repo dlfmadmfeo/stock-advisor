@@ -129,9 +129,14 @@ async function notifyNewFilings(filings: DartFiling[]): Promise<number> {
     });
     if (watchers.length === 0) continue;
 
+    // notificationsEnabled=false로 꺼둔 유저는 토큰이 있어도 발송 대상에서
+    // 빼요 — "알림" 탭 설정(2026-08-31 세션, /api/notification-settings).
     const tokens = (
       await prisma.pushToken.findMany({
-        where: { userId: { in: watchers.map((w) => w.userId) } },
+        where: {
+          userId: { in: watchers.map((w) => w.userId) },
+          user: { notificationsEnabled: true },
+        },
         select: { token: true },
       })
     ).map((t) => t.token);
