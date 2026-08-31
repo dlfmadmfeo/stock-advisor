@@ -32,12 +32,13 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { HOLDINGS, formatKRW, type Stock } from "@/lib/stocks";
+import { HOLDINGS, formatKRW, formatMarketCapEok, type Stock } from "@/lib/stocks";
 import type { NewsArticle } from "@/lib/naver-news";
 import { UserMenu } from "@/components/user-menu";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useStockNews } from "@/lib/use-stock-news";
 import { useInvestorTrend } from "@/lib/use-investor-trend";
+import { useFinancials } from "@/lib/use-financials";
 import {
   aggregateInvestorTrend,
   formatNetAmountEok,
@@ -128,11 +129,19 @@ function chartColor(index: number) {
   return CHART_PALETTE[index % CHART_PALETTE.length];
 }
 
+// 2026-08-29 세션: "추천"(/category)·"자산"(/analysis) 탭을 하단 nav/데스크톱
+// 사이드바에서만 잠시 뺐어요 — 추천 탭은 업종 필터 4개 중 3개(반도체/바이오/
+// 플랫폼)가 실제 DB 업종명이랑 안 맞아서 항상 0개만 나오는 버그가 있고,
+// 자산 탭은 HOLDINGS(하단 stocks.ts)가 하드코딩된 예시 데이터라 로그인
+// 계정과 무관하게 다 똑같이 보여요. 완전히 지우기엔 아직 확신이 없어서
+// (계속 이 방향이 맞는지 논의 중) 화면/라우트/코드는 그대로 두고 nav
+// 진입점만 주석 처리 — 필요해지면 그냥 주석만 풀면 됩니다. URL로 직접
+// /category, /analysis에 들어가면 여전히 접근은 돼요(진입 경로만 숨김).
 const navTabs = [
   { href: "/notifications", icon: Home, label: "홈" },
-  { href: "/category", icon: Star, label: "추천" },
+  // { href: "/category", icon: Star, label: "추천" },
   { href: "/watchlist", icon: Heart, label: "관심" },
-  { href: "/analysis", icon: AreaChart, label: "자산" },
+  // { href: "/analysis", icon: AreaChart, label: "자산" },
 ];
 
 const categoryIcons: Record<string, IconComponent> = {
@@ -1015,8 +1024,11 @@ function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
 function BottomNav() {
   const pathname = usePathname();
 
+  // grid-cols-4가 아니라 navTabs 개수(지금 2개)에 맞춘 grid-cols-2 —
+  // 위 navTabs 주석을 풀어서 4개로 되돌리면 여기도 grid-cols-4로 같이
+  // 되돌려야 칸이 안 남아요.
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-2 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
         const active =
           pathname === item.href ||
@@ -1257,6 +1269,43 @@ function PriceLineChart({ bars }: { bars: DailyBar[] }) {
   );
 }
 
+// 2026-08-31 세션 추가: 일봉(DailyBar)에 원래 volume 필드가 있었는데 화면에
+// 안 쓰고 있었어요 — 새 API 호출 없이 이미 받아온 값 그대로 막대만 그림.
+function VolumeChart({ bars }: { bars: DailyBar[] }) {
+  const width = 340;
+  const height = 46;
+  const padX = 2;
+  const maxVol = Math.max(1, ...bars.map((b) => b.volume));
+  const xStep = bars.length > 1 ? (width - padX * 2) / (bars.length - 1) : 0;
+  const xAt = (i: number) => padX + i * xStep;
+  const barWidth = Math.max(1, xStep * 0.6);
+
+  return (
+    <svg
+      className="mt-2 w-full"
+      height={height}
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      {bars.map((b, i) => {
+        const barHeight = (b.volume / maxVol) * height;
+        const up = i === 0 || b.close >= bars[i - 1].close;
+        return (
+          <rect
+            fill={up ? "#f04452" : "#3182f6"}
+            fillOpacity={0.55}
+            height={barHeight}
+            key={b.date}
+            width={barWidth}
+            x={xAt(i) - barWidth / 2}
+            y={height - barHeight}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 function MacdChart({ points }: { points: MacdPoint[] }) {
   const width = 340;
   const height = 90;
@@ -1351,7 +1400,11 @@ function StockChartsCard({ ticker }: { ticker: string }) {
         {displayBars.length < 2 ? (
           <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 부족해요.</p>
         ) : (
-          <PriceLineChart bars={displayBars} />
+          <>
+            <PriceLineChart bars={displayBars} />
+            <p className="mt-3 text-[11px] font-semibold text-[#8b95a1]">거래량</p>
+            <VolumeChart bars={displayBars} />
+          </>
         )}
       </div>
 
@@ -1391,6 +1444,176 @@ function StockChartsCard({ ticker }: { ticker: string }) {
         </p>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 업종 내 비교 — 종목 상세 화면 (2026-08-31 세션 추가). 새 API 호출 없이
+// 이미 로드된 useLiveStocks()를 업종으로만 필터링해서 씀 — 서버(getUniverse)
+// 가 이미 시가총액 내림차순으로 내려주기 때문에(universe.ts) 정렬을 다시
+// 안 해도 앞에서부터가 곧 시총 상위. 지금 보고 있는 종목이 업종 시총 5위
+// 밖이어도(작은 종목) 비교 대상에서 안 빠지게, 상위 4개 + 현재 종목으로 구성.
+// ---------------------------------------------------------------------------
+function SectorPeersCard({ stock }: { stock: Stock }) {
+  const allStocks = useLiveStocks();
+  const peers = useMemo(() => {
+    const sectorStocks = allStocks.filter((s) => s.sector === stock.sector);
+    const top = sectorStocks.slice(0, 5);
+    if (top.some((s) => s.ticker === stock.ticker)) return top;
+    const current = sectorStocks.find((s) => s.ticker === stock.ticker);
+    return current ? [...top.slice(0, 4), current] : top;
+  }, [allStocks, stock.sector, stock.ticker]);
+
+  if (peers.length < 2) return null;
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">업종 내 비교</h2>
+      <p className="mt-1 text-[11px] font-medium text-[#8b95a1]">
+        {stock.sector} 시가총액 상위 종목
+      </p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[380px] text-[12px]">
+          <thead>
+            <tr className="text-left text-[#8b95a1]">
+              <th className="py-1.5 font-semibold">종목명</th>
+              <th className="py-1.5 text-right font-semibold">시가총액</th>
+              <th className="py-1.5 text-right font-semibold">PER</th>
+              <th className="py-1.5 text-right font-semibold">PBR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {peers.map((p) => (
+              <tr
+                className={`border-t border-[#f2f4f6] ${
+                  p.ticker === stock.ticker ? "bg-[#f2f7ff]" : ""
+                }`}
+                key={p.ticker}
+              >
+                <td className="py-1.5 font-semibold text-[#191f28]">
+                  {p.name}
+                </td>
+                <td className="py-1.5 text-right text-[#4e5968]">{p.cap}</td>
+                <td className="py-1.5 text-right text-[#4e5968]">
+                  {p.per ? `${p.per}배` : "-"}
+                </td>
+                <td className="py-1.5 text-right text-[#4e5968]">
+                  {p.pbr ? `${p.pbr}배` : "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 재무 정보(연도별 매출/영업이익/순이익 + ROE/부채비율 등) — 종목 상세 화면
+// (2026-08-31 세션 추가). StockNewsCard/InvestorTrendCard와 같은 Suspense
+// 패턴. use-financials.ts가 완결된 회계연도만 걸러서 주기 때문에(kis.ts
+// fetchFinancials 주석 참고 — 진행 중인 연도는 증가율이 왜곡돼서 아예 뺌)
+// 여기선 그냥 최근 N개만 자르면 됩니다. 다른 카드들처럼 계산된 숫자만
+// 보여주고 "저평가/고평가"·"매수 신호" 같은 해석은 넣지 않습니다.
+// ---------------------------------------------------------------------------
+const FINANCIALS_DISPLAY_YEARS = 5;
+
+function FinancialsCardSkeleton() {
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
+      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+    </div>
+  );
+}
+
+function FinancialsCard({ ticker }: { ticker: string }) {
+  const { data: years } = useFinancials(ticker);
+  const recent = useMemo(
+    () => years.slice(-FINANCIALS_DISPLAY_YEARS),
+    [years],
+  );
+  const latest = recent[recent.length - 1];
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
+
+      {recent.length === 0 ? (
+        <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 없어요.</p>
+      ) : (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[420px] text-[12px]">
+              <thead>
+                <tr className="text-left text-[#8b95a1]">
+                  <th className="py-1.5 font-semibold">결산연도</th>
+                  <th className="py-1.5 text-right font-semibold">매출액</th>
+                  <th className="py-1.5 text-right font-semibold">영업이익</th>
+                  <th className="py-1.5 text-right font-semibold">순이익</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...recent].reverse().map((y) => (
+                  <tr className="border-t border-[#f2f4f6]" key={y.year}>
+                    <td className="py-1.5 font-semibold text-[#191f28]">
+                      {y.year.slice(0, 4)}
+                    </td>
+                    <td className="py-1.5 text-right text-[#4e5968]">
+                      {y.revenue !== null ? formatMarketCapEok(y.revenue) : "-"}
+                    </td>
+                    <td className="py-1.5 text-right text-[#4e5968]">
+                      {y.operatingProfit !== null
+                        ? formatMarketCapEok(y.operatingProfit)
+                        : "-"}
+                    </td>
+                    <td className="py-1.5 text-right text-[#4e5968]">
+                      {y.netIncome !== null ? formatMarketCapEok(y.netIncome) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {latest ? (
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <MetricCard
+                compact
+                label="영업이익률"
+                value={latest.opMarginPct !== null ? `${latest.opMarginPct}%` : "-"}
+                valueClassName={RESPONSIVE_TEXT.metricValue}
+              />
+              <MetricCard
+                compact
+                label="ROE"
+                value={latest.roe !== null ? `${latest.roe}%` : "-"}
+                valueClassName={RESPONSIVE_TEXT.metricValue}
+              />
+              <MetricCard
+                compact
+                label="부채비율"
+                value={latest.debtRatio !== null ? `${latest.debtRatio}%` : "-"}
+                valueClassName={RESPONSIVE_TEXT.metricValue}
+              />
+              <MetricCard
+                compact
+                label="EPS"
+                value={latest.eps !== null ? `${formatKRW(latest.eps)}원` : "-"}
+                valueClassName={RESPONSIVE_TEXT.metricValue}
+              />
+            </div>
+          ) : null}
+        </>
+      )}
+
+      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+        KIS 종목별 재무제표(연간) 기준이에요. 완결된 결산연도까지만
+        반영되고, 진행 중인 회계연도는 제외했어요. 이 화면도 계산된 값을
+        그대로 보여줄 뿐 매매 판단을 내리지 않아요.
+      </p>
+    </div>
   );
 }
 
@@ -1798,6 +2021,24 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
             valueClassName={RESPONSIVE_TEXT.metricValue}
           />
         </div>
+
+        <SectorPeersCard stock={stock} />
+
+        <ErrorBoundary
+          fallback={(error) => (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+              <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
+              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+                {error.message || "재무 정보를 불러오지 못했어요."}
+              </p>
+            </div>
+          )}
+          resetKey={stock.ticker}
+        >
+          <Suspense fallback={<FinancialsCardSkeleton />}>
+            <FinancialsCard ticker={stock.ticker} />
+          </Suspense>
+        </ErrorBoundary>
 
         <ErrorBoundary
           fallback={(error) => (
