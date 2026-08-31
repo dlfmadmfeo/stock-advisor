@@ -99,12 +99,49 @@ model User {
   // role 문자열 대신 boolean으로 충분 — 나중에 역할이 여러 개 필요해지면
   // 그때 role 필드로 바꾸면 됨.
   isAdmin       Boolean   @default(false)
+  // DART 공시 → 관심종목 보유 유저 푸시 알림을 이 유저가 받을지(2026-08-31
+  // 세션, "알림" 탭 설정). 꺼두면 dart-poll.ts가 이 유저의 PushToken을
+  // 발송 대상에서 아예 빼요 — 토큰 자체는 지우지 않고 서버에서 걸러서
+  // 보내는 방식이라, 다시 켜면 바로 재개됨.
+  notificationsEnabled Boolean @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  sessions  Session[]
-  accounts  Account[]
-  watchlist Watchlist[]
+  sessions   Session[]
+  accounts   Account[]
+  watchlist  Watchlist[]
+  pushTokens PushToken[]
+}
+
+// DART 공시 알림용 FCM 디바이스 토큰. 유저 한 명이 폰을 여러 대 쓸 수 있어서
+// User 1:N — token 자체가 기기를 식별하는 유니크 값이라 @unique로 재등록 시
+// upsert가 자연스럽게 됨(2026-08-31 세션, DART 공시 → 관심종목 보유 유저
+// 푸시 알림 기능).
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// DART 공시 폴링(크론)이 동시에 두 번 안 돌게 막는 락. RefreshLock과 똑같은
+// CAS 패턴 — 이유도 동일(Vercel 서버리스 인스턴스가 여러 개라 인메모리
+// 변수로는 못 막음, refresh-universe.ts 주석 참고).
+model DartPollLock {
+  id        Int      @id @default(1)
+  isRunning Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+// 이미 알림을 보낸 공시(rcept_no, DART 접수번호 — 공시 하나당 고유)를
+// 기록해서 같은 공시로 두 번 알림 안 가게 막음.
+model NotifiedDisclosure {
+  rcept_no String   @id
+  sentAt   DateTime @default(now())
 }
 
 model Session {

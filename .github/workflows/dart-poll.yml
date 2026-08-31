@@ -1,0 +1,19 @@
+name: DART 공시 폴링
+
+# Vercel Cron은 Hobby 플랜에서 하루 1회로 제한돼서(Pro부터 자유로운 주기)
+# 장중 몇 분 단위 폴링이 불가능해요 — 대신 무료인 GitHub Actions 스케줄로
+# /api/cron/dart-poll을 주기적으로 호출합니다(2026-08-31 세션).
+# 한국 장중(09:00~15:40 KST) = UTC 00:00~06:40, 10분 간격.
+on:
+  schedule:
+    - cron: "*/10 0-6 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: DART 공시 폴링 요청
+        run: |
+          curl -sf -X POST "https://stock-advisor2.vercel.app/api/cron/dart-poll" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
