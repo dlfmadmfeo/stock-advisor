@@ -123,6 +123,23 @@ export function computeMacdSeries(bars: DailyBar[]): MacdPoint[] {
   return points;
 }
 
+// MACD 반등 조짐(2026-09-01 세션): 히스토그램이 아직 음수(하락 모멘텀)지만
+// 최근 lookbackDays 거래일 연속으로 0에 가까워지는 중인지 판정합니다.
+// "매수 신호"가 아니라 "하락 힘이 약해지는 상태"라는 사실만 알려주는
+// 거예요 — screener.ts의 규제 회피 관례(판단이 아니라 상태 표시)를 그대로
+// 따릅니다. 5번째 스크리너 규칙으로 합치지 않고 독립 신호로 둔 이유는
+// screenerChecks가 "지금 조건을 만족하냐"는 정적 상태 체크인 반면, 이건
+// "방향이 바뀌는 중이냐"는 추세 판단이라 성격이 달라서예요.
+export function isMacdReboundSignal(points: MacdPoint[], lookbackDays = 3): boolean {
+  if (points.length < lookbackDays) return false;
+  const recent = points.slice(-lookbackDays).map((p) => p.histogram);
+  if (recent[recent.length - 1] >= 0) return false; // 이미 0을 넘었으면 "조짐"이 아니라 반등 완료
+  for (let i = 1; i < recent.length; i++) {
+    if (!(recent[i] > recent[i - 1])) return false; // 연속으로 0에 가까워지고 있어야 함
+  }
+  return true;
+}
+
 export type ScreenerInputs = {
   price: number;
   chg: number;

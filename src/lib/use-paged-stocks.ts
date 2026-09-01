@@ -28,21 +28,23 @@ type PagedResponse = {
 
 export function usePagedStocks(params: {
   screenerOnly?: boolean;
+  macdReboundOnly?: boolean;
   sector?: string;
   q?: string;
   sort?: SortField | null;
   dir?: SortDirection;
 }) {
-  const { screenerOnly = false, sector, q, sort = null, dir = "desc" } = params;
+  const { screenerOnly = false, macdReboundOnly = false, sector, q, sort = null, dir = "desc" } = params;
 
   return useInfiniteQuery({
-    queryKey: ["universe-paged", { screenerOnly, sector, q, sort, dir }],
+    queryKey: ["universe-paged", { screenerOnly, macdReboundOnly, sector, q, sort, dir }],
     queryFn: async ({ pageParam }) => {
       const search = new URLSearchParams({
         page: String(pageParam),
         pageSize: String(PAGE_SIZE),
       });
       if (screenerOnly) search.set("screenerOnly", "1");
+      if (macdReboundOnly) search.set("macdReboundOnly", "1");
       if (sector && sector !== "전체") search.set("sector", sector);
       if (q) search.set("q", q);
       if (sort) {

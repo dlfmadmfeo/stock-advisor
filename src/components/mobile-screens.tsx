@@ -31,6 +31,7 @@ import {
   Sparkles,
   Sprout,
   Star,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { HOLDINGS, formatKRW, formatMarketCapEok, type Stock } from "@/lib/stocks";
@@ -48,7 +49,7 @@ import {
   type InvestorTrendPoint,
 } from "@/lib/investor-trend";
 import { useDailyBars } from "@/lib/use-daily-bars";
-import { computeMacdSeries, type MacdPoint } from "@/lib/indicators";
+import { computeMacdSeries, isMacdReboundSignal, type MacdPoint } from "@/lib/indicators";
 import type { DailyBar } from "@/lib/kis";
 import {
   useIsWatched,
@@ -162,6 +163,7 @@ const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "
 export function NotificationsScreen() {
   const stocks = useLiveStocks();
   const passed = stocks.filter((s) => passesScreener(s));
+  const [macdReboundOnly, setMacdReboundOnly] = useState(false);
 
   return (
     <AppShell>
@@ -195,8 +197,21 @@ export function NotificationsScreen() {
               기준으로 비중이 높아진 종목을 우선적으로 보여주고, 종목을 누르면
               어떤 조건을 왜 충족했는지 그대로 볼 수 있어요.
             </p>
+            <button
+              className={`flex w-fit items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold ${
+                macdReboundOnly
+                  ? "bg-[#e6f0ff] text-[#185fa5] ring-1 ring-[#b5d4f4]"
+                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+              }`}
+              onClick={() => setMacdReboundOnly((v) => !v)}
+              type="button"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              MACD 반등 조짐만
+            </button>
             <PagedStockList
               emptyText="조건을 충족하는 종목이 없어요."
+              macdReboundOnly={macdReboundOnly}
               screenerOnly
             />
           </div>
@@ -632,11 +647,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 // 안 하면 뒷부분은 아예 요청조차 안 나가요.
 function PagedStockList({
   screenerOnly,
+  macdReboundOnly,
   sector,
   q,
   emptyText,
 }: {
   screenerOnly?: boolean;
+  macdReboundOnly?: boolean;
   sector?: string;
   q?: string;
   emptyText: string;
@@ -668,6 +685,7 @@ function PagedStockList({
     isLoading,
   } = usePagedStocks({
     screenerOnly,
+    macdReboundOnly,
     sector,
     q,
     sort: sortField,
@@ -981,6 +999,7 @@ const StockRow = memo(function StockRow({
             스크리너 {score}/{SCREENER_TOTAL_RULES}
             {pass ? " 통과" : ""}
           </span>
+          {stock.macdRebound ? <MacdReboundBadge /> : null}
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
           {stock.sector} · {stock.ticker} · {stock.cap}
@@ -1003,6 +1022,22 @@ const StockRow = memo(function StockRow({
     </Link>
   );
 });
+
+// MACD 히스토그램이 음수(하락 모멘텀)지만 최근 며칠 연속 0에 가까워지는
+// 중인 종목에 붙이는 뱃지. "반등 신호/매수 신호"가 아니라 "조짐"이라는
+// 중립 문구를 씀 — screener.ts 상단 주석의 규제 회피 관례(판단이 아니라
+// 상태 표시)를 그대로 따름. 리스트 행/필터 칩/상세 화면 MACD 카드 세
+// 군데에서 재사용.
+function MacdReboundBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={`shrink-0 inline-flex items-center gap-1 rounded-full bg-[#e6f0ff] px-2 py-0.5 text-[10px] font-bold text-[#185fa5] ${className ?? ""}`}
+    >
+      <TrendingUp className="h-2.5 w-2.5" />
+      반등 조짐
+    </span>
+  );
+}
 
 // 홈/검색 리스트 행에서 관심종목 여부만 보여주는 표시 전용 하트(2026-08-29
 // 세션 — 토글 기능은 종목 상세 화면에만 남기고 홈 리스트는 누를 수 없는
@@ -1387,6 +1422,7 @@ function StockChartsCardSkeleton() {
 function StockChartsCard({ ticker }: { ticker: string }) {
   const { data: bars } = useDailyBars(ticker);
   const macdPoints = useMemo(() => computeMacdSeries(bars), [bars]);
+  const macdRebound = useMemo(() => isMacdReboundSignal(macdPoints), [macdPoints]);
   const displayBars = bars.slice(-CHARTS_DISPLAY_DAYS);
   const displayMacd = macdPoints.slice(-CHARTS_DISPLAY_DAYS);
 
@@ -1412,7 +1448,10 @@ function StockChartsCard({ ticker }: { ticker: string }) {
 
       <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
+            {macdRebound ? <MacdReboundBadge /> : null}
+          </div>
           <span className="text-[11px] font-semibold text-[#8b95a1]">12·26·9</span>
         </div>
         {displayMacd.length < 2 ? (
@@ -2637,6 +2676,7 @@ function WatchlistRow({
             스크리너 {score}/{SCREENER_TOTAL_RULES}
             {pass ? " 통과" : ""}
           </span>
+          {stock.macdRebound ? <MacdReboundBadge /> : null}
         </div>
         <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
           {stock.sector} · {stock.ticker}
