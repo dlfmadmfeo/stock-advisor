@@ -34,6 +34,7 @@ export async function getUniverse(): Promise<UniverseResult> {
       ma5over20: r.ma5over20,
       volRatio: r.volRatio,
       rsi: r.rsi,
+      macdRebound: r.macdRebound,
     }));
 
     const latest = rows.reduce<Date | null>(

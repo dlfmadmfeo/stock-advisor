@@ -19,7 +19,8 @@ import type { Prisma } from "@prisma/client";
 // 처리해요 (프론트에서 200개 다 받아놓고 자르는 "가짜" 페이지네이션이 아님).
 //
 // 쿼리 파라미터: page(0부터), pageSize(기본 20, 최대 50), screenerOnly(1이면
-// 스크리너 통과 종목만), sector(업종 필터), q(이름/코드 검색어),
+// 스크리너 통과 종목만), macdReboundOnly(1이면 MACD 반등 조짐 종목만),
+// sector(업종 필터), q(이름/코드 검색어),
 // sort(screener|name|price|chg, 안 주면 기본 순서), dir(asc|desc)
 // ---------------------------------------------------------------------------
 
@@ -98,6 +99,7 @@ function toStock(r: {
   ma5over20: boolean;
   volRatio: number;
   rsi: number;
+  macdRebound: boolean;
 }): Stock {
   return {
     ticker: r.ticker,
@@ -113,6 +115,7 @@ function toStock(r: {
     ma5over20: r.ma5over20,
     volRatio: r.volRatio,
     rsi: r.rsi,
+    macdRebound: r.macdRebound,
   };
 }
 
@@ -121,6 +124,7 @@ function toStock(r: {
 // 의미가 없을 만큼 적은 수라 첫 페이지에 다 담아 보냅니다.
 function sampleFallback(
   screenerOnly: boolean,
+  macdReboundOnly: boolean,
   sector: string | null,
   q: string | null,
   sort: SortField | null,
@@ -128,6 +132,7 @@ function sampleFallback(
 ): Stock[] {
   const filtered = STOCKS.filter((s) => {
     if (screenerOnly && !passesScreener(s)) return false;
+    if (macdReboundOnly && !s.macdRebound) return false;
     if (sector && sector !== "전체" && s.sector !== sector) return false;
     if (q && !s.name.includes(q) && !s.ticker.includes(q)) return false;
     return true;
@@ -143,6 +148,7 @@ export async function GET(req: NextRequest) {
     Math.max(1, Number(searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE)) || DEFAULT_PAGE_SIZE),
   );
   const screenerOnly = searchParams.get("screenerOnly") === "1";
+  const macdReboundOnly = searchParams.get("macdReboundOnly") === "1";
   const sector = searchParams.get("sector");
   const q = searchParams.get("q")?.trim() || null;
   const sortParam = searchParams.get("sort");
@@ -160,6 +166,7 @@ export async function GET(req: NextRequest) {
 
   const where: Prisma.StockWhereInput = {};
   if (screenerOnly) where.screenerOk = true;
+  if (macdReboundOnly) where.macdRebound = true;
   if (sector && sector !== "전체") where.sector = sector;
   if (q) {
     where.OR = [{ name: { contains: q } }, { ticker: { contains: q } }];
@@ -177,7 +184,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     if (total === 0 && page === 0) {
-      const sample = sampleFallback(screenerOnly, sector, q, sort, dir);
+      const sample = sampleFallback(screenerOnly, macdReboundOnly, sector, q, sort, dir);
       return NextResponse.json({
         stocks: sample,
         page: 0,

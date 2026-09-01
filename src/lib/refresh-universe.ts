@@ -16,7 +16,7 @@
 import { prisma } from "./db";
 import { kisConfigured, fetchDailyBars, fetchWeeklyBars, fetchQuoteDetail } from "./kis";
 import { fetchKospiMaster } from "./kospi-master";
-import { computeScreenerInputs } from "./indicators";
+import { computeScreenerInputs, computeMacdSeries, isMacdReboundSignal } from "./indicators";
 import { formatMarketCapEok, type Stock } from "./stocks";
 import {
   passesScreener,
@@ -95,6 +95,7 @@ async function updateRecommendationRanks(): Promise<void> {
     ma5over20: r.ma5over20,
     volRatio: r.volRatio,
     rsi: r.rsi,
+    macdRebound: r.macdRebound,
   }));
 
   const avgPer = sectorAveragePer(stocks);
@@ -138,6 +139,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
     console.warn(`  [스킵] ${ticker} ${name} — 지표 계산에 필요한 데이터 부족`);
     return null;
   }
+  const macdRebound = isMacdReboundSignal(computeMacdSeries(daily));
 
   const price = detail?.price ?? inputs.price;
   const chg = detail?.chg ?? inputs.chg;
@@ -162,6 +164,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
     ma5over20: inputs.ma5over20,
     volRatio: inputs.volRatio,
     rsi: inputs.rsi,
+    macdRebound,
   };
 
   await withLockRetry(() => prisma.stock.upsert({
@@ -184,6 +187,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
       rsi: inputs.rsi,
       screenerOk: passesScreener(screenerInputForScore),
       screenerScore: screenerScore(screenerInputForScore),
+      macdRebound,
     },
     update: {
       name,
@@ -201,6 +205,7 @@ async function processTicker(ticker: string, name: string, rank: number): Promis
       rsi: inputs.rsi,
       screenerOk: passesScreener(screenerInputForScore),
       screenerScore: screenerScore(screenerInputForScore),
+      macdRebound,
     },
   }), `${ticker} ${name} upsert`);
 

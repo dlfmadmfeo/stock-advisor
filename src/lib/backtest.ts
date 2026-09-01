@@ -137,6 +137,10 @@ function buildStockSnapshot(
     ma5over20: inputs.ma5over20,
     volRatio: inputs.volRatio,
     rsi: inputs.rsi,
+    // 백테스트는 4개 스크리너 규칙(getRecommendation)만 시뮬레이션하고
+    // macdRebound는 별개 독립 신호라 안 씀 — 항상 false로 둬도 결과에
+    // 영향 없음.
+    macdRebound: false,
   };
 }
 

@@ -18,6 +18,10 @@ export type Stock = {
   ma5over20: boolean;
   volRatio: number;
   rsi: number;
+  // MACD 히스토그램이 음수(하락 모멘텀)지만 최근 며칠 연속 0에 가까워지는
+  // 중인지 — refresh-universe.ts 배치가 계산해서 저장하는 값이라 실시간
+  // 재계산은 안 함(indicators.ts isMacdReboundSignal 참고).
+  macdRebound: boolean;
 };
 
 export const SECTORS = [
@@ -32,16 +36,16 @@ export const SECTORS = [
 ] as const;
 
 export const STOCKS: Stock[] = [
-  { ticker: "005930", name: "삼성전자", sector: "반도체", price: 207000, chg: 1.8, cap: "2,069조원", per: 24.8, pbr: 2.1, hi: 234000, lo: 128000, ma5over20: true, volRatio: 1.6, rsi: 58 },
-  { ticker: "000660", name: "SK하이닉스", sector: "반도체", price: 1322000, chg: 0.9, cap: "962조원", per: 28.4, pbr: 3.4, hi: 1344000, lo: 931000, ma5over20: true, volRatio: 1.4, rsi: 55 },
-  { ticker: "035420", name: "NAVER", sector: "플랫폼", price: 198500, chg: -0.6, cap: "32조원", per: 19.6, pbr: 1.5, hi: 241000, lo: 176500, ma5over20: false, volRatio: 0.8, rsi: 47 },
-  { ticker: "035720", name: "카카오", sector: "플랫폼", price: 43500, chg: 0.4, cap: "19조원", per: 32.1, pbr: 1.1, hi: 58000, lo: 34200, ma5over20: false, volRatio: 1.1, rsi: 44 },
-  { ticker: "373220", name: "LG에너지솔루션", sector: "2차전지", price: 318500, chg: -1.2, cap: "74조원", per: 41.2, pbr: 3.8, hi: 339000, lo: 294600, ma5over20: false, volRatio: 0.9, rsi: 39 },
-  { ticker: "005380", name: "현대차", sector: "자동차", price: 235000, chg: 0.7, cap: "50조원", per: 6.8, pbr: 0.9, hi: 268000, lo: 198000, ma5over20: true, volRatio: 1.5, rsi: 61 },
-  { ticker: "000270", name: "기아", sector: "자동차", price: 98500, chg: 1.1, cap: "39조원", per: 5.9, pbr: 1.1, hi: 112000, lo: 84300, ma5over20: true, volRatio: 1.7, rsi: 63 },
-  { ticker: "207940", name: "삼성바이오로직스", sector: "바이오", price: 1082000, chg: 0.6, cap: "77조원", per: 62.3, pbr: 5.2, hi: 1167000, lo: 912000, ma5over20: true, volRatio: 1.3, rsi: 55 },
-  { ticker: "055550", name: "신한지주", sector: "금융", price: 68500, chg: -0.4, cap: "28조원", per: 6.1, pbr: 0.5, hi: 78200, lo: 52100, ma5over20: false, volRatio: 1.0, rsi: 46 },
-  { ticker: "012450", name: "한화에어로스페이스", sector: "방산", price: 812000, chg: 1.4, cap: "39조원", per: 33.5, pbr: 6.7, hi: 861000, lo: 312000, ma5over20: true, volRatio: 1.9, rsi: 66 },
+  { ticker: "005930", name: "삼성전자", sector: "반도체", price: 207000, chg: 1.8, cap: "2,069조원", per: 24.8, pbr: 2.1, hi: 234000, lo: 128000, ma5over20: true, volRatio: 1.6, rsi: 58, macdRebound: false },
+  { ticker: "000660", name: "SK하이닉스", sector: "반도체", price: 1322000, chg: 0.9, cap: "962조원", per: 28.4, pbr: 3.4, hi: 1344000, lo: 931000, ma5over20: true, volRatio: 1.4, rsi: 55, macdRebound: false },
+  { ticker: "035420", name: "NAVER", sector: "플랫폼", price: 198500, chg: -0.6, cap: "32조원", per: 19.6, pbr: 1.5, hi: 241000, lo: 176500, ma5over20: false, volRatio: 0.8, rsi: 47, macdRebound: false },
+  { ticker: "035720", name: "카카오", sector: "플랫폼", price: 43500, chg: 0.4, cap: "19조원", per: 32.1, pbr: 1.1, hi: 58000, lo: 34200, ma5over20: false, volRatio: 1.1, rsi: 44, macdRebound: false },
+  { ticker: "373220", name: "LG에너지솔루션", sector: "2차전지", price: 318500, chg: -1.2, cap: "74조원", per: 41.2, pbr: 3.8, hi: 339000, lo: 294600, ma5over20: false, volRatio: 0.9, rsi: 39, macdRebound: false },
+  { ticker: "005380", name: "현대차", sector: "자동차", price: 235000, chg: 0.7, cap: "50조원", per: 6.8, pbr: 0.9, hi: 268000, lo: 198000, ma5over20: true, volRatio: 1.5, rsi: 61, macdRebound: false },
+  { ticker: "000270", name: "기아", sector: "자동차", price: 98500, chg: 1.1, cap: "39조원", per: 5.9, pbr: 1.1, hi: 112000, lo: 84300, ma5over20: true, volRatio: 1.7, rsi: 63, macdRebound: false },
+  { ticker: "207940", name: "삼성바이오로직스", sector: "바이오", price: 1082000, chg: 0.6, cap: "77조원", per: 62.3, pbr: 5.2, hi: 1167000, lo: 912000, ma5over20: true, volRatio: 1.3, rsi: 55, macdRebound: false },
+  { ticker: "055550", name: "신한지주", sector: "금융", price: 68500, chg: -0.4, cap: "28조원", per: 6.1, pbr: 0.5, hi: 78200, lo: 52100, ma5over20: false, volRatio: 1.0, rsi: 46, macdRebound: false },
+  { ticker: "012450", name: "한화에어로스페이스", sector: "방산", price: 812000, chg: 1.4, cap: "39조원", per: 33.5, pbr: 6.7, hi: 861000, lo: 312000, ma5over20: true, volRatio: 1.9, rsi: 66, macdRebound: false },
 ];
 
 export function getStock(ticker: string): Stock | undefined {
