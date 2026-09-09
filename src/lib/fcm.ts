@@ -37,6 +37,7 @@ function getFirebaseApp(): App {
 
 export type PushResult = {
   successCount: number;
+  successfulTokens: string[];
   // 만료/미등록된 토큰(더 이상 유효하지 않음) — 호출부가 DB에서 지우는 데 씀.
   invalidTokens: string[];
 };
@@ -52,7 +53,7 @@ export async function sendPush(
   body: string,
   data?: Record<string, string>,
 ): Promise<PushResult> {
-  if (tokens.length === 0) return { successCount: 0, invalidTokens: [] };
+  if (tokens.length === 0) return { successCount: 0, successfulTokens: [], invalidTokens: [] };
 
   const messaging = getMessaging(getFirebaseApp());
   const res = await messaging.sendEachForMulticast({
@@ -62,8 +63,12 @@ export async function sendPush(
   });
 
   const invalidTokens: string[] = [];
+  const successfulTokens: string[] = [];
   res.responses.forEach((r, i) => {
-    if (r.success) return;
+    if (r.success) {
+      successfulTokens.push(tokens[i]);
+      return;
+    }
     const code = r.error?.code;
     if (
       code === "messaging/registration-token-not-registered" ||
@@ -73,5 +78,5 @@ export async function sendPush(
     }
   });
 
-  return { successCount: res.successCount, invalidTokens };
+  return { successCount: res.successCount, successfulTokens, invalidTokens };
 }

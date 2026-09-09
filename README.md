@@ -67,7 +67,8 @@ GitHub Actions에 평일 09:00~15:50(KST), 10분 간격으로 조회하도록
   해당 종목의 상태를 되돌립니다. 여러 종목을 변경할 때 서로의 결과를
   덮어쓰지 않도록 종목별로 캐시를 갱신합니다.
 - 공시 조회는 GitHub Actions가 서버 API를 호출하는 방식입니다.
-  공시 접수번호를 DB에 저장해 이미 처리한 공시를 구분합니다.
+  공시 내용과 기기별 발송 상태를 DB에 저장합니다. 일시적인 발송 실패는
+  다음 실행에서 재시도하며, FCM 접수에 성공한 기기는 재시도 대상에서 제외합니다.
 
 ## 개발 시작하기
 
@@ -92,6 +93,26 @@ npm run dev
 
 [http://localhost:3000](http://localhost:3000)에서 확인할 수 있습니다.
 데모 로그인은 해당 계정이 DB에 등록되어 있어야 동작합니다.
+
+### 테스트
+
+`npm test`로 종목 갱신, 화면 데이터 병합, 공시 알림 재시도 테스트를 실행합니다.
+DB와 외부 API는 테스트 대역을 사용합니다.
+
+### 기존 DB에 알림 재시도 적용
+
+이번 변경은 `DisclosureNotification`, `DisclosureDelivery` 테이블을 추가합니다.
+기존 DB에는 아래 SQL을 한 번 적용한 뒤 새 코드를 배포합니다.
+신규 DB를 `npm run db:push`로 생성했다면 별도로 실행하지 않습니다.
+
+```bash
+npx prisma db execute --schema prisma/schema.prisma --file prisma/add-disclosure-delivery.sql
+npx prisma generate
+```
+
+기존 완료 기록은 유지합니다. 이전 코드에서 완료로 기록한 실패 건은 자동 복원하지
+않습니다. FCM 접수 직후 DB 기록 전에 프로세스가 종료되면 재시도 시 중복 알림이
+발생할 수 있습니다. FCM 접수 성공은 기기의 실제 수신을 보장하지 않습니다.
 
 ## 환경 변수
 

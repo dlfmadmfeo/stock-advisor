@@ -81,7 +81,7 @@ export function labelToRank(label: string): number {
 // 계산 + DB 업데이트라 몇 초 안에 끝나요.
 async function updateRecommendationRanks(): Promise<void> {
   const rows = await prisma.stock.findMany();
-  const stocks: Stock[] = rows.map((r) => ({
+  const stocks: (Stock & { updatedAt: Date })[] = rows.map((r) => ({
     ticker: r.ticker,
     name: r.name,
     sector: r.sector,
@@ -96,6 +96,7 @@ async function updateRecommendationRanks(): Promise<void> {
     volRatio: r.volRatio,
     rsi: r.rsi,
     macdRebound: r.macdRebound,
+    updatedAt: r.updatedAt,
   }));
 
   const avgPer = sectorAveragePer(stocks);
@@ -113,7 +114,10 @@ async function updateRecommendationRanks(): Promise<void> {
           () =>
             prisma.stock.update({
               where: { ticker: s.ticker },
-              data: { recommendationRank: labelToRank(rec.label) },
+              data: {
+                recommendationRank: labelToRank(rec.label),
+                updatedAt: s.updatedAt,
+              },
             }),
           `${s.ticker} recommendationRank update`,
         );
@@ -340,7 +344,8 @@ export async function refreshUniverse(): Promise<RefreshResult> {
     let removedCount = 0;
     if (succeeded.length > 0) {
       const removed = await prisma.stock.deleteMany({
-        where: { ticker: { notIn: succeeded } },
+        // API 조회 실패는 편출 사유가 아닙니다. 마스터의 대상 목록으로 비교합니다.
+        where: { ticker: { notIn: ranking.map((r) => r.ticker) } },
       });
       removedCount = removed.count;
 
@@ -349,11 +354,13 @@ export async function refreshUniverse(): Promise<RefreshResult> {
     }
 
     return {
-      ok: true,
+      ok: succeeded.length > 0,
       total: ranking.length,
       succeeded: succeeded.length,
       removed: removedCount,
-      message: `${succeeded.length}/${ranking.length}개 종목을 갱신했어요.`,
+      message: succeeded.length === ranking.length
+        ? `${succeeded.length}/${ranking.length}개 종목을 갱신했어요.`
+        : `${succeeded.length}/${ranking.length}개 종목을 갱신했어요. 실패한 ${ranking.length - succeeded.length}개 종목의 기존 데이터는 유지합니다.`,
     };
   } finally {
     await releaseRefreshLock();

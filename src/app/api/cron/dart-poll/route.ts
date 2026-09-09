@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { pollDartDisclosures } from "@/lib/dart-poll";
 
+export const maxDuration = 60;
+
 // ---------------------------------------------------------------------------
 // GitHub Actions 스케줄 워크플로(.github/workflows/dart-poll.yml)가 호출하는
 // 엔드포인트. Vercel Cron이 아니라 GitHub Actions를 쓴 이유: 이 프로젝트가

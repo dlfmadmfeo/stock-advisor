@@ -129,6 +129,7 @@ model PushToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disclosureDeliveries DisclosureDelivery[]
 
   @@index([userId])
 }
@@ -147,6 +148,33 @@ model DartPollLock {
 model NotifiedDisclosure {
   rcept_no String   @id
   sentAt   DateTime @default(now())
+}
+
+// 공시 수집과 기기별 FCM 접수 결과를 분리해 실패한 대상만 재시도합니다.
+model DisclosureNotification {
+  rceptNo     String   @id
+  ticker      String
+  corpName    String
+  reportName  String
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  lastAttemptAt DateTime?
+  deliveries  DisclosureDelivery[]
+
+  @@index([completedAt, lastAttemptAt])
+}
+
+model DisclosureDelivery {
+  rceptNo     String
+  pushTokenId String
+  userId      String
+  status      String   @default("pending") // pending | sent | skipped
+  updatedAt   DateTime @updatedAt
+  notification DisclosureNotification @relation(fields: [rceptNo], references: [rceptNo], onDelete: Cascade)
+  pushToken    PushToken @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
+
+  @@id([rceptNo, pushTokenId])
+  @@index([pushTokenId])
 }
 
 model Session {

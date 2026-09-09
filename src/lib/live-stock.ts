@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useAdvisorStore, type LiveQuote } from "@/stores/use-advisor-store";
 import { getStock as getSampleStock, type Stock } from "@/lib/stocks";
 import { sectorAveragePbr, sectorAveragePer } from "@/lib/screener";
@@ -38,36 +38,12 @@ export function useLiveStock(ticker: string): Stock | undefined {
   return mergeLive(base, live);
 }
 
-// mergeLiveQuote(스토어)는 웹소켓 틱 하나마다 liveQuotes 객체 "전체"를 새로
-// 만들어요(해당 티커만 바뀌고 나머지 티커의 값 객체 참조는 그대로 유지됨).
-// 근데 그냥 base.map((s) => mergeLive(s, liveQuotes[s.ticker]))로 매번 새
-// 배열을 만들면, 틱 하나 때문에 관련 없는 종목까지 전부 새 객체가 되어
-// StockRow 같은 하위 컴포넌트가 React.memo를 써도 소용없이 다 리렌더돼요.
-// 여기서는 티커별로 "이전에 쓴 live 참조"를 기억해뒀다가, 그 참조가 그대로면
-// merge 결과 객체도 재사용해서 참조를 유지합니다 — 그래야 바뀐 종목만 새
-// 객체가 되고, 나머지는 React.memo가 실제로 리렌더를 건너뛸 수 있어요.
+// 원본 스냅샷 또는 실시간 시세가 바뀌면 병합 결과를 다시 계산합니다.
 function useMergedStocks(baseStocks: Stock[], liveQuotes: Record<string, LiveQuote>): Stock[] {
-  const cacheRef = useRef<Map<string, { live: LiveQuote | undefined; merged: Stock }>>(new Map());
-
-  return useMemo(() => {
-    const prevCache = cacheRef.current;
-    const nextCache = new Map<string, { live: LiveQuote | undefined; merged: Stock }>();
-
-    const result = baseStocks.map((base) => {
-      const live = liveQuotes[base.ticker];
-      const cached = prevCache.get(base.ticker);
-      if (cached && cached.live === live) {
-        nextCache.set(base.ticker, cached);
-        return cached.merged;
-      }
-      const merged = mergeLive(base, live);
-      nextCache.set(base.ticker, { live, merged });
-      return merged;
-    });
-
-    cacheRef.current = nextCache;
-    return result;
-  }, [baseStocks, liveQuotes]);
+  return useMemo(
+    () => baseStocks.map((base) => mergeLive(base, liveQuotes[base.ticker])),
+    [baseStocks, liveQuotes],
+  );
 }
 
 export function useLiveStocks(): Stock[] {

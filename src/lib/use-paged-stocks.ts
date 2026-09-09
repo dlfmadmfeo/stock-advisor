@@ -10,13 +10,6 @@ import { UNIVERSE_PAGE_SIZE, type SortDirection, type SortField } from "@/lib/co
 // 페이지네이션이에요.
 const PAGE_SIZE = UNIVERSE_PAGE_SIZE;
 
-// 실제 DB 쿼리는 20개 정도면 순식간(수십ms)에 끝나서, 로딩 스피너가 거의
-// 안 보이고 지나가 버립니다. "페이지네이션 되고 있다"는 게 눈에 보이게
-// 일부러 최소 1초는 걸리도록 지연을 넣어뒀어요 — 순전히 데모/UX용이고,
-// 실제 서비스라면 빼는 게 맞습니다 (사용자 입장에선 빠를수록 좋으니까요).
-const ARTIFICIAL_DELAY_MS = 1000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 type PagedResponse = {
   stocks: Stock[];
   page: number;
@@ -38,7 +31,7 @@ export function usePagedStocks(params: {
 
   return useInfiniteQuery({
     queryKey: ["universe-paged", { screenerOnly, macdReboundOnly, sector, q, sort, dir }],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const search = new URLSearchParams({
         page: String(pageParam),
         pageSize: String(PAGE_SIZE),
@@ -52,10 +45,7 @@ export function usePagedStocks(params: {
         search.set("dir", dir);
       }
 
-      const [res] = await Promise.all([
-        fetch(`/api/universe/paged?${search.toString()}`),
-        sleep(ARTIFICIAL_DELAY_MS),
-      ]);
+      const res = await fetch(`/api/universe/paged?${search.toString()}`, { signal });
       if (!res.ok) throw new Error("유니버스 조회에 실패했어요.");
       return (await res.json()) as PagedResponse;
     },

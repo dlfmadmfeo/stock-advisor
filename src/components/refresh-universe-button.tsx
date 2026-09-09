@@ -133,7 +133,7 @@ export function RefreshUniverseButton() {
       </button>
       {message ? (
         <span
-          className={`absolute right-0 top-full mt-1 whitespace-nowrap text-[11px] font-semibold ${
+          className={`absolute right-0 top-full z-10 mt-1 w-72 max-w-[calc(100vw-2rem)] whitespace-normal rounded bg-white p-1 text-[11px] font-semibold ${
             state === "error" ? "text-[#ff5a5a]" : "text-[#00a878]"
           }`}
         >
