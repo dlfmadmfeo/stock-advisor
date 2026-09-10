@@ -207,7 +207,7 @@ export function NotificationsScreen() {
               type="button"
             >
               <TrendingUp className="h-3.5 w-3.5" />
-              반등 조짐만
+              MACD 반등
             </button>
             <PagedStockList
               emptyText="조건을 충족하는 종목이 없어요."
