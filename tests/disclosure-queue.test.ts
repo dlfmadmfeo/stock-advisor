@@ -114,17 +114,31 @@ test("multicast is split into batches of at most 500 devices", async () => {
 });
 
 test("collection preserves deliveries and skips legacy completed filings", async () => {
-  mock.method(prisma.watchlist, "findMany", async () => [{ ticker: "005930", userId: "u" }]);
   mock.method(prisma.notifiedDisclosure, "findMany", async () => [{ rcept_no: "old" }]);
   mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
   const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
   await enqueueDisclosures(["old", "new"].map((id) => ({
-    rcept_no: id, stock_code: "005930", corp_name: "Example", report_nm: "Report", flr_nm: "", rcept_dt: "20260909",
+    rcept_no: id, stock_code: "005930", corp_name: "Example", report_nm: "분기보고서", flr_nm: "", rcept_dt: "20260909",
   })));
   assert.equal(upsert.mock.callCount(), 1);
   const args = upsert.mock.calls[0].arguments[0] as any;
   assert.deepEqual(args.update, {});
   assert.deepEqual(args.create.deliveries.create, [{ pushTokenId: "p", userId: "u" }]);
+});
+
+// 2026-09-10 세션: 관심종목 여부와 무관하게 전체 종목 대상으로 바뀌면서,
+// 대신 report_nm 키워드로 "중요 유형"만 거르는 필터가 핵심 로직이 됨 —
+// 절차성 공시(기업설명회 등)는 알림 켜둔 유저가 있어도 큐에 안 들어가야 함.
+test("non-important report types are filtered out regardless of recipients", async () => {
+  mock.method(prisma.notifiedDisclosure, "findMany", async () => []);
+  mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
+  const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
+  const matched = await enqueueDisclosures([{
+    rcept_no: "irrelevant", stock_code: "005930", corp_name: "Example",
+    report_nm: "기업설명회(IR)개최(안내공시)", flr_nm: "", rcept_dt: "20260909",
+  }]);
+  assert.equal(matched, 0);
+  assert.equal(upsert.mock.callCount(), 0);
 });
 
 test("missing FCM config does not process the queue", async () => {

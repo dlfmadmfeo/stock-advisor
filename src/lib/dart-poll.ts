@@ -1,5 +1,14 @@
+// ---------------------------------------------------------------------------
+// 2026-09-10 세션: "관심종목에 담은 것만" 알림이 오던 걸 "관심종목 여부와
+// 무관하게 전체 종목 대상, 대신 중요한 유형만"으로 바꿨습니다. 필터링
+// 기준은 dart.ts의 isImportantDisclosure(report_nm 키워드 매칭) — 실적/
+// 자본변동/자사주/배당/M&A/리스크 계열만 걸러서 노이즈를 줄입니다.
+// 수신 대상도 "그 종목을 담은 유저"가 아니라 "알림을 켜둔 전체 유저"로
+// 바뀌었습니다(enqueueDisclosures/processDisclosureQueue 참고).
+// ---------------------------------------------------------------------------
+
 import { prisma } from "./db";
-import { dartConfigured, fetchTodayDisclosures, type DartFiling } from "./dart";
+import { dartConfigured, fetchTodayDisclosures, isImportantDisclosure, type DartFiling } from "./dart";
 import { fcmConfigured, sendPush } from "./fcm";
 
 const STALE_LOCK_MS = 10 * 60 * 1000;
@@ -29,22 +38,21 @@ export type DartPollResult = {
 };
 
 export async function enqueueDisclosures(filings: DartFiling[]): Promise<number> {
-  const watchers = await prisma.watchlist.findMany({ select: { ticker: true, userId: true } });
-  const matched = filings.filter((f) => watchers.some((w) => w.ticker === f.stock_code));
+  const matched = filings.filter((f) => isImportantDisclosure(f.report_nm));
   const already = new Set((await prisma.notifiedDisclosure.findMany({
     where: { rcept_no: { in: matched.map((f) => f.rcept_no) } },
     select: { rcept_no: true },
   })).map((r) => r.rcept_no));
 
+  // 관심종목 여부와 무관하게 전체 종목 대상이라, 종목마다 다시 조회하지
+  // 않고 알림을 켜둔 전체 유저의 토큰을 한 번만 조회해서 재사용합니다.
+  const recipients = await prisma.pushToken.findMany({
+    where: { user: { notificationsEnabled: true } },
+    select: { id: true, userId: true },
+  });
+
   for (const filing of matched) {
     if (already.has(filing.rcept_no)) continue;
-    const recipients = await prisma.pushToken.findMany({
-      where: {
-        userId: { in: watchers.filter((w) => w.ticker === filing.stock_code).map((w) => w.userId) },
-        user: { notificationsEnabled: true },
-      },
-      select: { id: true, userId: true },
-    });
     // 최초 수집 시 대상을 고정합니다. 재조회로 성공한 기기의 전송을 만들지 않습니다.
     await prisma.disclosureNotification.upsert({
       where: { rceptNo: filing.rcept_no },
@@ -80,11 +88,8 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
     await prisma.disclosureNotification.update({
       where: { rceptNo: notification.rceptNo }, data: { lastAttemptAt: new Date() },
     });
-    const watchers = new Set((await prisma.watchlist.findMany({
-      where: { ticker: notification.ticker }, select: { userId: true },
-    })).map((w) => w.userId));
     const eligible = notification.deliveries.filter((d) =>
-      d.userId === d.pushToken.userId && d.pushToken.user.notificationsEnabled && watchers.has(d.userId));
+      d.userId === d.pushToken.userId && d.pushToken.user.notificationsEnabled);
     const skippedIds = notification.deliveries.filter((d) => !eligible.includes(d)).map((d) => d.pushTokenId);
     if (skippedIds.length) {
       await prisma.disclosureDelivery.updateMany({

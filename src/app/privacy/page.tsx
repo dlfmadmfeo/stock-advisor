@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-[#4e5968]">
           <li>회원 식별 및 로그인 유지</li>
           <li>관심종목 목록 저장 및 화면에 표시</li>
-          <li>관심종목에 새 공시가 등록되었을 때 휴대폰 푸시 알림 발송</li>
+          <li>실적·자본변동 등 중요 유형의 공시가 등록되었을 때 휴대폰 푸시 알림 발송(알림을 켜둔 이용자 전체 대상, 관심종목 등록 여부와 무관)</li>
         </ul>
       </section>
 
