@@ -21,14 +21,56 @@ type SessionRow = {
   token: string;
   createdAt: string | Date;
   userAgent?: string | null;
+  ipAddress?: string | null;
 };
+
+// User-Agent에서 브라우저 종류를 추출 — MAC 주소 같은 진짜 기기 식별값은
+// 브라우저가 서버로 아예 안 보내주는 값이라(로컬 네트워크 밖으로 안 나감)
+// 얻을 방법이 없어요. 대신 User-Agent에 이미 실려있는 정보(기기 모델명,
+// 브라우저 종류)를 더 자세히 뽑아서 보여줍니다(2026-09-13 세션).
+function describeBrowser(ua: string): string {
+  if (/SamsungBrowser/i.test(ua)) return "삼성 인터넷";
+  if (/EdgA?\//i.test(ua)) return "Edge";
+  if (/FxiOS|Firefox\//i.test(ua)) return "Firefox";
+  if (/CriOS|Chrome\//i.test(ua)) return "Chrome";
+  if (/Version\/[\d.]+.*Safari/i.test(ua)) return "Safari";
+  return "브라우저";
+}
+
+// IP 주소는 "어느 네트워크에서 접속했는지"의 대략적인 출처 정보예요.
+// 로컬 개발 서버 접속(::1, 0.0.0.0 형태의 IPv6 루프백, 127.0.0.1)은
+// 사용자한테 의미 없는 값이라 안 보여줍니다.
+function describeIp(ip?: string | null): string | null {
+  if (!ip) return null;
+  const isLoopback =
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    /^(0{1,4}:){7}0{1,4}$/.test(ip);
+  return isLoopback ? null : ip;
+}
 
 function describeDevice(ua?: string | null): string {
   if (!ua) return "알 수 없는 기기";
-  if (/android/i.test(ua)) return "안드로이드 기기";
-  if (/iphone|ipad|ipod/i.test(ua)) return "iPhone/iPad";
-  if (/windows/i.test(ua)) return "Windows";
-  if (/macintosh|mac os/i.test(ua)) return "Mac";
+
+  if (/android/i.test(ua)) {
+    // "Android 16; SM-S948N Build/..." 형태에서 모델명만 뽑아냄. "K"처럼
+    // 제조사가 기기명 대신 넣는 placeholder는 실제 모델명이 아니라서 걸러요.
+    const match = ua.match(/Android\s+[\d.]+;\s*([A-Za-z0-9 _-]+?)(?:\s+Build\/|[;)])/);
+    const model = match?.[1]?.trim();
+    const hasRealModel = !!model && model.length > 2 && !/^[A-Z]{1,2}\d*$/.test(model);
+    const modelLabel = hasRealModel ? model : "안드로이드";
+    // Flutter 앱의 WebView는 UA에 "; wv)" 마커가 붙어요 — 웹 브라우저가
+    // 아니라 이 앱 자체에서 로그인한 세션이라는 뜻이라 따로 표시할 가치가 있음.
+    if (/;\s*wv\)/i.test(ua)) return `${modelLabel} · 앱`;
+    return `${modelLabel} · ${describeBrowser(ua)}`;
+  }
+  if (/ipad/i.test(ua)) return `iPad · ${describeBrowser(ua)}`;
+  if (/iphone/i.test(ua)) return `iPhone · ${describeBrowser(ua)}`;
+  if (/windows/i.test(ua)) {
+    if (/Claude\//i.test(ua)) return "Windows · Claude 앱";
+    return `Windows · ${describeBrowser(ua)}`;
+  }
+  if (/macintosh|mac os/i.test(ua)) return `Mac · ${describeBrowser(ua)}`;
   return "알 수 없는 기기";
 }
 
@@ -135,6 +177,7 @@ export function DeviceSessionsContent() {
                 </div>
                 <p className="mt-0.5 text-[12px] font-medium text-[#8b95a1]">
                   {new Date(s.createdAt).toLocaleString("ko-KR")} 로그인
+                  {describeIp(s.ipAddress) ? ` · ${describeIp(s.ipAddress)}` : ""}
                 </p>
               </div>
               {!isCurrent ? (
