@@ -1,4 +1,4 @@
-import { Bell, Heart, ShieldCheck } from "lucide-react";
+import { Bell, Heart, ShieldCheck, Smartphone } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/mobile-screens";
 import { MenuList, SectionTitle, TopBar } from "@/components/ui-primitives";
@@ -90,6 +90,7 @@ export default async function MyPagePage() {
           items={[
             [Heart, "관심종목", "/watchlist"],
             [Bell, "알림 설정", "/alerts"],
+            [Smartphone, "활성 기기", "/devices"],
             [ShieldCheck, "개인정보처리방침", "/privacy"],
           ]}
         />
