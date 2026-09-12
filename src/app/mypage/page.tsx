@@ -40,7 +40,7 @@ export default async function MyPagePage() {
 
   return (
     <AppShell>
-      <TopBar title="마이" />
+      <TopBar title="마이페이지" />
       <section className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
         {/* 프로필 + 통계를 카드 하나로 묶음 — 예전엔 "누구인지"(아바타/이메일)와
             "내 지표"(관심종목 수 등)가 각각 다른 카드로 떨어져 있어서 한
