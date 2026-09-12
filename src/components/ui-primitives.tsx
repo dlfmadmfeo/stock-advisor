@@ -186,17 +186,22 @@ export function SectionTitle({
   );
 }
 
-export function MenuGrid({ items }: { items: Array<[IconComponent, string]> }) {
+// href가 필수예요(2026-09-12 세션) — 예전엔 onClick/href가 아예 없는
+// 장식용 버튼이라 마이페이지의 "거래내역/입출금/보안설정" 등을 눌러도
+// 아무 일도 안 일어났어요. 실제로 갈 곳이 있는 메뉴만 넣는 걸 강제하려고
+// 튜플에 href를 필수 항목으로 넣었습니다.
+export function MenuGrid({ items }: { items: Array<[IconComponent, string, string]> }) {
   return (
     <div className="grid grid-cols-3 gap-3">
-      {items.map(([Icon, label]) => (
-        <button
-          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb]"
+      {items.map(([Icon, label, href]) => (
+        <Link
+          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb] transition active:scale-[0.97] active:bg-[#f7f8fa]"
+          href={href}
           key={label}
         >
           <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
           <p className="mt-2 text-xs font-semibold text-[#333d4b]">{label}</p>
-        </button>
+        </Link>
       ))}
     </div>
   );
