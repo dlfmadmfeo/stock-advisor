@@ -33,7 +33,7 @@
 // 들어가서 새로고침하면 회원가입 탭이 로그인 탭으로 리셋됐었음).
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -86,6 +86,17 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     setToast(message);
     setTimeout(() => setToast(null), 2200);
   }
+
+  // 세션이 만료돼서 session-guard.tsx가 /login?expired=1로 보낸 경우, 왜
+  // 로그인 화면으로 왔는지 알려줍니다(2026-09-13 세션). useSearchParams 대신
+  // window.location을 직접 읽어요 — Suspense 경계 추가 없이 클라이언트에서만
+  // 한 번 확인하면 되는 값이라 이 방법이 더 간단합니다.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired") === "1") {
+      showToast("세션이 만료돼서 로그아웃됐어요. 다시 로그인해주세요.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // mode/email/password를 state에서 읽지 않고 인자로 받는 이유: 데모 로그인
   // 버튼이 setEmail/setPassword로 state를 채우는 것과 동시에 바로 로그인
