@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 export type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -186,21 +187,30 @@ export function SectionTitle({
   );
 }
 
-// href가 필수예요(2026-09-12 세션) — 예전엔 onClick/href가 아예 없는
-// 장식용 버튼이라 마이페이지의 "거래내역/입출금/보안설정" 등을 눌러도
-// 아무 일도 안 일어났어요. 실제로 갈 곳이 있는 메뉴만 넣는 걸 강제하려고
-// 튜플에 href를 필수 항목으로 넣었습니다.
-export function MenuGrid({ items }: { items: Array<[IconComponent, string, string]> }) {
+// 세로 목록형 메뉴(2026-09-12 세션, 마이페이지 리디자인). 원래 3열
+// 아이콘 그리드(MenuGrid)였는데 "개인정보처리방침"처럼 라벨이 조금만
+// 길어도 두 줄로 깨졌고, 항목이 3의 배수가 아니면 마지막 줄이 어중간하게
+// 비어 보였어요. 설정 화면에 흔한 세로 리스트(아이콘 + 라벨 + 화살표)로
+// 바꾸니 라벨 길이에 상관없이 한 줄로 안정적으로 들어가고, 항목이
+// 몇 개든 카드 하나로 자연스럽게 이어져요.
+export function MenuList({ items }: { items: Array<[IconComponent, string, string]> }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      {items.map(([Icon, label, href]) => (
+    <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
+      {items.map(([Icon, label, href], i) => (
         <Link
-          className="rounded-2xl bg-white px-2 py-4 text-center ring-1 ring-[#e5e8eb] transition active:scale-[0.97] active:bg-[#f7f8fa]"
+          className={`flex items-center gap-3 px-4 py-3.5 transition active:bg-[#f7f8fa] ${
+            i > 0 ? "border-t border-[#f2f4f6]" : ""
+          }`}
           href={href}
-          key={label}
+          key={href}
         >
-          <Icon className="mx-auto h-6 w-6 text-[#3182f6]" />
-          <p className="mt-2 text-xs font-semibold text-[#333d4b]">{label}</p>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f2f7ff]">
+            <Icon className="h-[18px] w-[18px] text-[#3182f6]" />
+          </span>
+          <span className="flex-1 text-[15px] font-semibold text-[#191f28]">
+            {label}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[#c3c9d1]" />
         </Link>
       ))}
     </div>

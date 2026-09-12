@@ -1,7 +1,7 @@
-import { Bell, Heart, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, Heart, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/mobile-screens";
-import { MenuGrid, MetricCard, SectionTitle, TopBar } from "@/components/ui-primitives";
+import { MenuList, SectionTitle, TopBar } from "@/components/ui-primitives";
 import { LogoutButton } from "@/components/logout-button";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -15,7 +15,9 @@ import { prisma } from "@/lib/db";
 // 기능이고(이 앱은 증권 계좌 연동이 없는 공개 지표 스크리너예요),
 // 버튼 자체에 onClick/href도 없어서 눌러도 아무 일도 안 났습니다.
 // 실제 세션/DB 값과, 실제로 존재하는 기능(관심종목/알림 설정/개인정보
-// 처리방침)으로만 다시 구성했습니다.
+// 처리방침)으로만 다시 구성했고, 같은 세션에서 시각적으로도 한 번 더
+// 다듬었습니다 — 프로필/통계를 카드 하나로 묶고, 메뉴는 라벨 길이에
+// 안 흔들리는 세로 리스트로.
 export default async function MyPagePage() {
   const user = await getSessionUser();
   if (!user) {
@@ -33,43 +35,58 @@ export default async function MyPagePage() {
   const joinedAt = dbUser?.createdAt
     ? `${dbUser.createdAt.getFullYear()}.${String(dbUser.createdAt.getMonth() + 1).padStart(2, "0")}.${String(dbUser.createdAt.getDate()).padStart(2, "0")}`
     : null;
+  const notificationsOn = dbUser?.notificationsEnabled ?? true;
+  const namePart = user.email.split("@")[0];
 
   return (
     <AppShell>
       <TopBar title="마이" />
-      <section className="px-5 pb-8 pt-3 lg:max-w-[960px] lg:px-8">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[#f2f7ff]">
-              <UserRound className="h-8 w-8 text-[#3182f6]" />
+      <section className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
+        {/* 프로필 + 통계를 카드 하나로 묶음 — 예전엔 "누구인지"(아바타/이메일)와
+            "내 지표"(관심종목 수 등)가 각각 다른 카드로 떨어져 있어서 한
+            화면인데 두 덩어리처럼 보였어요. 안쪽 구분선(border-t)만으로
+            나눠서 시각적으로는 하나의 프로필 단위로 읽히게 했습니다. */}
+        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
+          <div className="flex items-center gap-4 p-5">
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-2xl font-extrabold text-white shadow-lg shadow-[#3182f6]/25">
+              {namePart[0]?.toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[22px] font-extrabold tracking-[-0.02em] text-[#191f28]">
-                {user.email.split("@")[0]}님
+              <h1 className="truncate text-[20px] font-extrabold tracking-[-0.02em] text-[#191f28]">
+                {namePart}님
               </h1>
-              <p className="truncate text-sm font-medium text-[#6b7684]">
+              <p className="mt-0.5 truncate text-[13px] font-medium text-[#8b95a1]">
                 {user.email}
               </p>
               {joinedAt ? (
-                <p className="text-sm font-medium text-[#6b7684]">
+                <span className="mt-2 inline-block rounded-full bg-[#f2f4f6] px-2.5 py-1 text-[11px] font-bold text-[#6b7684]">
                   {joinedAt} 가입
-                </p>
+                </span>
               ) : null}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 border-t border-[#f2f4f6]">
+            <div className="border-r border-[#f2f4f6] px-5 py-4 text-center">
+              <p className="text-[12px] font-bold text-[#8b95a1]">관심종목</p>
+              <p className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+                {watchlistCount}개
+              </p>
+            </div>
+            <div className="px-5 py-4 text-center">
+              <p className="text-[12px] font-bold text-[#8b95a1]">공시 알림</p>
+              <p
+                className={`mt-1 text-lg font-extrabold tracking-[-0.02em] ${
+                  notificationsOn ? "text-[#3182f6]" : "text-[#8b95a1]"
+                }`}
+              >
+                {notificationsOn ? "켜짐" : "꺼짐"}
+              </p>
             </div>
           </div>
         </div>
 
-        <SectionTitle title="내 정보" />
-        <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="관심종목" value={`${watchlistCount}개`} />
-          <MetricCard
-            label="공시 알림"
-            value={dbUser?.notificationsEnabled ?? true ? "켜짐" : "꺼짐"}
-          />
-        </div>
-
         <SectionTitle title="메뉴" />
-        <MenuGrid
+        <MenuList
           items={[
             [Heart, "관심종목", "/watchlist"],
             [Bell, "알림 설정", "/alerts"],
