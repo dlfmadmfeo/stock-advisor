@@ -57,7 +57,10 @@ export function useWatchlistQuery(initialItems?: WatchlistItem[]) {
 // (WATCHLIST_QUERY_KEY)를 구독하되, 로그인 상태일 때만(enabled) 실제로
 // fetch하고, 결과는 그냥 티커 Set으로만 넘깁니다 — 같은 쿼리키를 쓰니까
 // WatchlistScreen(useSuspenseQuery)과 캐시가 자동으로 공유/동기화돼요.
-function useWatchlistSet() {
+// 로그인 상태일 때만(enabled) 실제로 fetch하는 공용 내부 훅. useWatchlistSet
+// (하트 표시용)과 useWatchlistCount(홈 화면 요약 카드용, 2026-09-13 세션)가
+// 같은 쿼리키를 공유해서 씁니다.
+function useWatchlistItemsIfLoggedIn() {
   const { data: session } = useSession();
   const loggedIn = !!session;
   const { data: items } = useQuery({
@@ -65,10 +68,24 @@ function useWatchlistSet() {
     queryFn: fetchWatchlist,
     enabled: loggedIn,
   });
+  return items;
+}
+
+function useWatchlistSet() {
+  const items = useWatchlistItemsIfLoggedIn();
   return useMemo(
     () => new Set((items ?? []).map((i) => i.ticker)),
     [items],
   );
+}
+
+// 홈 화면 요약 카드가 "관심종목 N개 관리 중"을 실제 값으로 보여주는 데 씀
+// (2026-09-13 세션 — 예전엔 하드코딩된 예시 자산 데이터를 보여주던 자리).
+// 비로그인 상태면 0을 돌려주는데, 실제로 관심종목이 0개인 것과 구분 안 되지만
+// 어차피 비로그인 화면엔 "로그인하기" 문구가 같이 뜨니 혼동 안 됨.
+export function useWatchlistCount(): number {
+  const items = useWatchlistItemsIfLoggedIn();
+  return items?.length ?? 0;
 }
 
 // 홈 리스트처럼 "누를 수는 없고 상태만 보여주는" 하트용 (2026-08-29 세션 —

@@ -28,7 +28,6 @@ import {
   Settings,
   ArrowDown,
   ArrowUp,
-  Sparkles,
   Sprout,
   Star,
   TrendingUp,
@@ -53,11 +52,13 @@ import { computeMacdSeries, isMacdReboundSignal, type MacdPoint } from "@/lib/in
 import type { DailyBar } from "@/lib/kis";
 import {
   useIsWatched,
+  useWatchlistCount,
   useWatchlistHeart,
   useWatchlistQuery,
   WATCHLIST_QUERY_KEY,
   type WatchlistItem,
 } from "@/lib/use-watchlist";
+import { useSession } from "@/lib/use-session";
 import {
   Allocation,
   EmptyState,
@@ -170,7 +171,7 @@ export function NotificationsScreen() {
       <HomeHeader />
       <section className="space-y-5 px-5 pb-8 lg:px-8">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
-          <PortfolioSummary />
+          <HomeSummaryCard />
           {/* <QuickActions /> */}
         </div>
 
@@ -518,73 +519,46 @@ function HomeHeader() {
 // 홈 화면에서 제일 먼저 눈에 들어와야 하는 카드라, 나머지 흰 카드들과 구분되게
 // 다크 톤으로 분리했어요. 시선이 자연스럽게 여기로 먼저 가고, 그 아래 흰 카드들은
 // 옅은 보더만으로 충분히 정돈돼 보입니다.
-function PortfolioSummary() {
-  const { total, returnAmount, returnPct } = usePortfolioTotals();
+//
+// 2026-09-13 세션: 원래 이 자리(PortfolioSummary)는 HOLDINGS(하드코딩된
+// 예시 보유 종목)로 계산한 가짜 "보유 자산 평가액"을 보여줬어요 — 로그인
+// 계정과 무관하게 누구한테나 똑같은 숫자가 뜨고, "업종별 스크리너 보기"
+// 버튼도 하단 네비게이션에서 이미 숨긴 /category(추천 탭)로 연결돼서
+// 눌러도 맥락이 이상했습니다(마이페이지 가짜 데이터를 지적받은 김에
+// 같이 발견). 실제 세션(이름)과 실제 관심종목 개수로 교체했습니다.
+function HomeSummaryCard() {
+  const { data: session } = useSession();
+  const watchlistCount = useWatchlistCount();
+  const loggedIn = !!session;
+  const namePart = session?.email.split("@")[0];
+
   return (
     <section className="relative overflow-hidden rounded-2xl bg-[#191f28] p-5 text-white">
-      {/* 데스크톱에서 이 카드가 QuickActions(고정폭)를 뺀 나머지 공간을 전부
-          차지하다 보니, justify-between으로 양 끝에 내용을 붙이면 가운데가
-          휑하게 비어 보였어요. 대신 내용은 왼쪽으로 모으고, 남는 공간엔 은은한
-          워터마크 아이콘을 깔아서 "의도된 여백"처럼 보이게 했습니다. */}
       <AreaChart
         aria-hidden="true"
         className="pointer-events-none absolute -bottom-8 -right-8 hidden h-44 w-44 text-white/[0.05] lg:block"
       />
-      <div className="relative lg:flex lg:items-end lg:gap-14">
-        <div>
-          <p className="text-[13px] font-medium text-[#8b95a1]">
-            보유 자산 평가액
-          </p>
-          <p className="mt-1.5 text-[24px] font-extrabold tracking-[-0.03em] text-white">
-            {formatKRW(total)}{" "}
-            <span className="text-[18px] text-[#c1c9d2]">원</span>
-          </p>
-          <p
-            className={`mt-1 text-sm font-bold ${returnAmount >= 0 ? "text-[#ff6b6b]" : "text-[#85b7eb]"}`}
-          >
-            매입가 대비 {returnAmount >= 0 ? "+" : ""}
-            {formatKRW(returnAmount)}원 ({returnPct >= 0 ? "+" : ""}
-            {returnPct}%)
-          </p>
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 lg:mt-0 lg:min-w-[280px] lg:border-t-0 lg:pt-0">
-          <SummaryItem label="보유 종목" value={`${HOLDINGS.length}개`} />
-          <SummaryItem
-            label="매입원가"
-            value={`${formatKRW(HOLDINGS.reduce((s, h) => s + h.avgBuy * h.qty, 0) / 10000)}만원`}
-          />
-          <SummaryItem label="상세" value="자산 탭" link />
-        </div>
+      <div className="relative">
+        <p className="text-[13px] font-medium text-[#8b95a1]">
+          {loggedIn ? `${namePart}님` : "관심종목"}
+        </p>
+        <p className="mt-1.5 text-[24px] font-extrabold tracking-[-0.03em] text-white">
+          {watchlistCount}
+          <span className="text-[18px] text-[#c1c9d2]">개 관리 중</span>
+        </p>
+        <p className="mt-1 text-sm font-medium text-[#8b95a1]">
+          {loggedIn
+            ? "관심종목에 새 공시가 뜨면 알림으로 알려드려요."
+            : "로그인하면 관심종목을 등록하고 공시 알림을 받을 수 있어요."}
+        </p>
       </div>
       <Link
         className="relative mt-4 flex h-12 items-center justify-center gap-2 rounded-sm bg-[#3182f6] text-[15px] font-bold text-white active:scale-[0.99] lg:w-[220px]"
-        href="/category"
+        href={loggedIn ? "/watchlist" : "/login"}
       >
-        {/* <Sparkles className="h-4 w-4" /> */}
-        업종별 스크리너 보기
+        {loggedIn ? "관심종목 보기" : "로그인하기"}
       </Link>
     </section>
-  );
-}
-
-function SummaryItem({
-  label,
-  value,
-  link,
-}: {
-  label: string;
-  value: string;
-  link?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-[11px] font-medium text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-1 text-sm font-bold ${link ? "text-[#85b7eb]" : "text-white"}`}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 

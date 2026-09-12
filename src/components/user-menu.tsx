@@ -14,13 +14,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronRight, Heart, History, LogOut, UserRound } from "lucide-react";
+import { Bell, Heart, History, LogOut, UserRound } from "lucide-react";
 import { LogoutConfirmModal } from "@/components/logout-button";
 import { useSession } from "@/lib/use-session";
 
 const MENU_ITEMS = [
   { href: "/mypage", icon: UserRound, label: "마이페이지" },
   { href: "/watchlist", icon: Heart, label: "관심종목" },
+  { href: "/alerts", icon: Bell, label: "알림 설정" },
   { href: "/history", icon: History, label: "스크리너 이력" },
 ];
 
@@ -86,15 +87,6 @@ export function UserMenu() {
                 {item.label}
               </Link>
             ))}
-            <button
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#333d4b] hover:bg-[#f7f8fa]"
-              onClick={() => setOpen(false)}
-              type="button"
-            >
-              <Bell className="h-4 w-4 text-[#8b95a1]" />
-              알림 설정
-              <ChevronRight className="ml-auto h-4 w-4 text-[#c3c9d1]" />
-            </button>
           </nav>
 
           <div className="my-1.5 h-px bg-[#f2f4f6]" />
