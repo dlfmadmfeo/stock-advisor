@@ -47,35 +47,35 @@ export default async function MyPagePage() {
             화면인데 두 덩어리처럼 보였어요. 안쪽 구분선(border-t)만으로
             나눠서 시각적으로는 하나의 프로필 단위로 읽히게 했습니다. */}
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
-          <div className="flex items-center gap-4 p-5">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-2xl font-extrabold text-white shadow-lg shadow-[#3182f6]/25">
+          <div className="flex items-center gap-3 p-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-sm font-extrabold text-white shadow-md shadow-[#3182f6]/20">
               {namePart[0]?.toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[20px] font-extrabold tracking-[-0.02em] text-[#191f28]">
+              <h1 className="truncate text-[16px] font-extrabold tracking-[-0.02em] text-[#191f28]">
                 {namePart}님
               </h1>
-              <p className="mt-0.5 truncate text-[13px] font-medium text-[#8b95a1]">
+              <p className="mt-0.5 truncate text-[12px] font-medium text-[#8b95a1]">
                 {user.email}
               </p>
               {joinedAt ? (
-                <span className="mt-2 inline-block rounded-full bg-[#f2f4f6] px-2.5 py-1 text-[11px] font-bold text-[#6b7684]">
+                <span className="mt-1.5 inline-block rounded-full bg-[#f2f4f6] px-2 py-0.5 text-[10px] font-bold text-[#6b7684]">
                   {joinedAt} 가입
                 </span>
               ) : null}
             </div>
           </div>
           <div className="grid grid-cols-2 border-t border-[#f2f4f6]">
-            <div className="border-r border-[#f2f4f6] px-5 py-4 text-center">
-              <p className="text-[12px] font-bold text-[#8b95a1]">관심종목</p>
-              <p className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+            <div className="border-r border-[#f2f4f6] px-4 py-3 text-center">
+              <p className="text-[11px] font-bold text-[#8b95a1]">관심종목</p>
+              <p className="mt-1 text-base font-extrabold tracking-[-0.02em] text-[#191f28]">
                 {watchlistCount}개
               </p>
             </div>
-            <div className="px-5 py-4 text-center">
-              <p className="text-[12px] font-bold text-[#8b95a1]">공시 알림</p>
+            <div className="px-4 py-3 text-center">
+              <p className="text-[11px] font-bold text-[#8b95a1]">공시 알림</p>
               <p
-                className={`mt-1 text-lg font-extrabold tracking-[-0.02em] ${
+                className={`mt-1 text-base font-extrabold tracking-[-0.02em] ${
                   notificationsOn ? "text-[#3182f6]" : "text-[#8b95a1]"
                 }`}
               >
