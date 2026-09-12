@@ -42,7 +42,11 @@ export const auth = betterAuth({
     minPasswordLength: 4,
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 30, // 30일 — 예전 SESSION_MAX_AGE_SECONDS와 동일
+    // ⚠️ 2026-09-13 세션: 세션 만료 감지(session-guard.tsx) 기능을 실기기에서
+    // 빨리 테스트해보려고 5분으로 임시로 줄여둠 — 테스트 끝나면 원래 값으로
+    // 되돌릴 것. 보안 강화 목적의 정식 값은 7일(better-auth 기본값과 동일)로
+    // 정하기로 했었음. 예전엔 30일(예전 SESSION_MAX_AGE_SECONDS와 동일)이었음.
+    expiresIn: 60 * 5,
   },
   // Prisma User.isAdmin 컬럼을 better-auth 세션에도 실어옵니다(2026-08-23
   // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요
