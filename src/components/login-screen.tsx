@@ -403,10 +403,20 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                     }}
                     type="checkbox"
                   />
+                  {/* 2026-09-13 세션: 예전엔 <b>로만 굵게 표시돼서 눌러도
+                      아무 반응이 없었어요(사용자 지적으로 발견) — 실제로
+                      읽어볼 방법이 없는 채로 동의를 받고 있었던 셈. 정식
+                      이용약관 문서는 아직 따로 없어서(개인정보처리방침만
+                      존재), 지금은 두 문구 다 /privacy로 연결합니다. */}
                   <span>
-                    <b className="font-bold text-[#191f28]">이용약관</b> 및{" "}
-                    <b className="font-bold text-[#191f28]">개인정보 처리방침</b>에
-                    동의합니다.
+                    <Link className="font-bold text-[#191f28] underline" href="/privacy">
+                      이용약관
+                    </Link>{" "}
+                    및{" "}
+                    <Link className="font-bold text-[#191f28] underline" href="/privacy">
+                      개인정보 처리방침
+                    </Link>
+                    에 동의합니다.
                   </span>
                 </label>
                 {termsError ? (
