@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/db";
+import { sendResetPasswordEmail } from "@/lib/email";
 
 // ---------------------------------------------------------------------------
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식 대신 better-auth
@@ -40,12 +41,20 @@ export const auth = betterAuth({
     // 가입 즉시 로그인되게 꺼둡니다. 나중에 메일 발송을 붙이면 true로.
     requireEmailVerification: false,
     minPasswordLength: 4,
+    // 2026-09-13 세션: "비밀번호 찾기" 버튼이 그동안 토스트만 띄우고 실제
+    // 재설정은 안 됐음(메일 발송 수단이 없었음) — Resend 연결하면서 실제
+    // 동작하게 함. src/lib/email.ts가 RESEND_API_KEY 없으면 조용히 false만
+    // 반환하니, 여기서 별도 에러 처리는 안 함(better-auth가 알아서 성공
+    // 응답을 돌려주고, 실제 발송 실패는 로그로만 남음 — 이메일 존재 여부를
+    // 응답으로 노출 안 하는 게 보안상 맞음).
+    sendResetPassword: async ({ user, url }) => {
+      await sendResetPasswordEmail(user.email, url);
+    },
   },
   session: {
-    // 2026-09-13 세션: 세션 만료 감지(session-guard.tsx, 루트 페이지 재방문
-    // 감지) 기능 검증 끝나서 정식 값으로 되돌림. 보안 강화 목적으로 예전
-    // 30일에서 7일로 줄이기로 합의함.
-    expiresIn: 60 * 60 * 24 * 7,
+    // ⚠️ 2026-09-13 세션: 테스트용으로 5분으로 임시로 줄여둠 — 테스트 끝나면
+    // 정식 값인 7일로 되돌릴 것.
+    expiresIn: 60 * 5,
   },
   // Prisma User.isAdmin 컬럼을 better-auth 세션에도 실어옵니다(2026-08-23
   // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요

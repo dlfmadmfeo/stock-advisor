@@ -53,7 +53,10 @@ import {
 
 type Mode = "login" | "signup";
 
-const MIN_PASSWORD_LENGTH = 4;
+// reset-password-screen.tsx도 같은 값을 씀(서버 쪽 auth.ts의
+// minPasswordLength: 4와 반드시 맞춰야 해요 — 화면 문구용 상수라 자동으로
+// 동기화되진 않습니다).
+export const MIN_PASSWORD_LENGTH = 4;
 
 // 데모 계정 — DB에 미리 가입되어 있어야 동작합니다. 직접 /login 화면에서
 // 이 이메일/비밀번호로 한 번 회원가입해두면 그 뒤로 계속 이 버튼으로
@@ -92,8 +95,14 @@ export function LoginScreen({ mode }: { mode: Mode }) {
   // window.location을 직접 읽어요 — Suspense 경계 추가 없이 클라이언트에서만
   // 한 번 확인하면 되는 값이라 이 방법이 더 간단합니다.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("expired") === "1") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("expired") === "1") {
       showToast("세션이 만료돼서 로그아웃됐어요. 다시 로그인해주세요.");
+    }
+    // reset-password-screen.tsx가 재설정 성공 후 /login?reset=1로 보내는
+    // 경우 — 새 비밀번호로 다시 로그인해야 함을 안내.
+    if (params.get("reset") === "1") {
+      showToast("비밀번호가 변경됐어요. 새 비밀번호로 로그인해주세요.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -267,15 +276,12 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                   비밀번호
                 </label>
                 {mode === "login" ? (
-                  <button
+                  <Link
                     className="text-[12.5px] font-bold text-[#3182f6]"
-                    onClick={() =>
-                      showToast("아직 비밀번호 재설정은 지원하지 않아요.")
-                    }
-                    type="button"
+                    href="/forgot-password"
                   >
                     비밀번호 찾기
-                  </button>
+                  </Link>
                 ) : null}
               </div>
               <div className="relative">
