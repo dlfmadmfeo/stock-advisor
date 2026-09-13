@@ -1,4 +1,4 @@
-import { Bell, Heart, ShieldCheck, Smartphone } from "lucide-react";
+import { Bell, Heart, ShieldCheck, Smartphone, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/mobile-screens";
 import { MenuList, SectionTitle, TopBar } from "@/components/ui-primitives";
@@ -92,6 +92,12 @@ export default async function MyPagePage() {
             [Bell, "알림 설정", "/alerts"],
             [Smartphone, "활성 기기", "/devices"],
             [ShieldCheck, "개인정보처리방침", "/privacy"],
+            // 관리자에게만 보이는 항목 — 일반 유저는 이 메뉴 자체가 존재하는지도
+            // 몰라도 되는 내부 도구라서(admin/users/page.tsx 상단 주석 참고),
+            // AI 추천 탭처럼 "권한 없음" 안내 대신 아예 항목을 안 보여줌.
+            ...(user.isAdmin
+              ? ([[Users, "유저 관리", "/admin/users"]] as Array<[typeof Users, string, string]>)
+              : []),
           ]}
         />
 
