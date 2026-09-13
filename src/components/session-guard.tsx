@@ -15,7 +15,8 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useSession } from "@/lib/use-session";
+import { useQueryClient } from "@tanstack/react-query";
+import { SESSION_QUERY_KEY, useSession } from "@/lib/use-session";
 
 // 이 경로들에서는 세션이 없어도 정상 상태라 리다이렉트하지 않음.
 const SKIP_PATHS = new Set(["/login", "/signup", "/privacy"]);
@@ -29,11 +30,31 @@ const SKIP_PATHS = new Set(["/login", "/signup", "/privacy"]);
 // 조용히 넘어갑니다.
 export const intentionalLogout = { current: false };
 
+// window에 심는 필드라 any 대신 최소한의 타입만 덧붙임.
+type WindowWithSessionHook = typeof window & { __refetchSession?: () => void };
+
 export function SessionGuard() {
   const { data: session, isFetched } = useSession();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
   const wasLoggedIn = useRef(false);
+
+  // Flutter 앱(stock_advisor_app)이 백그라운드에서 포그라운드로 돌아올 때
+  // 호출할 훅. WebView 안에 통째로 얹힌 웹페이지라 안드로이드 Activity의
+  // pause/resume이 이 페이지의 document.visibilityState 변화로 자동
+  // 이어지지 않아서(2026-09-13 세션, "5분 지나도 로그아웃 안 된다" 제보로
+  // 발견), refetchOnWindowFocus만으로는 세션 재확인이 트리거 안 됐어요.
+  // Flutter 쪽 main.dart의 didChangeAppLifecycleState가 앱 resume 시
+  // window.__refetchSession()을 직접 실행해서 우회합니다.
+  useEffect(() => {
+    (window as WindowWithSessionHook).__refetchSession = () => {
+      queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+    };
+    return () => {
+      delete (window as WindowWithSessionHook).__refetchSession;
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!isFetched) return;
