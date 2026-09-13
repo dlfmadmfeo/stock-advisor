@@ -28,6 +28,7 @@ import {
   Settings,
   ArrowDown,
   ArrowUp,
+  Sparkle,
   Sprout,
   Star,
   TrendingUp,
@@ -146,6 +147,11 @@ const navTabs = [
   { href: "/watchlist", icon: Heart, label: "관심" },
   // { href: "/analysis", icon: AreaChart, label: "자산" },
   { href: "/alerts", icon: Bell, label: "알림" },
+  // 2026-09-13 세션: AI 추천 탭 추가 — 아직 관리자(junhee92kr@naver.com,
+  // User.isAdmin)만 실제로 쓸 수 있고, 권한 없는 유저는 탭엔 들어오되
+  // src/app/ai-picks/page.tsx에서 "권한 없음" 안내만 보여줍니다(탭 자체를
+  // 숨기지 않음 — 존재는 알리되 접근만 막는 방식).
+  { href: "/ai-picks", icon: Sparkle, label: "AI 추천" },
 ];
 
 const categoryIcons: Record<string, IconComponent> = {
@@ -1035,11 +1041,11 @@ function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
 function BottomNav() {
   const pathname = usePathname();
 
-  // grid-cols-4가 아니라 navTabs 개수(지금 3개: 홈/관심/알림)에 맞춘
-  // grid-cols-3 — 위 navTabs의 추천/자산 주석을 풀면 여기도 grid-cols-5로
-  // 같이 맞춰야 칸이 안 남아요.
+  // navTabs 개수(지금 4개: 홈/관심/알림/AI 추천)에 맞춘 grid-cols-4 — 위
+  // navTabs의 추천/자산 주석을 풀면 여기도 grid-cols-6으로 같이 맞춰야
+  // 칸이 안 남아요.
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-3 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
         const active =
           pathname === item.href ||
