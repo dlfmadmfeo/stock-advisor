@@ -20,6 +20,15 @@ import { useSession } from "@/lib/use-session";
 // 이 경로들에서는 세션이 없어도 정상 상태라 리다이렉트하지 않음.
 const SKIP_PATHS = new Set(["/login", "/signup", "/privacy"]);
 
+// 2026-09-13 세션: "직접 로그아웃했는데도 세션 만료 문구가 뜬다"는 제보로
+// 추가. logout-button.tsx가 authClient.signOut() 성공 직후 세션 쿼리
+// 캐시를 null로 직접 밀어넣는데(react-query 캐시 갱신), 이 훅 입장에선
+// "로그인해 있다가 세션이 null이 됨"이라는 전이가 실제 만료 때와 완전히
+// 똑같이 보여서 구분을 못 했어요. logout-button.tsx가 signOut() 호출 직전에
+// 이 플래그를 true로 세워두면, 여기서 그 한 번의 null 전이만 만료 안내 없이
+// 조용히 넘어갑니다.
+export const intentionalLogout = { current: false };
+
 export function SessionGuard() {
   const { data: session, isFetched } = useSession();
   const router = useRouter();
@@ -31,6 +40,12 @@ export function SessionGuard() {
 
     if (session) {
       wasLoggedIn.current = true;
+      return;
+    }
+
+    if (intentionalLogout.current) {
+      intentionalLogout.current = false;
+      wasLoggedIn.current = false;
       return;
     }
 

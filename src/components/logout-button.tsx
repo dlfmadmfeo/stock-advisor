@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
+import { intentionalLogout } from "@/components/session-guard";
 
 export function LogoutConfirmModal({
   open,
@@ -50,6 +51,9 @@ export function LogoutConfirmModal({
           <button
             className="h-10 flex-1 rounded-lg bg-[#f04452] text-xs font-bold text-white"
             onClick={async () => {
+              // session-guard.tsx가 이 직후의 세션 null 전이를 "직접
+              // 로그아웃"으로 알아보고 만료 안내를 건너뛰게 하는 플래그.
+              intentionalLogout.current = true;
               try {
                 await authClient.signOut();
               } finally {
