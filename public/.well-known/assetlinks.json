@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.junhee.stockadvisor",
+      "sha256_cert_fingerprints": [
+        "F8:62:4D:75:49:6B:3D:28:9F:34:36:6B:50:AB:40:1F:0F:9A:28:1C:CD:8C:90:42:F2:69:3F:DE:C1:DD:C6:E3"
+      ]
+    }
+  }
+]
