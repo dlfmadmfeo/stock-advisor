@@ -77,6 +77,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
   const [termsError, setTermsError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const isSignup = mode === "signup";
@@ -104,6 +105,11 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     if (params.get("reset") === "1") {
       showToast("비밀번호가 변경됐어요. 새 비밀번호로 로그인해주세요.");
     }
+    // 회원가입 인증 메일의 링크를 눌러서 better-auth가 /login?verified=1로
+    // 돌려보낸 경우 — 이제 로그인할 수 있다고 안내.
+    if (params.get("verified") === "1") {
+      showToast("이메일 인증이 완료됐어요. 로그인해주세요.");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -121,12 +127,15 @@ export function LoginScreen({ mode }: { mode: Mode }) {
   async function submitLogin(targetMode: Mode, targetEmail: string, targetPassword: string) {
     setSubmitting(true);
     try {
-      const { error } =
+      const { data, error } =
         targetMode === "signup"
           ? await authClient.signUp.email({
               email: targetEmail,
               password: targetPassword,
               name: targetEmail.split("@")[0],
+              // 인증 메일 링크를 누르면 better-auth가 서버에서 바로 이
+              // 주소로 리다이렉트해요(/api/auth/verify-email이 처리).
+              callbackURL: "/login?verified=1",
             })
           : await authClient.signIn.email({
               email: targetEmail,
@@ -134,6 +143,14 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             });
       if (error) {
         showToast(error.message ?? "요청에 실패했어요.");
+        return;
+      }
+      // 2026-09-14 세션: requireEmailVerification이 켜지면(auth.ts) 회원가입
+      // 직후에도 세션이 안 만들어져요(token: null) — 이메일 인증 전까지는
+      // 로그인도 막혀요. 이 경우엔 홈으로 안 보내고 "메일함 확인해주세요"
+      // 안내만 보여줍니다.
+      if (targetMode === "signup" && !data?.token) {
+        setVerificationPending(true);
         return;
       }
       // 2026-08-20 세션: query-provider.tsx의 전역 staleTime(15초) 때문에,
@@ -538,6 +555,32 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               <p className="mt-1 text-sm text-[#8b95a1]">
                 홈 화면으로 이동할게요.
               </p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 인증 메일 발송 안내 오버레이 (requireEmailVerification 켜진 뒤에만
+            실제로 뜸 — auth.ts 참고) */}
+        {verificationPending ? (
+          <div className="absolute inset-0 grid place-items-center bg-white px-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="grid h-16 w-16 place-items-center rounded-full bg-[#eef4ff]">
+                <Mail className="h-8 w-8 text-[#3182f6]" />
+              </div>
+              <p className="mt-4 text-lg font-black text-[#191f28]">
+                이메일을 확인해주세요
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#8b95a1]">
+                {email} 주소로 인증 메일을 보냈어요.
+                <br />
+                메일의 링크를 눌러야 로그인할 수 있어요.
+              </p>
+              <Link
+                className="mt-8 flex h-12 w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-[15px] font-extrabold text-white"
+                href="/login"
+              >
+                로그인 화면으로
+              </Link>
             </div>
           </div>
         ) : null}
