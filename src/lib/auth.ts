@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/db";
-import { sendResetPasswordEmail } from "@/lib/email";
+import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
 
 // ---------------------------------------------------------------------------
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식 대신 better-auth
@@ -37,18 +37,31 @@ export const auth = betterAuth({
       : undefined,
   emailAndPassword: {
     enabled: true,
-    // 이메일 인증 메일을 보낼 서비스(예: Resend)를 아직 안 붙였어서, 일단
-    // 가입 즉시 로그인되게 꺼둡니다. 나중에 메일 발송을 붙이면 true로.
+    // ⚠️ 2026-09-14 세션: 이메일 인증 발송(email.ts, Gmail SMTP)은 연결해
+    // 뒀지만, GMAIL_USER/GMAIL_APP_PASSWORD를 실제로 넣어서 발송까지
+    // 검증하기 전까지는 true로 안 바꿔요 — 이 값이 true인데 발송이 실패하면
+    // 신규 가입자가 인증 메일을 영영 못 받아서 로그인 자체가 막혀버려요
+    // (sign-in.mjs가 emailVerified === false면 로그인을 거부함). 검증 끝나면
+    // true로.
     requireEmailVerification: false,
     minPasswordLength: 4,
     // 2026-09-13 세션: "비밀번호 찾기" 버튼이 그동안 토스트만 띄우고 실제
-    // 재설정은 안 됐음(메일 발송 수단이 없었음) — Resend 연결하면서 실제
-    // 동작하게 함. src/lib/email.ts가 RESEND_API_KEY 없으면 조용히 false만
-    // 반환하니, 여기서 별도 에러 처리는 안 함(better-auth가 알아서 성공
-    // 응답을 돌려주고, 실제 발송 실패는 로그로만 남음 — 이메일 존재 여부를
-    // 응답으로 노출 안 하는 게 보안상 맞음).
+    // 재설정은 안 됐음(메일 발송 수단이 없었음) — 이메일 발송 연결하면서
+    // 실제 동작하게 함. email.ts가 설정 안 됐으면 조용히 false만 반환하니,
+    // 여기서 별도 에러 처리는 안 함(better-auth가 알아서 성공 응답을
+    // 돌려주고, 실제 발송 실패는 로그로만 남음 — 이메일 존재 여부를 응답으로
+    // 노출 안 하는 게 보안상 맞음).
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
+    },
+  },
+  // 2026-09-14 세션: 회원가입 시 실제로 존재하는 이메일인지 확인하는 절차.
+  // requireEmailVerification이 true가 되면 sign-up.mjs가 이 콜백을 자동으로
+  // 호출해요(따로 트리거 안 해도 됨) — 검증 전까지는 이 콜백이 있어도
+  // requireEmailVerification이 false라 실제로는 안 불려요.
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendVerificationEmail(user.email, url);
     },
   },
   session: {
