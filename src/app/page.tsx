@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/auth";
+import { RETURNING_USER_COOKIE } from "@/lib/returning-user-mark";
 
 // 2026-09-13 세션: 예전엔 세션 상태를 전혀 안 보고 무조건 /login으로
 // 보냈어요 — 그래서 로그인이 멀쩡히 살아있는 상태로 앱(Flutter WebView)을
@@ -16,14 +17,16 @@ export default async function Home() {
 
   // "화면 켜져있는 동안 세션이 만료됨"은 session-guard.tsx가 처리하는데,
   // "앱을 껐다가 세션 만료된 채로 다시 켬"(콜드 스타트)은 그 훅이 아예
-  // 마운트되기 전이라 못 잡아요 — 여기서 따로 감지해야 합니다. 세션 쿠키
-  // 자체는(better-auth.session_token, 프로덕션 HTTPS에선 __Secure- 접두사가
-  // 붙음) 아직 브라우저에 남아있는데 getSessionUser()가 null을 준 경우
-  // "예전엔 로그인했었는데 지금 세션이 무효화됨"으로 보고, 진짜 첫 방문
-  // 손님(쿠키 자체가 없음)과 구분해서 후자만 안내 문구 없이 보냅니다.
+  // 마운트되기 전이라 못 잡아요 — 여기서 따로 감지해야 합니다.
+  //
+  // 2026-09-23 세션: 처음엔 세션 쿠키(better-auth.session_token) 자체가
+  // 남아있는지로 판단했는데, 그 쿠키의 Max-Age가 세션 expiresIn(auth.ts)과
+  // 똑같아서 세션이 만료되는 순간 쿠키도 같이 사라져요 — 그래서 정작
+  // "만료된 채로 재실행"하는 흔한 케이스에서 쿠키가 이미 없어 안내가 안
+  // 떴습니다(사용자 지적으로 발견). 세션 쿠키와 수명이 분리된 별도 마커
+  // (returning-user-mark.ts, 로그인 시 세우고 로그아웃 시에만 지움)로
+  // "예전에 로그인했었는지"를 판단하도록 교체.
   const cookieStore = await cookies();
-  const hadSessionCookie = cookieStore
-    .getAll()
-    .some((c) => c.name.endsWith(".session_token"));
+  const hadSessionCookie = cookieStore.get(RETURNING_USER_COOKIE)?.value === "1";
   redirect(hadSessionCookie ? "/login?expired=1" : "/login");
 }

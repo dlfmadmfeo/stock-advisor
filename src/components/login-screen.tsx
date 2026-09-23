@@ -39,6 +39,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
+import { markReturningUser } from "@/lib/returning-user-mark";
 import {
   AlertCircle,
   Check,
@@ -160,6 +161,9 @@ export function LoginScreen({ mode }: { mode: Mode }) {
       // 로그아웃 후 캐시를 직접 갱신하는 것처럼, 로그인/회원가입 성공
       // 직후에도 세션 쿼리를 무효화해서 즉시 새로 불러오게 함.
       await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+      // 세션 쿠키보다 오래 남는 마커 — src/app/page.tsx가 콜드 스타트
+      // 시 "만료됨" 안내 여부를 이걸로 판단합니다.
+      markReturningUser();
       setSuccess(true);
       setTimeout(() => router.push("/notifications"), 1100);
     } catch {

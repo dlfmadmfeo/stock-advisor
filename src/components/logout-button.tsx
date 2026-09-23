@@ -19,6 +19,7 @@ import { LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { intentionalLogout } from "@/components/session-guard";
+import { clearReturningUserMark } from "@/lib/returning-user-mark";
 
 export function LogoutConfirmModal({
   open,
@@ -57,6 +58,9 @@ export function LogoutConfirmModal({
               try {
                 await authClient.signOut();
               } finally {
+                // 직접 로그아웃했으니 다음에 앱을 다시 열어도 "세션
+                // 만료" 안내가 뜨면 안 됨 — 마커도 같이 지움.
+                clearReturningUserMark();
                 queryClient.setQueryData(SESSION_QUERY_KEY, null);
                 router.push("/login");
               }
