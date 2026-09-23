@@ -3,6 +3,7 @@ import { AppShell, BackTopBar } from "@/components/mobile-screens";
 import { EmptyState } from "@/components/ui-primitives";
 import { getSessionUser } from "@/lib/auth";
 import { getAdminUserList } from "@/lib/admin-users";
+import { formatKstDateTime } from "@/lib/format-kst";
 
 // 2026-09-13 세션: 관리자만 쓰는 유저 목록 화면. AI 추천 탭과 달리 이건
 // 일반 유저에게 존재를 알릴 이유가 전혀 없는 순수 내부 도구라서, 하단
@@ -10,13 +11,7 @@ import { getAdminUserList } from "@/lib/admin-users";
 // (src/app/mypage/page.tsx 참고). 그래서 여기 접근 제어도 AI 추천처럼
 // "화면 안에서 안내 문구"가 아니라, 존재 자체를 감추는 리다이렉트로 막아요.
 function formatDateTime(d: Date | null): string {
-  if (!d) return "-";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
+  return d ? formatKstDateTime(d) : "-";
 }
 
 export default async function AdminUsersPage() {

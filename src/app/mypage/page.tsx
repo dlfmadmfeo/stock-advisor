@@ -5,6 +5,7 @@ import { MenuList, SectionTitle, TopBar } from "@/components/ui-primitives";
 import { LogoutButton } from "@/components/logout-button";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { formatKstDate } from "@/lib/format-kst";
 
 // watchlist/alerts와 같은 이유로 로그인 안 했으면 /login으로 보냅니다.
 //
@@ -32,9 +33,7 @@ export default async function MyPagePage() {
     }),
   ]);
 
-  const joinedAt = dbUser?.createdAt
-    ? `${dbUser.createdAt.getFullYear()}.${String(dbUser.createdAt.getMonth() + 1).padStart(2, "0")}.${String(dbUser.createdAt.getDate()).padStart(2, "0")}`
-    : null;
+  const joinedAt = dbUser?.createdAt ? formatKstDate(dbUser.createdAt) : null;
   const notificationsOn = dbUser?.notificationsEnabled ?? true;
   const namePart = user.email.split("@")[0];
 
