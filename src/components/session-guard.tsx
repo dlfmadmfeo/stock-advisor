@@ -56,6 +56,36 @@ export function SessionGuard() {
     };
   }, [queryClient]);
 
+  // 2026-09-23 세션: "세션 만료 후에 아무 서버 호출이나 하면 그때 바로
+  // 감지 안 되냐"는 요청 — 지금까진 세션 조회(useSession) 재확인이 일어날
+  // 때만(창 포커스, 앱 복귀) 만료를 알아챘는데, 그 사이에 다른 API(관심종목
+  // 토글 등)를 호출하면 401을 받고도 조용히 실패할 뿐이었음. fetch를
+  // 감싸서 우리 API(/api/...)가 401을 주면 세션을 바로 재확인시킴 —
+  // /api/auth/*(로그인/회원가입 자체의 401, 예: 비밀번호 틀림)는 세션
+  // 만료가 아니라 정상적인 실패라 제외. 실제 만료가 맞을 때만 아래
+  // useEffect의 기존 로직(wasLoggedIn이 true였을 때만 리다이렉트)이
+  // 작동하므로, 비로그인 손님의 401은 여기서 걸려도 아무 일 안 일어남.
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      try {
+        const input = args[0];
+        const url = typeof input === "string" ? input : (input as Request).url;
+        const path = new URL(url, window.location.origin).pathname;
+        if (response.status === 401 && path.startsWith("/api/") && !path.startsWith("/api/auth/")) {
+          queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+        }
+      } catch {
+        // URL 파싱 실패 등은 무시 — 원래 응답은 그대로 반환.
+      }
+      return response;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [queryClient]);
+
   useEffect(() => {
     if (!isFetched) return;
 
