@@ -26,7 +26,8 @@ export type AdminUserRow = {
 
 export async function getAdminUserList(): Promise<AdminUserRow[]> {
   const [users, watchlistGroups, deviceGroups, sessionGroups] = await Promise.all([
-    prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
+    // 관리자를 항상 맨 위에 고정(2026-09-23 세션) — 그다음은 최근 가입순.
+    prisma.user.findMany({ orderBy: [{ isAdmin: "desc" }, { createdAt: "desc" }] }),
     prisma.watchlist.groupBy({ by: ["userId"], _count: { _all: true } }),
     prisma.pushToken.groupBy({ by: ["userId"], _count: { _all: true } }),
     prisma.session.groupBy({ by: ["userId"], _max: { createdAt: true } }),
