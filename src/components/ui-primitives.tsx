@@ -9,7 +9,7 @@
 //
 // 이 파일을 분리해두면, 서버 컴포넌트인 page.tsx가 TopBar 같은 걸 직접
 // import해서 클라이언트 JS 없이 렌더링할 수 있습니다 (예: src/app/mypage,
-// src/app/history). 뒤로가기 버튼처럼 useRouter가 필요한 경우엔
+// src/app/devices). 뒤로가기 버튼처럼 useRouter가 필요한 경우엔
 // mobile-screens.tsx의 BackTopBar(클라이언트)가 이 TopBar를 감싸서 씁니다.
 //
 // 반대로 CategoryScreen처럼 여전히 클라이언트인 화면들도 이 파일에서
@@ -213,27 +213,6 @@ export function MenuList({ items }: { items: Array<[IconComponent, string, strin
           <ChevronRight className="h-4 w-4 shrink-0 text-[#c3c9d1]" />
         </Link>
       ))}
-    </div>
-  );
-}
-
-export function HistoryMetric({
-  label,
-  value,
-  positive,
-}: {
-  label: string;
-  value: string;
-  positive?: boolean;
-}) {
-  return (
-    <div className="rounded-lg bg-[#f7f8fa] px-3 py-2">
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
-      <p
-        className={`mt-1 text-sm font-semibold ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
-      >
-        {value}
-      </p>
     </div>
   );
 }
