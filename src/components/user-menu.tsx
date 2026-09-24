@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Heart, History, LogOut, UserRound } from "lucide-react";
+import { Bell, Heart, LogOut, UserRound } from "lucide-react";
 import { LogoutConfirmModal } from "@/components/logout-button";
 import { useSession } from "@/lib/use-session";
 
@@ -22,7 +22,6 @@ const MENU_ITEMS = [
   { href: "/mypage", icon: UserRound, label: "마이페이지" },
   { href: "/watchlist", icon: Heart, label: "관심종목" },
   { href: "/alerts", icon: Bell, label: "알림 설정" },
-  { href: "/history", icon: History, label: "스크리너 이력" },
 ];
 
 export function UserMenu() {

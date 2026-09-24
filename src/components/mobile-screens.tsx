@@ -164,9 +164,6 @@ const categorySectors = ["반도체", "금융", "바이오", "플랫폼"];
 
 const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "투자 성향"];
 
-// history 데이터는 src/components/history-content.tsx로 옮겼습니다 (서버
-// 컴포넌트 분리 확장).
-
 export function NotificationsScreen() {
   const stocks = useLiveStocks();
   const passed = stocks.filter((s) => passesScreener(s));
@@ -467,7 +464,7 @@ function buildDonutGradient(entries: [string, number][], total: number) {
 
 // ---------------------------------------------------------------------------
 // BackTopBar: "뒤로가기"(useRouter 필요)만 담당하는 작은 클라이언트 조각.
-// 서버 컴포넌트인 page.tsx(예: src/app/history/page.tsx)가 AppShell과 함께
+// 서버 컴포넌트인 page.tsx(예: src/app/devices/page.tsx)가 AppShell과 함께
 // 직접 조합해서 씁니다. ("시장 소식" 화면은 2026-08-14 세션에 아예
 // 제거했습니다 — 목업 데이터만 있던 화면이라 정리했어요.)
 // ---------------------------------------------------------------------------
@@ -492,11 +489,11 @@ export function BackTopBar({
   );
 }
 
-// MyPageScreen/HistoryScreen 제거됨 (2026-08-14 세션, 서버 컴포넌트 분리
-// 확장). 둘 다 실제로는 정적 목업 콘텐츠라 뉴스 화면과 같은 패턴으로
-// src/app/mypage/page.tsx, src/app/history/page.tsx(둘 다 서버 컴포넌트)에서
-// 직접 조립합니다. `history` 데이터는 src/components/history-content.tsx로
-// 옮겼어요.
+// MyPageScreen은 제거됨 (2026-08-14 세션, 서버 컴포넌트 분리 확장) —
+// src/app/mypage/page.tsx(서버 컴포넌트)가 직접 조립합니다. 목업이던
+// HistoryScreen(스크리너 이력)은 2026-09-24 세션에 화면 자체를 삭제했어요
+// (가짜 데이터였고, "추천가→수익률" 구조가 이 앱의 비추천/비수익률 표시
+// 원칙과 충돌해서).
 
 function HomeHeader() {
   const router = useRouter();
@@ -848,9 +845,7 @@ function DesktopSidebar() {
 
       <nav className="mt-8 space-y-1">
         {navTabs.map((item) => {
-          const active =
-            pathname === item.href ||
-            (pathname === "/history" && item.href === "/category");
+          const active = pathname === item.href;
           return (
             <Link
               className={`flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold ${
@@ -1034,9 +1029,9 @@ function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
   );
 }
 
-// EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle/MenuGrid/
-// HistoryMetric은 전부 서버 컴포넌트 분리 작업으로 src/components/
-// ui-primitives.tsx로 옮겼습니다 (위 AppShell 주석 참고).
+// EmptyState/MetricCard/Allocation/SectionHeader/SectionTitle은 전부 서버
+// 컴포넌트 분리 작업으로 src/components/ui-primitives.tsx로 옮겼습니다 (위
+// AppShell 주석 참고).
 
 function BottomNav() {
   const pathname = usePathname();
@@ -1047,9 +1042,7 @@ function BottomNav() {
   return (
     <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
       {navTabs.map((item) => {
-        const active =
-          pathname === item.href ||
-          (pathname === "/history" && item.href === "/category");
+        const active = pathname === item.href;
         return (
           <Link
             className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
