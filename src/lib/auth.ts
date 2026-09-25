@@ -37,13 +37,12 @@ export const auth = betterAuth({
       : undefined,
   emailAndPassword: {
     enabled: true,
-    // ⚠️ 2026-09-14 세션: 이메일 인증 발송(email.ts, Gmail SMTP)은 연결해
-    // 뒀지만, GMAIL_USER/GMAIL_APP_PASSWORD를 실제로 넣어서 발송까지
-    // 검증하기 전까지는 true로 안 바꿔요 — 이 값이 true인데 발송이 실패하면
-    // 신규 가입자가 인증 메일을 영영 못 받아서 로그인 자체가 막혀버려요
-    // (sign-in.mjs가 emailVerified === false면 로그인을 거부함). 검증 끝나면
-    // true로.
-    requireEmailVerification: false,
+    // 2026-09-25 세션: 회원가입 이메일 인증 활성화. 이 값이 true면 인증 전
+    // 계정은 로그인이 거부돼요(sign-in.mjs가 emailVerified === false면 403)
+    // — 켜기 전에 기존 가입자 전원(관리자/데모/실가입자)을 emailVerified=true로
+    // 미리 바꿔뒀어요(데모 계정은 가짜 도메인이라 인증 자체가 불가능). 앞으로
+    // 이 플래그를 다시 끌 일이 있더라도 그 3명은 이미 인증 처리된 상태예요.
+    requireEmailVerification: true,
     minPasswordLength: 4,
     // 2026-09-13 세션: "비밀번호 찾기" 버튼이 그동안 토스트만 띄우고 실제
     // 재설정은 안 됐음(메일 발송 수단이 없었음) — 이메일 발송 연결하면서
@@ -55,11 +54,14 @@ export const auth = betterAuth({
       await sendResetPasswordEmail(user.email, url);
     },
   },
-  // 2026-09-14 세션: 회원가입 시 실제로 존재하는 이메일인지 확인하는 절차.
-  // requireEmailVerification이 true가 되면 sign-up.mjs가 이 콜백을 자동으로
-  // 호출해요(따로 트리거 안 해도 됨) — 검증 전까지는 이 콜백이 있어도
-  // requireEmailVerification이 false라 실제로는 안 불려요.
+  // 회원가입 시 실제로 존재하는 이메일인지 확인하는 절차. requireEmailVerification이
+  // true라 sign-up.mjs가 가입 직후 이 콜백을 자동으로 호출해요. sendOnSignIn:
+  // 인증 전 계정이 로그인을 시도하면(메일을 놓쳤거나 링크가 만료된 경우) 인증
+  // 메일을 새로 보내줘요. 링크 유효시간은 기본 1시간이라 메일을 늦게 확인해도
+  // 되게 24시간으로 늘림.
   emailVerification: {
+    sendOnSignIn: true,
+    expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, url }) => {
       await sendVerificationEmail(user.email, url);
     },
