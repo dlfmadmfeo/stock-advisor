@@ -40,6 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { markReturningUser } from "@/lib/returning-user-mark";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
 import {
   AlertCircle,
   Check,
@@ -59,11 +60,8 @@ type Mode = "login" | "signup";
 // 동기화되진 않습니다).
 export const MIN_PASSWORD_LENGTH = 4;
 
-// 데모 계정 — DB에 미리 가입되어 있어야 동작합니다. 직접 /login 화면에서
-// 이 이메일/비밀번호로 한 번 회원가입해두면 그 뒤로 계속 이 버튼으로
-// 로그인돼요 (서버에 자동으로 시드하는 스크립트는 따로 없음).
-const DEMO_EMAIL = "demo@stock-advisor.app";
-const DEMO_PASSWORD = "demo1234";
+// 데모 계정 값은 탈퇴 방지(auth.ts)와 공유해서 src/lib/demo-account.ts에 둡니다.
+
 
 export function LoginScreen({ mode }: { mode: Mode }) {
   const router = useRouter();
@@ -110,6 +108,10 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     // 돌려보낸 경우 — 이제 로그인할 수 있다고 안내.
     if (params.get("verified") === "1") {
       showToast("이메일 인증이 완료됐어요. 로그인해주세요.");
+    }
+    // 회원 탈퇴(delete-account-form.tsx) 직후 돌아온 경우.
+    if (params.get("deleted") === "1") {
+      showToast("회원 탈퇴가 완료됐어요. 이용해주셔서 감사해요.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

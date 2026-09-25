@@ -1,4 +1,5 @@
 import { Bell, Heart, ShieldCheck, Smartphone, Users } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/mobile-screens";
 import { MenuList, SectionTitle, TopBar } from "@/components/ui-primitives";
@@ -101,6 +102,14 @@ export default async function MyPagePage() {
         />
 
         <LogoutButton />
+
+        {/* 회원 탈퇴(2026-09-25 세션) — 로그아웃 버튼과 헷갈리지 않게 눈에 덜
+            띄는 텍스트 링크로 둠. */}
+        <div className="mt-5 text-center">
+          <Link className="text-[12px] font-semibold text-[#8b95a1] underline" href="/mypage/delete">
+            회원 탈퇴
+          </Link>
+        </div>
       </section>
     </AppShell>
   );

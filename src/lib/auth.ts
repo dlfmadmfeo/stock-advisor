@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/db";
 import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
+import { afterAccountDelete, beforeAccountDelete } from "@/lib/account-deletion";
 
 // ---------------------------------------------------------------------------
 // 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식 대신 better-auth
@@ -66,6 +68,18 @@ export const auth = betterAuth({
       await sendVerificationEmail(user.email, url);
     },
   },
+  // 회원 탈퇴는 비밀번호를 같이 보내야만 되게 서버에서 강제해요. better-auth의
+  // delete-user는 비밀번호를 안 보내면 "세션이 방금 만들어졌는지(freshAge,
+  // 기본 24시간)"만 보고 통과시켜서, 세션 토큰만 탈취돼도 API 직접 호출로
+  // 계정을 지울 수 있어요. freshAge를 줄여서 막으면 같은 신선도 검사를 쓰는
+  // /list-sessions(활성 기기 화면)가 깨져서, 이 엔드포인트만 훅으로 막습니다.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/delete-user" && !ctx.body?.password) {
+        throw new APIError("BAD_REQUEST", { message: "탈퇴하려면 비밀번호를 입력해야 해요." });
+      }
+    }),
+  },
   session: {
     // ⚠️ 2026-09-24 세션: 실기기(프로덕션)에서 콜드스타트 만료 감지
     // (returning-user-mark.ts)를 테스트하려고 5분으로 임시 배포함 — 테스트
@@ -78,6 +92,18 @@ export const auth = betterAuth({
   // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요
   // — DB에서 직접 켜야만 관리자가 됨(스스로 관리자 체크박스를 켜는 걸 막음).
   user: {
+    // 회원 탈퇴(2026-09-25 세션, Google Play 계정 삭제 요구사항). 클라이언트가
+    // 비밀번호를 같이 보내야만 삭제돼요(delete-user 엔드포인트가 검증). 데모/관리자
+    // 계정 보호와 실시간 구독 정리는 account-deletion.ts 참고.
+    deleteUser: {
+      enabled: true,
+      beforeDelete: async (user) => {
+        await beforeAccountDelete(user as { id: string; email: string; isAdmin?: boolean });
+      },
+      afterDelete: async (user) => {
+        await afterAccountDelete(user);
+      },
+    },
     additionalFields: {
       isAdmin: {
         type: "boolean",
