@@ -143,6 +143,12 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               password: targetPassword,
             });
       if (error) {
+        // 인증 전 계정의 로그인 — better-auth가 인증 메일을 새로 보냈어요
+        // (auth.ts emailVerification.sendOnSignIn).
+        if (error.code === "EMAIL_NOT_VERIFIED") {
+          showToast("이메일 인증이 필요해요. 인증 메일을 다시 보냈으니 메일함을 확인해주세요.");
+          return;
+        }
         showToast(error.message ?? "요청에 실패했어요.");
         return;
       }
