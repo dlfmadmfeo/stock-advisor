@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatKstDate } from "@/lib/format-kst";
+import { accountDeletionBlockReason } from "@/lib/account-deletion";
 
 // watchlist/alerts와 같은 이유로 로그인 안 했으면 /login으로 보냅니다.
 //
@@ -104,12 +105,15 @@ export default async function MyPagePage() {
         <LogoutButton />
 
         {/* 회원 탈퇴(2026-09-25 세션) — 로그아웃 버튼과 헷갈리지 않게 눈에 덜
-            띄는 텍스트 링크로 둠. */}
-        <div className="mt-5 text-center">
-          <Link className="text-[12px] font-semibold text-[#8b95a1] underline" href="/mypage/delete">
-            회원 탈퇴
-          </Link>
-        </div>
+            띄는 텍스트 링크로 둠. 탈퇴가 막힌 계정(데모/관리자)에는 아예 안
+            보여줌. */}
+        {accountDeletionBlockReason(user) ? null : (
+          <div className="mt-5 text-center">
+            <Link className="text-[12px] font-semibold text-[#8b95a1] underline" href="/mypage/delete">
+              회원 탈퇴
+            </Link>
+          </div>
+        )}
       </section>
     </AppShell>
   );

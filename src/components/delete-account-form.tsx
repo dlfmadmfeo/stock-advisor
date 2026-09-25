@@ -8,9 +8,10 @@
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { intentionalLogout } from "@/components/session-guard";
@@ -21,13 +22,14 @@ const DELETED_ITEMS = [
   "관심종목 목록",
   "공시 알림 설정",
   "알림용 기기 등록 정보",
-  "로그인 기록(활성 기기)",
+  "로그인한 기기 목록",
 ];
 
 export function DeleteAccountForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,24 +79,46 @@ export function DeleteAccountForm() {
           ))}
         </ul>
         <p className="mt-3 text-[12px] font-semibold text-[#8b95a1]">
-          삭제된 정보는 복구할 수 없어요. 같은 이메일로 다시 가입은 할 수 있어요.
+          탈퇴 후에도 같은 이메일로 다시 가입할 수 있어요.
         </p>
       </div>
 
       <div className="mt-5 space-y-[7px]">
         <label className="text-[12.5px] font-bold text-[#6b7684]" htmlFor="delete-password">
-          비밀번호 확인
+          현재 비밀번호
         </label>
-        <input
-          autoComplete="current-password"
-          className="h-[50px] w-full rounded-[13px] border-[1.5px] border-[#e5e8eb] bg-white px-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[#f04452] focus:ring-4 focus:ring-[#f04452]/10"
-          id="delete-password"
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="현재 비밀번호를 입력하세요"
-          type="password"
-          value={password}
-        />
+        <div className="relative">
+          <input
+            autoComplete="current-password"
+            className={`h-[50px] w-full rounded-[13px] border-[1.5px] bg-white pl-4 pr-11 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:ring-4 ${
+              error
+                ? "border-[#f04452] focus:border-[#f04452] focus:ring-[#f04452]/10"
+                : "border-[#e5e8eb] focus:border-[#f04452] focus:ring-[#f04452]/10"
+            }`}
+            id="delete-password"
+            onChange={(e) => {
+              setPassword(e.target.value);
+              // 틀렸다는 안내는 다시 입력하기 시작하면 바로 지움.
+              if (error) setError(null);
+            }}
+            placeholder="본인 확인을 위해 입력해주세요"
+            type={showPassword ? "text" : "password"}
+            value={password}
+          />
+          <button
+            aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8b95a1]"
+            onClick={() => setShowPassword((v) => !v)}
+            type="button"
+          >
+            {showPassword ? <EyeOff className="h-[17px] w-[17px]" /> : <Eye className="h-[17px] w-[17px]" />}
+          </button>
+        </div>
         {error ? <p className="text-[12px] font-semibold text-[#f04452]">{error}</p> : null}
+        {/* 탈퇴엔 비밀번호가 필요해서, 잊은 사람이 막히지 않게 재설정 경로를 열어둠. */}
+        <Link className="inline-block text-[12px] font-semibold text-[#3182f6]" href="/forgot-password">
+          비밀번호를 잊으셨나요?
+        </Link>
       </div>
 
       <label className="mt-4 flex cursor-pointer items-start gap-[9px] text-[13px] leading-[1.6] text-[#4e5968]">
@@ -118,7 +142,7 @@ export function DeleteAccountForm() {
             탈퇴 처리 중...
           </>
         ) : (
-          "회원 탈퇴"
+          "탈퇴하기"
         )}
       </button>
     </form>
