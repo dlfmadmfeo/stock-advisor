@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACT_EMAIL = "dlfmadmfeo@gmail.com";
-const LAST_UPDATED = "2026-09-01";
+const LAST_UPDATED = "2026-09-25";
 
 export default function PrivacyPage() {
   return (
@@ -65,9 +65,13 @@ export default function PrivacyPage() {
       <section className="mt-8 space-y-2">
         <h2 className="text-base font-bold">4. 보관 기간 및 삭제</h2>
         <p className="text-sm leading-6 text-[#4e5968]">
-          회원 탈퇴 기능은 아직 앱 내에 별도로 제공되지 않아요. 계정 및
-          연관 데이터(관심종목, 푸시 토큰 등)의 삭제를 원하시면 아래
-          이메일로 요청해주시면 확인 후 지체 없이 삭제해드려요.
+          개인정보는 회원 탈퇴 시까지 보관하고, 탈퇴하면 계정과 연관 데이터(관심종목, 알림 설정,
+          푸시 토큰, 로그인 기록)를 바로 삭제해요. 탈퇴는 앱의 마이페이지 하단 &quot;회원
+          탈퇴&quot;에서 직접 할 수 있고, 앱에 접속할 수 없다면{" "}
+          <a className="font-semibold text-[#3182f6] underline" href="/account-deletion">
+            계정 및 데이터 삭제 안내
+          </a>
+          에 따라 아래 이메일로 요청해주시면 확인 후 지체 없이 삭제해드려요.
         </p>
       </section>
 
