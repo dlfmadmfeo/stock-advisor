@@ -5,6 +5,12 @@
 // 자본변동/자사주/배당/M&A/리스크 계열만 걸러서 노이즈를 줄입니다.
 // 수신 대상도 "그 종목을 담은 유저"가 아니라 "알림을 켜둔 전체 유저"로
 // 바뀌었습니다(enqueueDisclosures/processDisclosureQueue 참고).
+//
+// 2026-10-06 세션: 대상 종목을 "앱이 종목 화면을 보여줄 수 있는 종목"으로
+// 한정했습니다(DB Stock 테이블 = 유니버스, 코스피 시총 상위 200). DART는
+// 코스피+코스닥 전체를 주는데 앱엔 그중 일부만 있어서, 알림을 눌러도
+// "종목을 찾을 수 없어요"가 뜨는 알림이 대부분이었어요(9/28~10/6 실측: 대상
+// 428건 중 코스닥이 331건).
 // ---------------------------------------------------------------------------
 
 import { prisma } from "./db";
@@ -38,7 +44,16 @@ export type DartPollResult = {
 };
 
 export async function enqueueDisclosures(filings: DartFiling[]): Promise<number> {
-  const matched = filings.filter((f) => isImportantDisclosure(f.report_nm));
+  const important = filings.filter((f) => isImportantDisclosure(f.report_nm));
+  // 후보 종목코드만 골라서 조회 — 유니버스 전체(200개)를 매번 읽을 필요가 없어요.
+  // 유니버스가 갱신되며 순위권에서 빠진 종목은 그 시점부터 알림도 안 갑니다.
+  const inApp = new Set(
+    (await prisma.stock.findMany({
+      where: { ticker: { in: [...new Set(important.map((f) => f.stock_code))] } },
+      select: { ticker: true },
+    })).map((s) => s.ticker),
+  );
+  const matched = important.filter((f) => inApp.has(f.stock_code));
   const already = new Set((await prisma.notifiedDisclosure.findMany({
     where: { rcept_no: { in: matched.map((f) => f.rcept_no) } },
     select: { rcept_no: true },

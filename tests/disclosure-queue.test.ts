@@ -10,7 +10,7 @@ const delegate = () => Object.fromEntries(
 const prisma = {
   disclosureNotification: delegate(), disclosureDelivery: delegate(),
   notifiedDisclosure: delegate(), pushToken: delegate(), watchlist: delegate(),
-  dartPollLock: delegate(), $transaction: unexpected,
+  stock: delegate(), dartPollLock: delegate(), $transaction: unexpected,
 } as unknown as PrismaClient;
 (globalThis as unknown as { prisma: PrismaClient }).prisma = prisma;
 // Install the in-memory DB before loading modules; no live DB can be reached.
@@ -114,6 +114,7 @@ test("multicast is split into batches of at most 500 devices", async () => {
 });
 
 test("collection preserves deliveries and skips legacy completed filings", async () => {
+  mock.method(prisma.stock, "findMany", async () => [{ ticker: "005930" }]);
   mock.method(prisma.notifiedDisclosure, "findMany", async () => [{ rcept_no: "old" }]);
   mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
   const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
@@ -130,12 +131,47 @@ test("collection preserves deliveries and skips legacy completed filings", async
 // 대신 report_nm 키워드로 "중요 유형"만 거르는 필터가 핵심 로직이 됨 —
 // 절차성 공시(기업설명회 등)는 알림 켜둔 유저가 있어도 큐에 안 들어가야 함.
 test("non-important report types are filtered out regardless of recipients", async () => {
+  mock.method(prisma.stock, "findMany", async () => [{ ticker: "005930" }]);
   mock.method(prisma.notifiedDisclosure, "findMany", async () => []);
   mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
   const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
   const matched = await enqueueDisclosures([{
     rcept_no: "irrelevant", stock_code: "005930", corp_name: "Example",
     report_nm: "기업설명회(IR)개최(안내공시)", flr_nm: "", rcept_dt: "20260909",
+  }]);
+  assert.equal(matched, 0);
+  assert.equal(upsert.mock.callCount(), 0);
+});
+
+// 2026-10-06 세션: DART는 코스피+코스닥 전체를 주는데 앱엔 DB 유니버스(Stock
+// 테이블) 종목만 화면이 있어서, 그 밖의 종목 공시는 큐에 안 들어가야 함 —
+// 눌러도 "종목을 찾을 수 없어요"가 뜨는 알림을 막는 필터.
+test("filings for stocks outside the app universe are not queued", async () => {
+  const universe = mock.method(prisma.stock, "findMany", async () => [{ ticker: "005930" }]);
+  mock.method(prisma.notifiedDisclosure, "findMany", async () => []);
+  mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
+  const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
+  const filing = (rcept_no: string, stock_code: string) => ({
+    rcept_no, stock_code, corp_name: "Example", report_nm: "분기보고서", flr_nm: "", rcept_dt: "20260909",
+  });
+  const matched = await enqueueDisclosures([
+    filing("in-app", "005930"), filing("kosdaq-only", "123456"), filing("in-app-2", "005930"),
+  ]);
+  assert.equal(matched, 2);
+  assert.deepEqual(upsert.mock.calls.map((c) => (c.arguments[0] as any).where.rceptNo), ["in-app", "in-app-2"]);
+  // 유니버스 전체를 읽지 않고, 후보 종목코드(중복 제거)만 조회해야 함.
+  const query = universe.mock.calls[0].arguments[0] as any;
+  assert.deepEqual(query.where.ticker.in, ["005930", "123456"]);
+});
+
+test("nothing is queued when no important filing belongs to an app stock", async () => {
+  mock.method(prisma.stock, "findMany", async () => []);
+  mock.method(prisma.notifiedDisclosure, "findMany", async () => []);
+  mock.method(prisma.pushToken, "findMany", async () => [{ id: "p", userId: "u" }]);
+  const upsert = mock.method(prisma.disclosureNotification, "upsert", async () => ({}));
+  const matched = await enqueueDisclosures([{
+    rcept_no: "kosdaq-only", stock_code: "123456", corp_name: "Example",
+    report_nm: "유상증자결정", flr_nm: "", rcept_dt: "20260909",
   }]);
   assert.equal(matched, 0);
   assert.equal(upsert.mock.callCount(), 0);
