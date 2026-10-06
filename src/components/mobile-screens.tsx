@@ -2253,8 +2253,8 @@ export function AlertSettingsScreen() {
               <h2 className="text-base font-bold text-[#191f28]">공시 알림</h2>
               <p className="mt-1 text-[13px] leading-5 text-[#8b95a1]">
                 실적·자본변동 등 중요한 공시가 등록되면 휴대폰 알림으로
-                알려드려요. 관심종목 등록 여부와 무관하게 전체 종목이
-                대상이에요.
+                알려드려요. 관심종목 등록 여부와 무관하게 앱에서 다루는
+                시가총액 상위 200종목이 대상이에요.
               </p>
             </div>
             <button
