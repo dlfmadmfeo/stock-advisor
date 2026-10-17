@@ -109,6 +109,11 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     if (params.get("verified") === "1") {
       showToast("이메일 인증이 완료됐어요. 로그인해주세요.");
     }
+    // 로그아웃한 상태에서 공시 알림을 눌러 들어온 경우(stock/[ticker]/page.tsx).
+    // 세션이 만료된 거였다면 위의 expired 안내가 대신 뜹니다.
+    if (params.get("loggedout") === "1") {
+      showToast("로그아웃된 상태예요. 다시 로그인해주세요.");
+    }
     // 회원 탈퇴(delete-account-form.tsx) 직후 돌아온 경우.
     if (params.get("deleted") === "1") {
       showToast("회원 탈퇴가 완료됐어요. 이용해주셔서 감사해요.");
