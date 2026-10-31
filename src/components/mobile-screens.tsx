@@ -2519,11 +2519,9 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
       ) : null}
 
       <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-        검색창에 아무것도 안 쳐도 "추천종목만"이면 스크리너 통과 종목만, "전체
-        종목"이면 유니버스(시가총액 상위 200종목) 전체가 후보로 나와요.
-        관심종목은 stock-advisor-server가 KIS 웹소켓으로 실시간 구독해서
-        체결가가 올 때마다 화면에 바로 반영되고, 세션 구독 한도 때문에 최대{" "}
-        {WATCHLIST_LIMIT}개까지만 담을 수 있어요.
+        종목명이나 코드로 검색해서 관심종목에 담을 수 있어요. 앱에서 다루는
+        시가총액 상위 200종목이 대상이고, 담아둔 종목은 체결가가 바뀔 때마다
+        화면에 바로 반영돼요. 최대 {WATCHLIST_LIMIT}개까지 담을 수 있어요.
       </p>
 
       <div className="space-y-2">
