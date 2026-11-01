@@ -40,7 +40,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { markReturningUser } from "@/lib/returning-user-mark";
-import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
+// 데모 로그인 버튼 비노출로 미사용 (2026-11-01 세션)
+// import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
 import {
   AlertCircle,
   Check,
@@ -210,11 +211,12 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     await submitLogin(mode, email, password);
   }
 
-  function handleDemoLogin() {
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
-    submitLogin("login", DEMO_EMAIL, DEMO_PASSWORD);
-  }
+  // 데모 로그인 버튼과 함께 비노출 (2026-11-01 세션, 버튼 쪽 주석 참고)
+  // function handleDemoLogin() {
+  //   setEmail(DEMO_EMAIL);
+  //   setPassword(DEMO_PASSWORD);
+  //   submitLogin("login", DEMO_EMAIL, DEMO_PASSWORD);
+  // }
 
   // 서버는 길이(8자 이상)만 검사하기 때문에, 강도 표시도 그것만 반영합니다 —
   // "영문+숫자 조합" 같은 실제로 강제 안 하는 기준을 보여주면 화면과 실제
@@ -484,6 +486,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               )}
             </button>
 
+            {/* 정식 출시로 데모 로그인 버튼 비노출 (2026-11-01 세션)
             {mode === "login" ? (
               <button
                 className="flex h-11 w-full items-center justify-center gap-1.5 rounded-[13px] border-[1.5px] border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
@@ -497,6 +500,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 데모 계정으로 바로 둘러보기
               </button>
             ) : null}
+            */}
           </div>
 
           {/* 소셜 로그인 + 하단 */}
