@@ -68,8 +68,8 @@ export function DeleteAccountForm() {
 
   return (
     <form className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8" onSubmit={handleDelete}>
-      <div className="rounded-2xl bg-[#fff4f4] p-4 ring-1 ring-[#f9d3d6]">
-        <p className="flex items-center gap-1.5 text-sm font-extrabold text-[#f04452]">
+      <div className="rounded-lg bg-[#fff4f4] p-4 ring-1 ring-[#f9d3d6]">
+        <p className="flex items-center gap-1.5 text-sm font-bold text-[#f04452]">
           <AlertTriangle className="h-4 w-4" />
           탈퇴하면 아래 정보가 모두 삭제돼요
         </p>
@@ -78,7 +78,7 @@ export function DeleteAccountForm() {
             <li key={item}>{item}</li>
           ))}
         </ul>
-        <p className="mt-3 text-[12px] font-semibold text-[#8b95a1]">
+        <p className="mt-3 text-[12px] font-semibold text-[#6b7684]">
           탈퇴 후에도 같은 이메일로 다시 가입할 수 있어요.
         </p>
       </div>
@@ -107,7 +107,7 @@ export function DeleteAccountForm() {
           />
           <button
             aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8b95a1]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#6b7684]"
             onClick={() => setShowPassword((v) => !v)}
             type="button"
           >
@@ -116,7 +116,7 @@ export function DeleteAccountForm() {
         </div>
         {error ? <p className="text-[12px] font-semibold text-[#f04452]">{error}</p> : null}
         {/* 탈퇴엔 비밀번호가 필요해서, 잊은 사람이 막히지 않게 재설정 경로를 열어둠. */}
-        <Link className="inline-block text-[12px] font-semibold text-[#3182f6]" href="/forgot-password">
+        <Link className="inline-block text-[12px] font-semibold text-[var(--brand)]" href="/forgot-password">
           비밀번호를 잊으셨나요?
         </Link>
       </div>
@@ -132,7 +132,7 @@ export function DeleteAccountForm() {
       </label>
 
       <button
-        className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#f04452] text-[15px] font-extrabold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#f04452] text-[15px] font-bold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         disabled={!canSubmit}
         type="submit"
       >

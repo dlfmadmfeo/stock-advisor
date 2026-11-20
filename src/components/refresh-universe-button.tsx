@@ -119,10 +119,10 @@ export function RefreshUniverseButton() {
   return (
     <div className="relative">
       <button
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 transition ${
+        className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ring-1 transition ${
           loading
-            ? "cursor-not-allowed bg-[#f2f4f6] text-[#8b95a1] ring-[#e5e8eb]"
-            : "bg-white text-[#4e5968] ring-[#e5e8eb] hover:bg-[#f2f4f6] active:scale-[0.97]"
+            ? "cursor-not-allowed bg-[#f2f4f6] text-[#6b7684] ring-[#e5e8eb]"
+            : "bg-white text-[#4e5968] ring-[#e5e8eb] hover:bg-[#f2f4f6]"
         }`}
         disabled={loading}
         onClick={handleClick}
@@ -133,8 +133,8 @@ export function RefreshUniverseButton() {
       </button>
       {message ? (
         <span
-          className={`absolute right-0 top-full z-10 mt-1 w-72 max-w-[calc(100vw-2rem)] whitespace-normal rounded bg-white p-1 text-[11px] font-semibold ${
-            state === "error" ? "text-[#ff5a5a]" : "text-[#00a878]"
+          className={`absolute right-0 top-full z-10 mt-1 w-72 max-w-[calc(100vw-2rem)] whitespace-normal rounded bg-white p-1 text-[12px] font-semibold ${
+            state === "error" ? "text-[#ff5a5a]" : "text-[#0b7a5a]"
           }`}
         >
           {message}

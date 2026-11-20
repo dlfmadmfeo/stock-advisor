@@ -49,7 +49,6 @@ import {
   EyeOff,
   Info,
   Loader2,
-  Lock,
   Mail,
   TrendingUp,
 } from "lucide-react";
@@ -235,7 +234,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-[#f2f4f6] p-0 sm:p-4">
       <div
-        className="relative flex h-dvh w-full max-w-md flex-col overflow-hidden bg-white sm:h-[840px] sm:rounded-3xl sm:border sm:border-[#e5e8eb] sm:shadow-2xl"
+        className="relative flex h-dvh w-full max-w-md flex-col overflow-hidden bg-white sm:h-[840px] sm:rounded-lg sm:border sm:border-[#e5e8eb]"
         data-testid="login-webview"
       >
         <form
@@ -244,35 +243,35 @@ export function LoginScreen({ mode }: { mode: Mode }) {
         >
           {/* 브랜딩 */}
           <div className="flex flex-col items-center text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#3182f6] to-[#1b64da] shadow-lg shadow-[#3182f6]/30">
+            <div className="grid h-14 w-14 place-items-center rounded-lg bg-[var(--brand)]">
               <TrendingUp className="h-7 w-7 text-white" />
             </div>
-            <h1 className="mt-3 text-[19px] font-extrabold tracking-tight text-[#191f28]">
+            <h1 className="mt-3 text-[19px] font-bold tracking-tight text-[#191f28]">
               주식 어드바이저
             </h1>
-            <p className="mt-1.5 text-xs leading-5 text-[#8b95a1]">
+            <p className="mt-1.5 text-balance break-keep text-[13px] leading-5 text-[#6b7684]">
               막연한 종목 감이 아니라, 공개 지표로 투명하게 걸러낸 결과만
               보여드려요.
             </p>
           </div>
 
           {/* 로그인/회원가입 탭 */}
-          <div className="mt-7 flex gap-1 rounded-xl bg-[#f2f4f6] p-1">
+          <div className="mt-7 flex gap-1 rounded-lg bg-[#f2f4f6] p-1">
             <Link
-              className={`flex-1 rounded-[9px] py-2.5 text-center text-[13px] font-bold transition-all ${
+              className={`flex-1 rounded-md py-2.5 text-center text-[13px] font-bold transition-all ${
                 mode === "login"
-                  ? "bg-white text-[#191f28] shadow-sm"
-                  : "text-[#8b95a1]"
+                  ? "bg-white text-[#191f28] ring-1 ring-[#e5e8eb]"
+                  : "text-[#6b7684]"
               }`}
               href="/login"
             >
               로그인
             </Link>
             <Link
-              className={`flex-1 rounded-[9px] py-2.5 text-center text-[13px] font-bold transition-all ${
+              className={`flex-1 rounded-md py-2.5 text-center text-[13px] font-bold transition-all ${
                 mode === "signup"
-                  ? "bg-white text-[#191f28] shadow-sm"
-                  : "text-[#8b95a1]"
+                  ? "bg-white text-[#191f28] ring-1 ring-[#e5e8eb]"
+                  : "text-[#6b7684]"
               }`}
               href="/signup"
             >
@@ -290,10 +289,9 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 이메일
               </label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-[#8b95a1]" />
                 <input
                   autoComplete="email"
-                  className="h-[50px] w-full rounded-[13px] border-[1.5px] border-[#e5e8eb] bg-[#f9fafb] pl-[42px] pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[#3182f6] focus:bg-white focus:ring-4 focus:ring-[#3182f6]/10"
+                  className="h-[50px] w-full rounded-lg border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
                   id="login-email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -313,7 +311,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 </label>
                 {mode === "login" ? (
                   <Link
-                    className="text-[12.5px] font-bold text-[#3182f6]"
+                    className="text-[12.5px] font-bold text-[var(--brand)]"
                     href="/forgot-password"
                   >
                     비밀번호 찾기
@@ -321,10 +319,9 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 ) : null}
               </div>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-[#8b95a1]" />
                 <input
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  className="h-[50px] w-full rounded-[13px] border-[1.5px] border-[#e5e8eb] bg-[#f9fafb] pl-[42px] pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[#3182f6] focus:bg-white focus:ring-4 focus:ring-[#3182f6]/10"
+                  className="h-[50px] w-full rounded-lg border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
                   id="login-password"
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={
@@ -337,7 +334,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 />
                 <button
                   aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8b95a1]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#6b7684]"
                   onClick={() => setShowPassword((v) => !v)}
                   type="button"
                 >
@@ -370,7 +367,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 </div>
               ) : null}
               {isSignup ? (
-                <p className="text-[11px] font-medium text-[#8b95a1]">
+                <p className="text-[12px] font-medium text-[#6b7684]">
                   {MIN_PASSWORD_LENGTH}자 이상 입력해주세요
                 </p>
               ) : null}
@@ -385,13 +382,12 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                   비밀번호 확인
                 </label>
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-[#8b95a1]" />
                   <input
                     autoComplete="new-password"
-                    className={`h-[50px] w-full rounded-[13px] border-[1.5px] bg-[#f9fafb] pl-[42px] pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:bg-white focus:ring-4 ${
+                    className={`h-[50px] w-full rounded-lg border bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:bg-white focus:ring-1 ${
                       passwordMismatch
-                        ? "border-[#f04452] bg-[#fff6f6] focus:border-[#f04452] focus:ring-[#f04452]/10"
-                        : "border-[#e5e8eb] focus:border-[#3182f6] focus:ring-[#3182f6]/10"
+                        ? "border-[#f04452] bg-[#fff6f6] focus:border-[#f04452] focus:ring-[#f04452]"
+                        : "border-[#e5e8eb] focus:border-[var(--brand)] focus:ring-[var(--brand)]"
                     }`}
                     id="login-password-confirm"
                     onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -403,7 +399,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                     aria-label={
                       showPasswordConfirm ? "비밀번호 확인 숨기기" : "비밀번호 확인 보기"
                     }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8b95a1]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#6b7684]"
                     onClick={() => setShowPasswordConfirm((v) => !v)}
                     type="button"
                   >
@@ -427,7 +423,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               <label className="-mt-1 flex items-center gap-2 text-xs text-[#6b7684]">
                 <input
                   checked={remember}
-                  className="h-4 w-4 rounded border-[#c3c9d1] text-[#3182f6] focus:ring-[#3182f6]/30"
+                  className="h-4 w-4 rounded border-[#c3c9d1] text-[var(--brand)] focus:ring-[var(--brand)]/30"
                   onChange={(e) => setRemember(e.target.checked)}
                   type="checkbox"
                 />
@@ -438,7 +434,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 <label className="flex cursor-pointer items-start gap-[9px] text-xs leading-[1.6] text-[#6b7684]">
                   <input
                     checked={agreedToTerms}
-                    className="mt-[3px] h-4 w-4 shrink-0 rounded border-[#c3c9d1] text-[#3182f6] focus:ring-[#3182f6]/30"
+                    className="mt-[3px] h-4 w-4 shrink-0 rounded border-[#c3c9d1] text-[var(--brand)] focus:ring-[var(--brand)]/30"
                     onChange={(e) => {
                       setAgreedToTerms(e.target.checked);
                       if (e.target.checked) setTermsError(false);
@@ -470,7 +466,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             )}
 
             <button
-              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-[15px] font-extrabold text-white shadow-lg shadow-[#3182f6]/30 transition-transform active:scale-[0.98] disabled:opacity-70"
+              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white active:bg-[var(--brand-strong)] disabled:opacity-70"
               disabled={submitting}
               type="submit"
             >
@@ -489,7 +485,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             {/* 정식 출시로 데모 로그인 버튼 비노출 (2026-11-01 세션)
             {mode === "login" ? (
               <button
-                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-[13px] border-[1.5px] border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
+                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
                 disabled={submitting}
                 onClick={handleDemoLogin}
                 type="button"
@@ -508,14 +504,14 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             {/* 카카오/Apple 로그인 실연동 전까지 비노출 (2026-08-22 세션)
             <div className="relative flex items-center justify-center">
               <div className="h-px w-full bg-[#f2f4f6]" />
-              <span className="absolute bg-white px-3 text-[11px] font-semibold text-[#8b95a1]">
+              <span className="absolute bg-white px-3 text-[12px] font-semibold text-[#6b7684]">
                 간편 로그인
               </span>
             </div>
 
             <div className="flex gap-2.5">
               <button
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[13px] border-[1.5px] border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
                 onClick={() => showToast("카카오 로그인은 아직 준비 중이에요.")}
                 type="button"
               >
@@ -531,12 +527,12 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 카카오
               </button>
               <button
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[13px] border-[1.5px] border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
                 onClick={() => showToast("Apple 로그인은 아직 준비 중이에요.")}
                 type="button"
               >
                 <span className="grid h-6 w-6 place-items-center rounded-full bg-[#111]">
-                  <span className="text-[11px] font-extrabold text-white">A</span>
+                  <span className="text-[12px] font-bold text-white">A</span>
                 </span>
                 Apple
               </button>
@@ -547,14 +543,14 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               {mode === "login" ? (
                 <>
                   계정이 없으신가요?{" "}
-                  <Link className="font-bold text-[#3182f6]" href="/signup">
+                  <Link className="font-bold text-[var(--brand)]" href="/signup">
                     회원가입
                   </Link>
                 </>
               ) : (
                 <>
                   이미 계정이 있으신가요?{" "}
-                  <Link className="font-bold text-[#3182f6]" href="/login">
+                  <Link className="font-bold text-[var(--brand)]" href="/login">
                     로그인
                   </Link>
                 </>
@@ -567,13 +563,13 @@ export function LoginScreen({ mode }: { mode: Mode }) {
         {success ? (
           <div className="absolute inset-0 grid place-items-center bg-white">
             <div className="flex flex-col items-center text-center">
-              <div className="grid h-16 w-16 animate-bounce place-items-center rounded-full bg-[#e7f8ef] text-[#00c473]">
+              <div className="grid h-16 w-16 place-items-center rounded-full bg-[#e7f8ef] text-[#0b7a5a]">
                 <Check className="h-8 w-8" strokeWidth={3} />
               </div>
-              <p className="mt-4 text-lg font-black text-[#191f28]">
-                {mode === "login" ? "로그인 완료!" : "회원가입 완료!"}
+              <p className="mt-4 text-lg font-bold text-[#191f28]">
+                {mode === "login" ? "로그인했어요" : "가입이 끝났어요"}
               </p>
-              <p className="mt-1 text-sm text-[#8b95a1]">
+              <p className="mt-1 text-sm text-[#6b7684]">
                 홈 화면으로 이동할게요.
               </p>
             </div>
@@ -586,18 +582,18 @@ export function LoginScreen({ mode }: { mode: Mode }) {
           <div className="absolute inset-0 grid place-items-center bg-white px-6">
             <div className="flex flex-col items-center text-center">
               <div className="grid h-16 w-16 place-items-center rounded-full bg-[#eef4ff]">
-                <Mail className="h-8 w-8 text-[#3182f6]" />
+                <Mail className="h-8 w-8 text-[var(--brand)]" />
               </div>
-              <p className="mt-4 text-lg font-black text-[#191f28]">
+              <p className="mt-4 text-lg font-bold text-[#191f28]">
                 이메일을 확인해주세요
               </p>
-              <p className="mt-1 text-sm leading-6 text-[#8b95a1]">
+              <p className="mt-1 text-sm leading-6 text-[#6b7684]">
                 {email} 주소로 인증 메일을 보냈어요.
                 <br />
                 메일의 링크를 눌러야 로그인할 수 있어요.
               </p>
               <Link
-                className="mt-8 flex h-12 w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-[15px] font-extrabold text-white"
+                className="mt-8 flex h-12 w-full items-center justify-center rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white"
                 href="/login"
               >
                 로그인 화면으로
@@ -608,8 +604,8 @@ export function LoginScreen({ mode }: { mode: Mode }) {
 
         {/* 토스트 */}
         {toast ? (
-          <div className="absolute left-1/2 top-6 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#191f28] px-4 py-3 text-xs font-semibold text-white shadow-xl">
-            <Info className="h-4 w-4 text-[#3182f6]" />
+          <div className="absolute left-1/2 top-6 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-[#191f28] px-4 py-3 text-[13px] font-medium text-white">
+            <Info className="h-4 w-4 text-[var(--brand)]" />
             {toast}
           </div>
         ) : null}

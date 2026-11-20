@@ -3,6 +3,12 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* 강조색(탭·링크·버튼·막대). 한국 주식은 상승=빨강, 하락=파랑이라 파랑을
+     강조색으로 쓰면 "하락"처럼 읽혀서 초록 계열로 분리했어요(2026-11-20 세션).
+     바꾸고 싶으면 이 두 값만 고치면 전체에 반영됩니다. 하락 파랑(#1b64da)은
+     시세 색이라 mobile-screens.tsx에 의미 색으로 그대로 남아 있어요. */
+  --brand: #0f7b5f;
+  --brand-strong: #0b6a52;
   --radius: 0.875rem;
   --background: #f5f6f8;
   --foreground: oklch(0.235 0.015 65);
@@ -78,7 +84,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Arial, Helvetica, sans-serif;
+  font-family: "Pretendard Variable", Pretendard, var(--font-inter), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Arial, Helvetica, sans-serif;
 }
 
 @keyframes donut-in {

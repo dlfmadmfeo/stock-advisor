@@ -41,10 +41,10 @@ export function TopBar({
   rightHref?: string;
 }) {
   const buttonClass =
-    "grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5";
+    "grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5";
   return (
-    <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center justify-between bg-[#f7f8fa]/95 px-4 backdrop-blur lg:px-8">
-      <div className="flex w-10 items-center justify-start">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[#eef0f2] bg-white px-3 lg:px-8">
+      <div className="flex w-11 items-center justify-start">
         {left ? (
           onLeftClick ? (
             <button className={buttonClass} onClick={onLeftClick} type="button">
@@ -54,13 +54,13 @@ export function TopBar({
             <IconButton>{left}</IconButton>
           )
         ) : (
-          <div className="h-10 w-10" />
+          <div className="h-11 w-11" />
         )}
       </div>
-      <h1 className="text-xl font-extrabold tracking-[-0.02em] text-[#191f28]">
+      <h1 className="text-[17px] font-bold tracking-[-0.01em] text-[#191f28]">
         {title}
       </h1>
-      <div className="flex w-10 items-center justify-end">
+      <div className="flex w-11 items-center justify-end">
         {right ? (
           onRightClick ? (
             <button className={buttonClass} onClick={onRightClick} type="button">
@@ -74,7 +74,7 @@ export function TopBar({
             <IconButton>{right}</IconButton>
           )
         ) : (
-          <div className="h-10 w-10" />
+          <div className="h-11 w-11" />
         )}
       </div>
     </header>
@@ -83,7 +83,7 @@ export function TopBar({
 
 export function IconButton({ children }: { children: React.ReactNode }) {
   return (
-    <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#333d4b] ring-1 ring-[#e5e8eb] active:scale-[0.98] [&_svg]:h-5 [&_svg]:w-5">
+    <button className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5">
       {children}
     </button>
   );
@@ -110,9 +110,9 @@ export function MetricCard({
 }) {
   return (
     <div
-      className={`rounded-2xl bg-white ring-1 ring-[#e5e8eb] ${compact ? "p-3" : "p-4"}`}
+      className={`rounded-lg bg-white ring-1 ring-[#e5e8eb] ${compact ? "p-3" : "p-4"}`}
     >
-      <p className="text-xs font-bold text-[#8b95a1]">{label}</p>
+      <p className="text-xs font-bold text-[#6b7684]">{label}</p>
       <p
         className={`mt-2 font-bold tracking-[-0.02em] ${valueClassName ?? "text-xl"} ${positive ? "text-[#f04452]" : "text-[#191f28]"}`}
       >
@@ -156,11 +156,11 @@ export function SectionHeader({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+      <h2 className="text-lg font-bold tracking-[-0.02em] text-[#191f28]">
         {title}
       </h2>
       {action && href ? (
-        <Link className="text-sm font-bold text-[#3182f6]" href={href}>
+        <Link className="text-sm font-bold text-[var(--brand)]" href={href}>
           {action}
         </Link>
       ) : null}
@@ -177,11 +177,11 @@ export function SectionTitle({
 }) {
   return (
     <div className="mb-3 mt-7 flex items-center justify-between">
-      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#191f28]">
+      <h2 className="text-lg font-bold tracking-[-0.02em] text-[#191f28]">
         {title}
       </h2>
       {action ? (
-        <button className="text-sm font-bold text-[#3182f6]">{action}</button>
+        <button className="text-sm font-bold text-[var(--brand)]">{action}</button>
       ) : null}
     </div>
   );
@@ -195,7 +195,7 @@ export function SectionTitle({
 // 몇 개든 카드 하나로 자연스럽게 이어져요.
 export function MenuList({ items }: { items: Array<[IconComponent, string, string]> }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
+    <div className="overflow-hidden rounded-lg bg-white ring-1 ring-[#e5e8eb]">
       {items.map(([Icon, label, href], i) => (
         <Link
           className={`flex items-center gap-3 px-4 py-3.5 transition active:bg-[#f7f8fa] ${
@@ -204,10 +204,8 @@ export function MenuList({ items }: { items: Array<[IconComponent, string, strin
           href={href}
           key={href}
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f2f7ff]">
-            <Icon className="h-[18px] w-[18px] text-[#3182f6]" />
-          </span>
-          <span className="flex-1 text-[15px] font-semibold text-[#191f28]">
+          <Icon className="h-5 w-5 shrink-0 text-[var(--brand)]" />
+          <span className="flex-1 text-[15px] font-medium text-[#191f28]">
             {label}
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-[#c3c9d1]" />
@@ -219,7 +217,7 @@ export function MenuList({ items }: { items: Array<[IconComponent, string, strin
 
 export function EmptyState({ text }: { text: string }) {
   return (
-    <p className="rounded-2xl bg-white px-4 py-10 text-center text-sm font-semibold text-[#8b95a1] ring-1 ring-[#e5e8eb]">
+    <p className="rounded-xl bg-white px-4 py-14 text-center text-sm text-[#6b7684]">
       {text}
     </p>
   );

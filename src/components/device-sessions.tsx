@@ -128,7 +128,7 @@ export function DeviceSessionsContent() {
 
   if (sessions === null) {
     return (
-      <p className="px-5 py-10 text-center text-sm font-medium text-[#8b95a1]">
+      <p className="px-5 py-10 text-center text-sm font-medium text-[#6b7684]">
         불러오는 중...
       </p>
     );
@@ -138,7 +138,7 @@ export function DeviceSessionsContent() {
 
   return (
     <section className="space-y-3 px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
-      <p className="text-xs font-medium leading-5 text-[#8b95a1]">
+      <p className="text-xs font-medium leading-5 text-[#6b7684]">
         지금 이 계정으로 로그인돼 있는 기기 목록이에요. 본인이 쓰지 않는
         기기가 있으면 로그아웃시킬 수 있어요.
       </p>
@@ -154,7 +154,7 @@ export function DeviceSessionsContent() {
         </button>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
+      <div className="overflow-hidden rounded-lg bg-white ring-1 ring-[#e5e8eb]">
         {sessions.map((s, i) => {
           const isCurrent = s.token === currentToken;
           return (
@@ -170,12 +170,12 @@ export function DeviceSessionsContent() {
                     {describeDevice(s.userAgent)}
                   </p>
                   {isCurrent ? (
-                    <span className="shrink-0 rounded-full bg-[#e6f0ff] px-1.5 py-0.5 text-[10px] font-bold text-[#185fa5]">
+                    <span className="shrink-0 text-xs font-medium text-[var(--brand)]">
                       이 기기
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-[12px] font-medium text-[#8b95a1]">
+                <p className="mt-0.5 text-[12px] font-medium text-[#6b7684]">
                   {new Date(s.createdAt).toLocaleString("ko-KR")} 로그인
                   {describeIp(s.ipAddress) ? ` · ${describeIp(s.ipAddress)}` : ""}
                 </p>

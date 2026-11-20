@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
 // Google Play Console 공개 테스트 등록에 필요한 개인정보처리방침 페이지.
 // 로그인 여부와 무관하게 누구나 봐야 하므로 AppShell(하단 네비게이션 등)
@@ -12,11 +14,19 @@ const LAST_UPDATED = "2026-10-06";
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-5 py-12 text-[#191f28] lg:px-8">
-      <h1 className="text-2xl font-extrabold tracking-tight">
+    <main className="mx-auto max-w-2xl px-5 pb-12 pt-3 text-[#191f28] lg:px-8">
+      {/* 앱(웹뷰) 안에서 열었을 때 돌아갈 곳이 없어서 상단에 링크를 뒀어요. */}
+      <Link
+        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
+        href="/notifications"
+      >
+        <ChevronLeft className="h-5 w-5" />
+        홈으로
+      </Link>
+      <h1 className="mt-4 text-2xl font-bold tracking-tight">
         개인정보처리방침
       </h1>
-      <p className="mt-2 text-sm font-medium text-[#8b95a1]">
+      <p className="mt-2 text-sm font-medium text-[#6b7684]">
         시행일: {LAST_UPDATED}
       </p>
 
@@ -68,7 +78,7 @@ export default function PrivacyPage() {
           개인정보는 회원 탈퇴 시까지 보관하고, 탈퇴하면 계정과 연관 데이터(관심종목, 알림 설정,
           푸시 토큰, 로그인 기록)를 바로 삭제해요. 탈퇴는 앱의 마이페이지 하단 &quot;회원
           탈퇴&quot;에서 직접 할 수 있고, 앱에 접속할 수 없다면{" "}
-          <a className="font-semibold text-[#3182f6] underline" href="/account-deletion">
+          <a className="font-semibold text-[var(--brand)] underline" href="/account-deletion">
             계정 및 데이터 삭제 안내
           </a>
           에 따라 아래 이메일로 요청해주시면 확인 후 지체 없이 삭제해드려요.
@@ -88,7 +98,7 @@ export default function PrivacyPage() {
         <p className="text-sm leading-6 text-[#4e5968]">
           개인정보 관련 문의: {" "}
           <a
-            className="font-semibold text-[#3182f6] underline"
+            className="font-semibold text-[var(--brand)] underline"
             href={`mailto:${CONTACT_EMAIL}`}
           >
             {CONTACT_EMAIL}
@@ -96,7 +106,7 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <p className="mt-10 border-t border-[#e5e8eb] pt-4 text-xs leading-5 text-[#8b95a1]">
+      <p className="mt-10 border-t border-[#e5e8eb] pt-4 text-xs leading-5 text-[#6b7684]">
         이 방침은 서비스 변경에 따라 업데이트될 수 있으며, 변경 시 이 페이지에
         시행일을 갱신해 공지해요.
       </p>

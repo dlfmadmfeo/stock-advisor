@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, TriangleAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui-primitives";
 import type { AiPick } from "@/lib/ai-picks";
 
@@ -43,13 +43,13 @@ export function AiPicksContent({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-        <p className="text-xs font-semibold leading-5 text-[#8b95a1]">
+      <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <p className="text-xs font-semibold leading-5 text-[#6b7684]">
           AI가 스크리너 조건·재무 스냅샷·최근 뉴스를 바탕으로 작성한 설명이에요.
           매수·매도 판단이 아니라 데이터 사이의 관계를 요약한 참고 자료예요.
         </p>
         <button
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#3182f6] px-3 py-1.5 text-[12px] font-bold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 inline-flex h-11 items-center gap-1.5 rounded-lg bg-[var(--brand)] px-4 text-[14px] font-semibold text-white active:bg-[var(--brand-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={loading}
           onClick={handleGenerate}
           type="button"
@@ -58,26 +58,27 @@ export function AiPicksContent({
           {loading ? "생성 중… (몇십 초 걸려요)" : "다시 생성하기"}
         </button>
         {generatedAt ? (
-          <p className="mt-2 text-[11px] font-semibold text-[#8b95a1]">
+          <p className="mt-2 text-[12px] font-semibold text-[#6b7684]">
             마지막 생성: {new Date(generatedAt).toLocaleString("ko-KR")}
           </p>
         ) : null}
         {error ? (
-          <p className="mt-2 text-[11px] font-semibold text-[#ff5a5a]">{error}</p>
+          <p className="mt-2 text-[12px] font-semibold text-[#d6333f]">{error}</p>
         ) : null}
       </div>
 
       {picks && picks.length > 0 ? (
         <div className="space-y-3">
           {picks.map((p) => (
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]" key={p.ticker}>
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]" key={p.ticker}>
               <p className="text-sm font-bold text-[#191f28]">
-                {p.name} <span className="font-medium text-[#8b95a1]">{p.ticker}</span>
+                {p.name} <span className="font-medium text-[#6b7684]">{p.ticker}</span>
               </p>
               <p className="mt-1.5 text-sm leading-5 text-[#4e5968]">{p.highlight}</p>
               {p.caution ? (
-                <p className="mt-2 rounded-lg bg-[#fff8ec] px-2.5 py-1.5 text-[12px] font-semibold leading-4 text-[#b8860b]">
-                  ⚠ {p.caution}
+                <p className="mt-2 flex items-start gap-1.5 border-t border-[#eef0f2] pt-2 text-[12px] leading-4 text-[#9a5b00]">
+                  <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+                  {p.caution}
                 </p>
               ) : null}
             </div>

@@ -47,26 +47,23 @@ export function UserMenu() {
     <div className="relative" ref={rootRef}>
       <button
         aria-label="프로필 메뉴 열기"
-        className="grid h-10 w-10 place-items-center rounded-full bg-[#f2f7ff] ring-1 ring-[#e5e8eb] active:scale-[0.98]"
+        className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6]"
         onClick={() => setOpen((v) => !v)}
         type="button"
       >
-        <UserRound className="h-5 w-5 text-[#3182f6]" />
+        <UserRound className="h-5 w-5" />
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-12 z-40 w-64 rounded-2xl bg-white p-2 shadow-[0_12px_32px_rgba(25,31,40,0.16)] ring-1 ring-[#e5e8eb]">
-          <div className="flex items-center gap-3 rounded-xl px-3 py-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f2f7ff]">
-              <UserRound className="h-5 w-5 text-[#3182f6]" />
-            </div>
+        <div className="absolute right-2.5 top-12 z-40 w-64 rounded-lg border border-[#e5e8eb] bg-white p-1.5 shadow-[0_4px_16px_rgba(25,31,40,0.06)]">
+          <div className="rounded-md px-3 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-[#191f28]">
                 {/* 아직 별도 닉네임 필드가 없어서 이메일 앞부분으로 대신
                     표시 — 나중에 User 테이블에 name 컬럼이 생기면 바꾸면 됨. */}
                 {user ? `${user.email.split("@")[0]}님` : "게스트님"}
               </p>
-              <p className="truncate text-xs font-medium text-[#8b95a1]">
+              <p className="truncate text-xs font-medium text-[#6b7684]">
                 {email}
               </p>
             </div>
@@ -77,12 +74,12 @@ export function UserMenu() {
           <nav>
             {MENU_ITEMS.map((item) => (
               <Link
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#333d4b] hover:bg-[#f7f8fa]"
+                className="flex h-11 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-[#333d4b] hover:bg-[#f7f8fa]"
                 href={item.href}
                 key={item.href}
                 onClick={() => setOpen(false)}
               >
-                <item.icon className="h-4 w-4 text-[#8b95a1]" />
+                <item.icon className="h-4 w-4 text-[#6b7684]" />
                 {item.label}
               </Link>
             ))}
@@ -91,7 +88,7 @@ export function UserMenu() {
           <div className="my-1.5 h-px bg-[#f2f4f6]" />
 
           <button
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-[#f04452] hover:bg-[#fdeeee]"
+            className="flex h-11 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm font-medium text-[#d6333f] hover:bg-[#fdeeee]"
             onClick={() => {
               setOpen(false);
               setConfirmOpen(true);

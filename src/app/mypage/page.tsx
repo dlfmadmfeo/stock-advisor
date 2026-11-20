@@ -47,37 +47,37 @@ export default async function MyPagePage() {
             "내 지표"(관심종목 수 등)가 각각 다른 카드로 떨어져 있어서 한
             화면인데 두 덩어리처럼 보였어요. 안쪽 구분선(border-t)만으로
             나눠서 시각적으로는 하나의 프로필 단위로 읽히게 했습니다. */}
-        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-[#e5e8eb]">
+        <div className="overflow-hidden rounded-lg bg-white ring-1 ring-[#e5e8eb]">
           <div className="flex items-center gap-3 p-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#3182f6] to-[#1b64da] text-sm font-extrabold text-white shadow-md shadow-[#3182f6]/20">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-sm font-bold text-white">
               {namePart[0]?.toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[16px] font-extrabold tracking-[-0.02em] text-[#191f28]">
+              <h1 className="truncate text-[16px] font-bold tracking-[-0.02em] text-[#191f28]">
                 {namePart}님
               </h1>
-              <p className="mt-0.5 truncate text-[12px] font-medium text-[#8b95a1]">
+              <p className="mt-0.5 truncate text-[12px] font-medium text-[#6b7684]">
                 {user.email}
               </p>
               {joinedAt ? (
-                <span className="mt-1.5 inline-block rounded-full bg-[#f2f4f6] px-2 py-0.5 text-[10px] font-bold text-[#6b7684]">
+                <p className="mt-0.5 text-[12px] text-[#6b7684]">
                   {joinedAt} 가입
-                </span>
+                </p>
               ) : null}
             </div>
           </div>
           <div className="grid grid-cols-2 border-t border-[#f2f4f6]">
             <div className="border-r border-[#f2f4f6] px-4 py-3 text-center">
-              <p className="text-[11px] font-bold text-[#8b95a1]">관심종목</p>
-              <p className="mt-1 text-base font-extrabold tracking-[-0.02em] text-[#191f28]">
+              <p className="text-[12px] text-[#6b7684]">관심종목</p>
+              <p className="mt-1 text-base font-bold tracking-[-0.02em] text-[#191f28]">
                 {watchlistCount}개
               </p>
             </div>
             <div className="px-4 py-3 text-center">
-              <p className="text-[11px] font-bold text-[#8b95a1]">공시 알림</p>
+              <p className="text-[12px] text-[#6b7684]">공시 알림</p>
               <p
-                className={`mt-1 text-base font-extrabold tracking-[-0.02em] ${
-                  notificationsOn ? "text-[#3182f6]" : "text-[#8b95a1]"
+                className={`mt-1 text-base font-bold tracking-[-0.02em] ${
+                  notificationsOn ? "text-[var(--brand)]" : "text-[#6b7684]"
                 }`}
               >
                 {notificationsOn ? "켜짐" : "꺼짐"}
@@ -109,7 +109,7 @@ export default async function MyPagePage() {
             보여줌. */}
         {accountDeletionBlockReason(user) ? null : (
           <div className="mt-5 text-center">
-            <Link className="text-[12px] font-semibold text-[#8b95a1] underline" href="/mypage/delete">
+            <Link className="text-[12px] font-semibold text-[#6b7684] underline" href="/mypage/delete">
               회원 탈퇴
             </Link>
           </div>

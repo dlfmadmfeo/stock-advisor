@@ -20,6 +20,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Cpu,
   Heart,
@@ -31,7 +32,6 @@ import {
   Sparkle,
   Sprout,
   Star,
-  TrendingUp,
   X,
 } from "lucide-react";
 import { HOLDINGS, formatKRW, formatMarketCapEok, type Stock } from "@/lib/stocks";
@@ -64,7 +64,6 @@ import {
   Allocation,
   EmptyState,
   MetricCard,
-  SectionHeader,
   SectionTitle,
   TopBar,
   type IconComponent,
@@ -89,7 +88,6 @@ import {
 import { usePagedStocks } from "@/lib/use-paged-stocks";
 import {
   RESPONSIVE_TEXT,
-  UNIVERSE_PAGE_SIZE,
   UNIVERSE_SORT_FIELDS,
   WATCHLIST_LIMIT,
   type SortDirection,
@@ -169,84 +167,75 @@ export function NotificationsScreen() {
   const passed = stocks.filter((s) => passesScreener(s));
   const [macdReboundOnly, setMacdReboundOnly] = useState(false);
 
+  // 위 숫자는 store에 이미 로드된 전체 목록(웹소켓 실시간 병합 포함)에서
+  // 클라이언트가 계산하고, 아래 리스트는 PagedStockList가 DB의 screenerOk
+  // 스냅샷을 서버에서 페이지 단위로 가져와서 소스가 달라요. 마지막 배치
+  // 시점 기준인 종목은 두 값이 완전히 일치하지 않을 수 있습니다.
   return (
     <AppShell>
       <HomeHeader />
-      <section className="space-y-5 px-5 pb-8 lg:px-8">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-stretch">
-          <HomeSummaryCard />
-          {/* <QuickActions /> */}
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-          <div className="min-w-0 space-y-3 lg:order-1">
-            {/* SectionHeader를 다른 요소랑 같은 flex 줄에 욱여넣으면 내부의
-                justify-between이 펼쳐질 공간을 못 받아서 제목이랑 "전체 보기"가
-                딱 붙어버리는 문제가 있었음. 그래서 SectionHeader는 단독으로 한
-                줄 전체를 쓰게 하고, 상태 뱃지들은 그 아래 별도 줄로 뺐어요.
-                모바일 좁은 화면에서도 flex-wrap이 걸려서 넘치지 않고 줄바꿈됨. */}
-            <SectionHeader
-              title="스크리너 통과 종목"
-              action="전체 보기"
-              href="/search"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill />
-              <WsStatusPill />
-              <RefreshUniverseButton />
-            </div>
-            <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-              이동평균·거래량·52주 고저·RSI {SCREENER_TOTAL_RULES}개 공개 지표
-              중 {SCREENER_PASS_THRESHOLD}개 이상 충족한 종목이에요. 최근
-              기준으로 비중이 높아진 종목을 우선적으로 보여주고, 종목을 누르면
-              어떤 조건을 왜 충족했는지 그대로 볼 수 있어요.
-            </p>
-            <button
-              className={`flex w-fit items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold ${
-                macdReboundOnly
-                  ? "bg-[#e6f0ff] text-[#185fa5] ring-1 ring-[#b5d4f4]"
-                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-              }`}
-              onClick={() => setMacdReboundOnly((v) => !v)}
-              type="button"
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-              MACD 반등
-            </button>
-            <PagedStockList
-              emptyText="조건을 충족하는 종목이 없어요."
-              macdReboundOnly={macdReboundOnly}
-              screenerOnly
-            />
-          </div>
-
-          {/* 모바일에서는 이 요약 카드가 전체 종목 리스트보다 먼저 보여야
-              스크롤 안 해도 "몇 개 통과했는지"부터 바로 보임 — 예전엔 리스트
-              DOM 뒤에 있어서 화면 맨 아래로 밀렸음(피드백으로 발견,
-              2026-08-23 세션). 데스크톱(lg:)에서는 원래 의도대로 오른쪽
-              사이드바 자리를 유지하도록 order로 되돌림. */}
-          <aside className="order-first space-y-5 lg:order-2">
-            {/* 참고: 이 숫자는 store에 이미 로드된 전체 목록(stocks, 웹소켓 실시간
-                병합 포함)에서 클라이언트가 직접 계산한 값이고, 바로 아래 리스트는
-                PagedStockList가 DB의 screenerOk 스냅샷을 페이지 단위로 서버에서
-                가져온 값이라 소스가 달라요. 관심종목(실시간 갱신되는 것)은 둘 다
-                최신이지만, 그 외 종목은 마지막 배치 시점 기준이라 두 값이 완전히
-                일치하지 않을 수 있어요 — 오차가 커지면 통일하는 리팩터링이 필요. */}
-            <section className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-              <p className="text-sm font-bold text-[#8b95a1]">스크리너 현황</p>
-              <p className="mt-1 text-[28px] font-extrabold tracking-[-0.03em] text-[#191f28]">
-                {passed.length}/{stocks.length}
-                <span className="ml-1 text-base font-bold text-[#8b95a1]">
-                  종목 통과
+      <section className="px-5 pb-8 lg:max-w-[720px] lg:px-8">
+        {/* 문장 대신 숫자 자체를 크게 보여줍니다(장식 대신 숫자로 위계를 줌).
+            "200종목 중 스크리너 통과"를 작은 라벨로 먼저 읽고 큰 숫자가 따라오는
+            구조라 "111/200" 같은 약식 표기보다 뜻이 바로 읽혀요. */}
+        {/* 색은 장식이 아니라 구조에 써요(2026-11-20 세션, "밋밋하다" 피드백):
+            페이지 배경은 연한 회청색, 그 위에 흰 시트, 맨 위 요약만 단색 파랑
+            면으로 둡니다. 그라데이션/글로우 없이 단색이라 안티슬롭 규칙과도
+            맞고, 글자는 흰색 대비 6:1 이상이 되도록 파랑을 약간 진하게 썼어요. */}
+        <div className="rounded-xl bg-white p-5">
+          <p className="text-[13px] font-medium text-[#6b7684]">
+            {stocks.length > 0
+              ? `${stocks.length}종목 중 스크리너 통과`
+              : "스크리너 결과를 불러오고 있어요"}
+          </p>
+          {stocks.length > 0 ? (
+            <>
+              <p className="mt-1.5 text-[40px] font-bold leading-none tracking-[-0.03em] tabular-nums text-[#191f28]">
+                {passed.length}
+                <span className="ml-1 text-[20px] font-semibold tracking-normal">
+                  종목
                 </span>
               </p>
-              <p className="mt-1 text-xs font-medium text-[#8b95a1]">
-                {SCREENER_TOTAL_RULES}개 규칙 중 {SCREENER_PASS_THRESHOLD}개
-                이상 충족한 종목 수예요. 수익률 예측이 아니라 공개 지표 충족
-                개수입니다.
-              </p>
-            </section>
-          </aside>
+              {/* 통과 비율을 얇은 막대 하나로만 보여줘요. 색 면 대신 정보 자체가
+                  시각 요소가 되게 한 것(2026-11-20 세션, "너무 파랗다" 피드백). */}
+              <div
+                aria-label={`전체 ${stocks.length}종목 중 ${passed.length}종목`}
+                className="mt-4 h-1.5 overflow-hidden rounded-[2px] bg-[#e5e8eb]"
+                role="img"
+              >
+                <div
+                  className="h-full bg-[var(--brand)]"
+                  style={{
+                    width: `${Math.round((passed.length / stocks.length) * 100)}%`,
+                  }}
+                />
+              </div>
+            </>
+          ) : null}
+          <p className="mt-3 break-keep text-[13px] leading-5 text-[#6b7684]">
+            공개 지표 {SCREENER_TOTAL_RULES}개 중 {SCREENER_PASS_THRESHOLD}개
+            이상 충족한 종목이에요. 수익률 예측이 아니며, 종목을 누르면 충족한
+            조건을 볼 수 있어요.
+          </p>
+        </div>
+
+        <HomeWatchlistLink />
+
+        {/* 연동 상태·유니버스 새로고침은 관리자 계정에서만 렌더링돼요(세 컴포넌트
+            모두 비관리자에겐 null). 내용이 없으면 줄 자체도 숨깁니다. */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 empty:hidden">
+          <StatusPill />
+          <WsStatusPill />
+          <RefreshUniverseButton />
+        </div>
+
+        <div className="mt-3">
+          <PagedStockList
+            emptyText="조건을 충족하는 종목이 없어요."
+            macdReboundOnly={macdReboundOnly}
+            onMacdReboundChange={setMacdReboundOnly}
+            screenerOnly
+          />
         </div>
       </section>
     </AppShell>
@@ -285,7 +274,7 @@ export function CategoryScreen() {
             const count = stocks.filter((s) => s.sector === label).length;
             return (
               <button
-                className={`relative rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
+                className={`relative rounded-lg border p-4 text-left transition active:scale-[0.98] ${
                   active
                     ? "border-[#3182f6] bg-[#f2f7ff]"
                     : "border-[#e5e8eb] bg-white"
@@ -302,13 +291,13 @@ export function CategoryScreen() {
                   className={`grid h-11 w-11 place-items-center rounded-full ${active ? "bg-white" : "bg-[#eaf1fd]"}`}
                 >
                   <Icon
-                    className={`h-6 w-6 ${active ? "text-[#3182f6]" : "text-[#4e5968]"}`}
+                    className={`h-6 w-6 ${active ? "text-[var(--brand)]" : "text-[#4e5968]"}`}
                   />
                 </div>
                 <p className="mt-4 text-base font-bold text-[#191f28]">
                   {label}
                 </p>
-                <p className="mt-1 text-sm font-medium text-[#8b95a1]">
+                <p className="mt-1 text-sm font-medium text-[#6b7684]">
                   {count}개 종목
                 </p>
               </button>
@@ -385,10 +374,10 @@ export function AnalysisScreen() {
           />
         </div>
 
-        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] lg:max-w-[620px]">
+        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb] lg:max-w-[620px]">
           <div>
             <h2 className="text-lg font-bold text-[#191f28]">자산 배분</h2>
-            <p className="mt-1 text-sm font-semibold text-[#8b95a1]">
+            <p className="mt-1 text-sm font-semibold text-[#6b7684]">
               예시 보유 종목 {HOLDINGS.length}개 기준
             </p>
           </div>
@@ -414,7 +403,7 @@ export function AnalysisScreen() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
           <h2 className="text-lg font-bold text-[#191f28]">보유 종목</h2>
           <div className="mt-3 space-y-2">
             {HOLDINGS.map((h) => {
@@ -431,7 +420,7 @@ export function AnalysisScreen() {
                     {s.name} · {h.qty}주
                   </span>
                   <span
-                    className={`text-sm font-bold ${ret >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+                    className={`text-sm font-bold ${ret >= 0 ? "text-[#f04452]" : "text-[#1b64da]"}`}
                   >
                     {ret >= 0 ? "+" : ""}
                     {ret}%
@@ -440,7 +429,7 @@ export function AnalysisScreen() {
               );
             })}
           </div>
-          <p className="mt-3 text-[11px] font-medium leading-5 text-[#8b95a1]">
+          <p className="mt-3 text-[12px] font-medium leading-5 text-[#6b7684]">
             실제 계좌와 연동되어 있지 않은 예시 데이터예요. 변동성·최대낙폭 같은
             지표는 시계열 데이터가 없어 정확히 계산할 수 없어 표시하지 않았어요.
           </p>
@@ -498,76 +487,57 @@ export function BackTopBar({
 function HomeHeader() {
   const router = useRouter();
   return (
-    <header className="px-5 pb-2 pt-5 lg:px-8 lg:pt-8">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            aria-label="종목 검색"
-            className="rounded-full p-2 text-[#333d4b] transition hover:bg-[#f2f4f6] active:scale-[0.95]"
-            onClick={() => router.push("/search")}
-            type="button"
-          >
-            <Search className="h-5 w-5" />
-          </button>
-          <UserMenu />
-        </div>
+    <header className="flex h-14 items-center justify-between px-5 lg:px-8 lg:pt-6">
+      <h1 className="text-lg font-bold tracking-[-0.01em] text-[#191f28]">
+        주식 어드바이저
+      </h1>
+      <div className="-mr-2.5 flex items-center">
+        <button
+          aria-label="종목 검색"
+          className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6]"
+          onClick={() => router.push("/search")}
+          type="button"
+        >
+          <Search className="h-5 w-5" />
+        </button>
+        <UserMenu />
       </div>
     </header>
   );
 }
 
-// 홈 화면에서 제일 먼저 눈에 들어와야 하는 카드라, 나머지 흰 카드들과 구분되게
-// 다크 톤으로 분리했어요. 시선이 자연스럽게 여기로 먼저 가고, 그 아래 흰 카드들은
-// 옅은 보더만으로 충분히 정돈돼 보입니다.
-//
-// 2026-09-13 세션: 원래 이 자리(PortfolioSummary)는 HOLDINGS(하드코딩된
-// 예시 보유 종목)로 계산한 가짜 "보유 자산 평가액"을 보여줬어요 — 로그인
-// 계정과 무관하게 누구한테나 똑같은 숫자가 뜨고, "업종별 스크리너 보기"
-// 버튼도 하단 네비게이션에서 이미 숨긴 /category(추천 탭)로 연결돼서
-// 눌러도 맥락이 이상했습니다(마이페이지 가짜 데이터를 지적받은 김에
-// 같이 발견). 실제 세션(이름)과 실제 관심종목 개수로 교체했습니다.
-function HomeSummaryCard() {
+// 예전 홈 상단은 다크 카드(이름 + 관리 중 개수 + 큰 버튼)였는데, 하단 탭의
+// "관심"과 역할이 겹치고 첫 화면을 다 차지해서 한 줄짜리 링크로 줄였어요.
+// 2026-09-13 세션 이후로 이름/개수는 실제 세션과 실제 관심종목 기준입니다
+// (HOLDINGS 예시 데이터는 쓰지 않음).
+function HomeWatchlistLink() {
   const { data: session } = useSession();
   const watchlistCount = useWatchlistCount();
   const loggedIn = !!session;
-  const namePart = session?.email.split("@")[0];
 
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-[#191f28] p-5 text-white">
-      <AreaChart
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-8 -right-8 hidden h-44 w-44 text-white/[0.05] lg:block"
-      />
-      <div className="relative">
-        <p className="text-[13px] font-medium text-[#8b95a1]">
-          {loggedIn ? `${namePart}님` : "관심종목"}
-        </p>
-        <p className="mt-1.5 text-[24px] font-extrabold tracking-[-0.03em] text-white">
-          {watchlistCount}
-          <span className="text-[18px] text-[#c1c9d2]">개 관리 중</span>
-        </p>
-        <p className="mt-1 text-sm font-medium text-[#8b95a1]">
+    <Link
+      className="mt-3 flex min-h-16 items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 active:bg-[#f7f8fa]"
+      href={loggedIn ? "/watchlist" : "/login"}
+    >
+      <span className="min-w-0">
+        <span className="block text-[15px] font-semibold text-[#191f28]">
+          {loggedIn ? `관심종목 ${watchlistCount}개` : "로그인하고 시작하기"}
+        </span>
+        <span className="mt-0.5 block break-keep text-[13px] text-[#6b7684]">
           {loggedIn
-            ? "관심종목에 새 공시가 뜨면 알림으로 알려드려요."
-            : "로그인하면 관심종목을 등록하고 공시 알림을 받을 수 있어요."}
-        </p>
-      </div>
-      <Link
-        className="relative mt-4 flex h-12 items-center justify-center gap-2 rounded-sm bg-[#3182f6] text-[15px] font-bold text-white active:scale-[0.99] lg:w-[220px]"
-        href={loggedIn ? "/watchlist" : "/login"}
-      >
-        {loggedIn ? "관심종목 보기" : "로그인하기"}
-      </Link>
-    </section>
+            ? "새 공시가 뜨면 알림으로 알려드려요"
+            : "관심종목을 등록하고 공시 알림을 받아보세요"}
+        </span>
+      </span>
+      <ChevronRight className="h-5 w-5 shrink-0 text-[#6b7684]" />
+    </Link>
   );
 }
 
 function QuickActions() {
   return (
-    <section className="grid grid-cols-4 gap-1.5 rounded-2xl bg-white p-3 ring-1 ring-[#e5e8eb] lg:grid-cols-2 lg:gap-2">
+    <section className="grid grid-cols-4 gap-1.5 rounded-lg bg-white p-3 ring-1 ring-[#e5e8eb] lg:grid-cols-2 lg:gap-2">
       {[
         [AreaChart, "자산", "/analysis"],
         [Star, "추천", "/category"],
@@ -581,7 +551,7 @@ function QuickActions() {
             key={label as string}
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#eaf1fd] lg:h-10 lg:w-10">
-              <TypedIcon className="h-[18px] w-[18px] text-[#3182f6]" />
+              <TypedIcon className="h-[18px] w-[18px] text-[var(--brand)]" />
             </span>
             <p className="mt-2 text-sm font-semibold text-[#333d4b] lg:mt-0">
               {label as string}
@@ -604,7 +574,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-dvh bg-[#e9edf2] text-[#191f28]">
       <div
-        className="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-[#f7f8fa] shadow-[0_18px_50px_rgba(25,31,40,0.14)] sm:h-[812px] sm:rounded-[24px] sm:border sm:border-[#d1d6db] lg:h-dvh lg:max-w-none lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
+        className="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-[#f2f4f8] sm:h-[812px] sm:rounded-[24px] sm:border sm:border-[#d1d6db] lg:h-dvh lg:max-w-none lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
         data-testid="app-webview"
       >
         <DesktopSidebar />
@@ -625,15 +595,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function PagedStockList({
   screenerOnly,
   macdReboundOnly,
+  onMacdReboundChange,
   sector,
   q,
   emptyText,
+  stickyTop = "top-0",
 }: {
   screenerOnly?: boolean;
   macdReboundOnly?: boolean;
+  // 넘기면 목록 위 줄에 "반등 조짐만" 스위치가 같이 나와요(홈 전용).
+  onMacdReboundChange?: (next: boolean) => void;
   sector?: string;
   q?: string;
   emptyText: string;
+  // 정렬 탭이 스크롤해도 화면 위에 붙어 있도록 하는 top 위치(Tailwind 클래스).
+  // 위에 고정 상단바가 있는 화면(검색)은 그 높이만큼 "top-14"를 넘겨요.
+  stickyTop?: "top-0" | "top-14";
 }) {
   // 정렬 필드를 아무것도 안 고르면(null) "기본 순서"예요. 버튼을 누를 때마다
   // 없음 → 자연방향 → 반대방향 → 없음, 3단으로 순환합니다.
@@ -701,22 +678,62 @@ function PagedStockList({
   const sectorAvgPbr = useSectorAvgPbr();
   const total = pages[0]?.total ?? 0;
 
-  // 정렬 선택 칩은 로딩/에러/빈 목록 상태에서도 계속 보여야 다른 정렬로
-  // 바로 바꿔볼 수 있어서, 이 아래 상태 분기랑 별개로 항상 렌더링합니다.
-  // 버튼 하나가 필드 하나: 안 눌렀으면 화살표 없음(=기본 순서에 영향 없음),
-  // 누르면 그 필드의 자연방향 화살표, 한 번 더 누르면 반대방향, 한 번 더
-  // 누르면 다시 화살표 없음(기본 순서로 복귀).
-  const sortChips = (
-    <div className="flex flex-wrap gap-1.5">
+  // 정렬은 로딩/에러/빈 목록 상태에서도 계속 보여야 다른 정렬로 바로 바꿔볼
+  // 수 있어서 상태 분기와 별개로 항상 렌더링합니다. 항목 하나가 필드 하나:
+  // 안 눌렀으면 화살표 없음(=기본 순서), 누르면 자연방향 화살표, 한 번 더
+  // 누르면 반대방향, 한 번 더 누르면 다시 기본 순서로 돌아가요. 필터 토글과
+  // 모양이 달라야 역할이 구분돼서(필터=체크박스, 정렬=밑줄 탭) 칩 대신
+  // 가로 스크롤 탭으로 만들었어요. 탭 6개가 폰 폭(350px)에 딱 들어가도록
+  // 간격을 16px로 두고 "정렬" 라벨은 뺐어요(예전엔 마지막 "등급"이 반쯤
+  // 잘려서 버그처럼 보였음). 필터 스위치는 위 줄(종목 수 옆)로 합쳤습니다.
+  // 홈은 맨 위 큰 숫자가 이미 전체 통과 개수를 보여주니까, 여기 종목 수는
+  // 필터를 켰을 때(숫자가 달라질 때)와 스위치가 없는 화면(검색)에서만 보여요.
+  const showCount = total > 0 && (!onMacdReboundChange || !!macdReboundOnly);
+  const filterRow = (
+    <div className="flex h-11 items-center justify-between">
+      <p className="text-[13px] text-[#6b7684]">
+        {showCount ? `${total}종목` : ""}
+      </p>
+      {onMacdReboundChange ? (
+        <button
+          aria-checked={!!macdReboundOnly}
+          className="flex h-11 items-center gap-2 text-[13px] text-[#333d4b]"
+          onClick={() => onMacdReboundChange(!macdReboundOnly)}
+          role="switch"
+          type="button"
+        >
+          MACD 반등 조짐만
+          <span
+            className={`relative h-5 w-9 rounded-full transition-colors ${
+              macdReboundOnly ? "bg-[var(--brand)]" : "bg-[#8b95a1]"
+            }`}
+          >
+            <span
+              className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                macdReboundOnly ? "translate-x-4" : ""
+              }`}
+            />
+          </span>
+        </button>
+      ) : null}
+    </div>
+  );
+  const sortRow = (
+    <div
+      aria-label="정렬 기준"
+      className={`sticky ${stickyTop} z-10 flex items-center overflow-x-auto border-b border-[#eef0f2] bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+      role="group"
+    >
       {UNIVERSE_SORT_FIELDS.map((field) => {
         const active = sortField === field.value;
         const shownDirection = active ? sortDir : null;
         return (
           <button
-            className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold ${
+            aria-pressed={active}
+            className={`-mb-px flex h-11 shrink-0 items-center gap-1 border-b-2 px-2 text-[14px] first:pl-0 ${
               active
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+                ? "border-[#191f28] font-semibold text-[#191f28]"
+                : "border-transparent text-[#6b7684]"
             }`}
             key={field.value}
             onClick={() => handleSortClick(field.value, field.naturalDirection)}
@@ -733,90 +750,93 @@ function PagedStockList({
       })}
     </div>
   );
+  // 프래그먼트로 두는 이유: sortRow(sticky)의 기준 영역이 목록 전체가 되어야
+  // 스크롤하는 동안 화면 위에 붙어 있을 수 있어서, 종목 행들과 같은 부모에
+  // 형제로 넣어요.
+  const sortTabs = (
+    <>
+      {showCount || onMacdReboundChange ? filterRow : null}
+      {sortRow}
+    </>
+  );
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        {sortChips}
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <StockRowSkeleton key={i} />
-          ))}
-        </div>
+      <div className="rounded-xl bg-white px-4">
+        {sortTabs}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <StockRowSkeleton key={i} />
+        ))}
       </div>
     );
   }
   if (error) {
     return (
-      <div className="space-y-3">
-        {sortChips}
+      <div className="rounded-xl bg-white px-4">
+        {sortTabs}
         <EmptyState text="종목을 불러오지 못했어요." />
       </div>
     );
   }
   if (!stocks.length) {
     return (
-      <div className="space-y-3">
-        {sortChips}
+      <div className="rounded-xl bg-white px-4">
+        {sortTabs}
         <EmptyState text={emptyText} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {sortChips}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-[#8b95a1]">
-          {stocks.length}/{total}개 표시 중 (한 번에 {UNIVERSE_PAGE_SIZE}개씩)
-        </p>
-        {stocks.map((s) => (
-          <StockRow
-            key={s.ticker}
-            stock={s}
-            sectorAvgPer={sectorAvgPer[s.sector]}
-            sectorAvgPbr={sectorAvgPbr[s.sector]}
-          />
-        ))}
-        <div ref={sentinelRef} />
-        {isFetchingNextPage ? (
-          <LoadingSpinnerRow text={``} />
-        ) : hasNextPage ? (
-          <button
-            className="w-full rounded-lg bg-white py-3 text-sm font-bold text-[#3182f6] ring-1 ring-[#e5e8eb] active:scale-[0.99]"
-            onClick={() => fetchNextPage()}
-            type="button"
-          >
-            {UNIVERSE_PAGE_SIZE}개 더 보기
-          </button>
-        ) : null}
-      </div>
+    <div className="rounded-xl bg-white px-4">
+      {sortTabs}
+      {stocks.map((s) => (
+        <StockRow
+          key={s.ticker}
+          stock={s}
+          sectorAvgPer={sectorAvgPer[s.sector]}
+          sectorAvgPbr={sectorAvgPbr[s.sector]}
+        />
+      ))}
+      <div ref={sentinelRef} />
+      {isFetchingNextPage ? (
+        <LoadingSpinnerRow text="" />
+      ) : hasNextPage ? (
+        <button
+          className="flex h-14 w-full items-center justify-center text-[14px] font-semibold text-[var(--brand)] active:bg-[#f7f8fa]"
+          onClick={() => fetchNextPage()}
+          type="button"
+        >
+          더 보기 ({stocks.length}/{total})
+        </button>
+      ) : null}
     </div>
   );
 }
 
 function LoadingSpinnerRow({ text }: { text: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 rounded-lg bg-white py-6 ring-1 ring-[#e5e8eb]">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#e5e8eb] border-t-[#3182f6]" />
-      <span className="text-xs font-semibold text-[#8b95a1]">{text}</span>
+    <div className="flex items-center justify-center gap-2 border-b border-[#eef0f2] py-6">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#e5e8eb] border-t-[var(--brand)]" />
+      {text ? (
+        <span className="text-xs font-medium text-[#6b7684]">{text}</span>
+      ) : null}
     </div>
   );
 }
 
-// 종목 리스트 첫 로딩 때, 빈 화면이나 스피너 한 줄 대신 카드 모양 그대로 회색
-// 블록으로 채워서 보여줘요. 로딩이 끝나고 실제 StockRow로 바뀔 때 레이아웃이
-// 거의 안 튀어서(카드 높이가 같음) 덜 깜빡이는 느낌을 줍니다.
+// 종목 리스트 첫 로딩 때, 스피너 한 줄 대신 행 모양 그대로 회색 블록으로
+// 채워서 로딩이 끝나고 실제 StockRow로 바뀔 때 레이아웃이 덜 튀게 합니다.
 function StockRowSkeleton() {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-28 animate-pulse rounded-full bg-[#eef0f2]" />
-        <div className="h-3 w-20 animate-pulse rounded-full bg-[#f2f4f6]" />
+    <div className="flex items-center justify-between border-b border-[#eef0f2] py-4">
+      <div className="space-y-2.5">
+        <div className="h-4 w-28 animate-pulse rounded bg-[#eef0f2]" />
+        <div className="h-3 w-40 animate-pulse rounded bg-[#f2f4f6]" />
       </div>
-      <div className="shrink-0 space-y-2 text-right">
-        <div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#eef0f2]" />
-        <div className="ml-auto h-3 w-10 animate-pulse rounded-full bg-[#f2f4f6]" />
+      <div className="space-y-2.5">
+        <div className="ml-auto h-4 w-16 animate-pulse rounded bg-[#eef0f2]" />
+        <div className="ml-auto h-3 w-10 animate-pulse rounded bg-[#f2f4f6]" />
       </div>
     </div>
   );
@@ -824,7 +844,7 @@ function StockRowSkeleton() {
 
 function DisclaimerBar() {
   return (
-    <div className="bg-[#fff4e8] px-5 py-2 text-center text-[11px] font-semibold leading-4 text-[#9a5b00] lg:px-8">
+    <div className="bg-[#fff4e8] px-5 py-2 text-center text-[12px] font-semibold leading-4 text-[#9a5b00] lg:px-8">
       투자 자문 아님 · &quot;스크리너 통과&quot;는 공개 지표 4개를 기계적으로
       적용한 결과이며 매수·매도 추천이 아니에요
     </div>
@@ -837,9 +857,8 @@ function DesktopSidebar() {
   return (
     <aside className="hidden w-[236px] shrink-0 border-r border-[#e5e8eb] bg-white px-4 py-5 lg:flex lg:flex-col">
       <Link className="px-2" href="/notifications">
-        <p className="text-sm font-bold text-[#3182f6]">전략투자</p>
-        <p className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-[#191f28]">
-          Stock Advisor
+        <p className="text-xl font-bold tracking-[-0.02em] text-[#191f28]">
+          주식 어드바이저
         </p>
       </Link>
 
@@ -848,10 +867,10 @@ function DesktopSidebar() {
           const active = pathname === item.href;
           return (
             <Link
-              className={`flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold ${
+              className={`flex h-11 items-center gap-3 rounded-lg px-3 text-sm ${
                 active
-                  ? "bg-[#f2f7ff] text-[#3182f6]"
-                  : "text-[#4e5968] hover:bg-[#f7f8fa]"
+                  ? "bg-[#f2f4f6] font-semibold text-[#191f28]"
+                  : "font-medium text-[#4e5968] hover:bg-[#f7f8fa]"
               }`}
               href={item.href}
               key={item.label}
@@ -862,13 +881,6 @@ function DesktopSidebar() {
           );
         })}
       </nav>
-
-      <div className="mt-auto rounded-lg bg-[#f7f8fa] p-4">
-        <p className="text-xs font-bold text-[#8b95a1]">오늘 기준</p>
-        <p className="mt-1 text-sm font-semibold text-[#191f28]">
-          시장 상태를 반영한 추천 결과입니다.
-        </p>
-      </div>
     </aside>
   );
 }
@@ -879,7 +891,7 @@ function DesktopSidebar() {
 function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
-      <h1 className="text-[23px] font-extrabold tracking-[-0.03em] text-[#191f28]">
+      <h1 className="text-[23px] font-bold tracking-[-0.03em] text-[#191f28]">
         {title}
       </h1>
       <p className="mt-1 text-sm font-semibold leading-5 text-[#6b7684]">
@@ -889,53 +901,38 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
+// 스크리너 점수 막대(규칙 개수만큼 칸, 충족한 만큼 채움). 색이 곧 정보예요:
+// 기준(통과선) 미달은 회색 한 톤, 통과는 중간 초록, 전부 충족은 진한 초록.
+// 점수가 오를수록 단계적으로 진해지게 하면 미달인 1/4, 2/4도 "조금 좋은 것"처럼
+// 보여서(통과선이 흐려져서) 통과/미달만 색으로 가르고 만점만 한 단계 더 진하게
+// 했어요(2026-11-20 세션). 홈/검색/관심종목 행에서 공통으로 씁니다.
+function ScoreMeter({ pass, score }: { pass: boolean; score: number }) {
+  const full = score >= SCREENER_TOTAL_RULES;
+  const fill = !pass
+    ? "bg-[#9aa4b0]"
+    : full
+      ? "bg-[var(--brand)]"
+      : "bg-[#4aa88c]";
+  return (
+    <span aria-hidden="true" className="flex gap-0.5">
+      {Array.from({ length: SCREENER_TOTAL_RULES }).map((_, i) => (
+        <span
+          className={`h-1.5 w-3.5 rounded-[2px] ${i < score ? fill : "bg-[#e5e8eb]"}`}
+          key={i}
+        />
+      ))}
+    </span>
+  );
+}
+
 // stock 참조가 안 바뀌면(=이 종목 시세가 이번 틱에 안 바뀌었으면) 리렌더를
 // 건너뜁니다. 위쪽 useMergedStocksWithLive/useLiveStocks가 티커별로 참조를
 // 안정적으로 유지해주기 때문에 memo가 실제로 의미가 있어요.
 //
-// 예전엔 signal(buy/sell/hold) 3가지에 각각 다른 색(빨강/파랑/회색)을
-// 입혔는데, 그 색이 "빨강=상승/매수, 파랑=하락/매도"라는 이 앱의 등락률
-// 색 관례(StockRow의 up ? 빨강 : 파랑)랑 겹쳐서 은연중에 "매수/매도" 방향성을
-// 계속 암시하고 있었어요. 라벨을 완전충족/조건충족/보류/주의 4단계로 바꾸면서
-// (2026-08-23 세션) 색도 등락 방향과 무관한, 순서만 있는 중립 팔레트로
-// 다시 짰습니다 — 인디고(완전충족) > 골드(조건충족) > 회색(보류) > 주황(주의).
-// "완전충족"은 처음에 스크리너 통과 배지랑 같은 초록을 썼는데, 같은 카드 안에
-// "스크리너 4/4 통과"(초록) 배지랑 나란히 붙어있으면 색이 겹쳐 보인다는
-// 피드백으로 골드로 바꿨다가, 완전충족/조건충족끼리 색을 서로 바꿔서 지금은
-// 완전충족=인디고, 조건충족=골드예요.
-function recommendationStyle(label: string): string {
-  switch (label) {
-    case "완전충족":
-      return "bg-[#eef2ff] text-[#4f46e5]";
-    case "조건충족":
-      return "bg-[#fef9c3] text-[#a16207]";
-    case "주의":
-      return "bg-[#fff7ed] text-[#c2410c]";
-    default: // 보류
-      return "bg-[#f2f4f6] text-[#8b95a1]";
-  }
-}
-
-function RecommendationBadge({
-  stock,
-  sectorAvgPer,
-  sectorAvgPbr,
-  className,
-}: {
-  stock: Stock;
-  sectorAvgPer?: number;
-  sectorAvgPbr?: number;
-  className?: string;
-}) {
-  const rec = getRecommendation(stock, sectorAvgPer, sectorAvgPbr);
-  return (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${recommendationStyle(rec.label)} ${className ?? ""}`}
-    >
-      {rec.label}
-    </span>
-  );
-}
+// 판정 라벨(완전충족/조건충족/보류/주의)은 색 배지로 칠하지 않고 글자로만
+// 보여줍니다. 예전엔 빨강/파랑 같은 색을 입혔는데 이 앱의 등락률 색 관례
+// (상승=빨강, 하락=파랑)와 겹쳐 매수/매도 방향을 은연중에 암시했고, 알약
+// 배지를 3개씩 나란히 두면 위계도 안 보였어요(2026-11-20 세션).
 
 const StockRow = memo(function StockRow({
   stock,
@@ -949,50 +946,46 @@ const StockRow = memo(function StockRow({
   const score = screenerScore(stock);
   const pass = score >= SCREENER_PASS_THRESHOLD;
   const up = stock.chg >= 0;
+  const rec = getRecommendation(stock, sectorAvgPer, sectorAvgPbr);
   return (
     <Link
       href={`/stock/${stock.ticker}`}
-      className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99] active:bg-[#f7f8fa]"
+      className="flex items-center justify-between gap-3 border-b border-[#eef0f2] py-4 active:bg-[#f7f8fa]"
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h3 className="truncate text-base font-bold text-[#191f28]">
+        <div className="flex items-center gap-1.5">
+          <h3 className="truncate text-[16px] font-semibold leading-6 text-[#191f28]">
             {stock.name}
           </h3>
-          <RecommendationBadge
-            stock={stock}
-            sectorAvgPer={sectorAvgPer}
-            sectorAvgPbr={sectorAvgPbr}
-          />
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              pass
-                ? "bg-[#e6f9f1] text-[#00a878]"
-                : "bg-[#f2f4f6] text-[#8b95a1]"
-            }`}
-          >
-            스크리너 {score}/{SCREENER_TOTAL_RULES}
-            {pass ? " 통과" : ""}
-          </span>
-          {stock.macdRebound ? <MacdReboundBadge /> : null}
+          <WatchlistHeartIndicator ticker={stock.ticker} />
         </div>
-        <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
-          {stock.sector} · {stock.ticker} · {stock.cap}
+        <p className="mt-0.5 truncate text-[13px] text-[#6b7684]">
+          {stock.sector} · {stock.ticker}
+        </p>
+        {/* 스크리너 점수는 글자만 있으면 한눈에 안 읽혀서 칸 막대로 보여줘요.
+            통과(기준 이상)는 파랑, 미달은 회색이라 색이 곧 정보입니다. */}
+        <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#6b7684]">
+          <ScoreMeter pass={pass} score={score} />
+          <span className="sr-only">스크리너</span>
+          <span className={pass ? "font-semibold text-[#191f28]" : undefined}>
+            {score}/{SCREENER_TOTAL_RULES}
+          </span>
+          <span className="truncate">
+            · {rec.label}
+            {stock.macdRebound ? " · 반등 조짐" : ""}
+          </span>
         </p>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-[#191f28]">
+        <p className="text-[17px] font-bold tabular-nums tracking-[-0.01em] text-[#191f28]">
           {formatKRW(stock.price)}
         </p>
-        <div className="mt-0.5 flex items-center justify-end gap-1.5">
-          <p
-            className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
-          >
-            {up ? "+" : ""}
-            {stock.chg}%
-          </p>
-          <WatchlistHeartIndicator ticker={stock.ticker} />
-        </div>
+        <p
+          className={`mt-0.5 text-[13px] font-medium tabular-nums ${up ? "text-[#e03131]" : "text-[#1b64da]"}`}
+        >
+          {up ? "+" : "-"}
+          {Math.abs(stock.chg).toFixed(2)}%
+        </p>
       </div>
     </Link>
   );
@@ -1006,9 +999,8 @@ const StockRow = memo(function StockRow({
 function MacdReboundBadge({ className }: { className?: string }) {
   return (
     <span
-      className={`shrink-0 inline-flex items-center gap-1 rounded-full bg-[#e6f0ff] px-2 py-0.5 text-[10px] font-bold text-[#185fa5] ${className ?? ""}`}
+      className={`shrink-0 text-xs font-medium text-[var(--brand)] ${className ?? ""}`}
     >
-      <TrendingUp className="h-2.5 w-2.5" />
       반등 조짐
     </span>
   );
@@ -1020,11 +1012,16 @@ function MacdReboundBadge({ className }: { className?: string }) {
 // 문제가 없음 — 그래서 StockRow도 다시 통짜 <Link> 하나로 되돌렸어요.
 function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
   const watched = useIsWatched(ticker);
+  // 담은 종목에만 채운 하트를 이름 옆에 보여줍니다. 예전엔 안 담은 종목에도
+  // 빈 하트가 행마다 붙어서 목록 전체가 지저분해 보였어요(2026-11-20 세션).
+  if (!watched) return null;
   return (
     <Heart
-      aria-hidden="true"
-      className={`h-[15px] w-[15px] shrink-0 ${watched ? "text-[#f04452]" : "text-[#c3c9d1]"}`}
-      fill={watched ? "currentColor" : "none"}
+      aria-label="관심종목"
+      className="shrink-0 text-[#f04452]"
+      fill="currentColor"
+      role="img"
+      size={13}
     />
   );
 }
@@ -1038,15 +1035,15 @@ function BottomNav() {
 
   // navTabs 개수(지금 4개: 홈/관심/알림/AI 추천)에 맞춘 grid-cols-4 — 위
   // navTabs의 추천/자산 주석을 풀면 여기도 grid-cols-6으로 같이 맞춰야
-  // 칸이 안 남아요.
+  // 칸이 안 남아요. 배경은 블러 없이 불투명 흰색 + 위쪽 1px 선입니다.
   return (
-    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white/96 backdrop-blur lg:hidden">
+    <nav className="absolute bottom-0 left-0 z-30 grid h-[68px] w-full grid-cols-4 border-t border-[#e5e8eb] bg-white lg:hidden">
       {navTabs.map((item) => {
         const active = pathname === item.href;
         return (
           <Link
-            className={`relative flex flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
-              active ? "text-[#3182f6]" : "text-[#8b95a1]"
+            className={`flex flex-col items-center justify-center gap-1 text-[12px] ${
+              active ? "font-semibold text-[var(--brand)]" : "font-medium text-[#6b7684]"
             }`}
             href={item.href}
             key={item.label}
@@ -1054,21 +1051,16 @@ function BottomNav() {
             {/* Home(house)/AreaChart(chart-area)는 아이콘 안에 path가 2개예요
                 — 문/축선 같은 "디테일 선"이 첫 번째, 집/차트 영역을 이루는
                 "메인 도형"이 마지막(closed path)입니다. 활성일 때 메인
-                도형(마지막 path)만 파란색으로 채우고, 디테일 선(마지막이
-                아닌 path)은 상태와 상관없이 항상 고정 회색으로 둬서 파란
-                채움 위에서도 안 묻히게 합니다. Star/Heart처럼 path가 1개뿐인
-                아이콘은 그 path가 곧 마지막 path라 그대로 채워집니다. */}
+                도형(마지막 path)만 채우고, 디테일 선(마지막이 아닌 path)은
+                상태와 상관없이 고정 회색으로 둬서 채움 위에서도 안 묻히게
+                합니다. Star/Heart처럼 path가 1개뿐인 아이콘은 그 path가
+                곧 마지막 path라 그대로 채워집니다. */}
             <item.icon
-              className={`h-5 w-5 [&>path:not(:last-child)]:stroke-[#8b95a1] ${
-                active ? "[&>path:last-child]:fill-[#3182f6]" : ""
+              className={`h-5 w-5 [&>path:not(:last-child)]:stroke-[#6b7684] ${
+                active ? "[&>path:last-child]:fill-[var(--brand)]" : ""
               }`}
             />
             {item.label}
-            {item.label === "뉴스" ? (
-              <span className="absolute right-[27%] top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f04452] px-1 text-[9px] leading-none text-white">
-                3
-              </span>
-            ) : null}
           </Link>
         );
       })}
@@ -1082,11 +1074,78 @@ function BottomNav() {
 // 대충 분류한 거라(진짜 감성분석 아님) 참고만 하시라는 안내 문구를 같이 둡니다.
 // 알고리즘(매매 판단)에는 아직 연결 안 함 — 화면 표시 전용.
 // ---------------------------------------------------------------------------
+// 뉴스 한 건마다 붙던 호재/악재 알약 배지는 글자 색만 남겼어요(정적 메타
+// 정보에 알약을 두르지 않는다는 안티슬롭 규칙, 2026-11-20 세션).
 const SENTIMENT_STYLE: Record<NewsArticle["sentiment"], string> = {
-  positive: "bg-[#fdeeee] text-[#f04452]",
-  negative: "bg-[#eef4ff] text-[#3182f6]",
-  neutral: "bg-[#f2f4f6] text-[#8b95a1]",
+  positive: "font-semibold text-[#e03131]",
+  negative: "font-semibold text-[#1b64da]",
+  neutral: "text-[#6b7684]",
 };
+
+// 상세 화면의 보기 전환(뉴스 정렬, 차트/테이블, 기간)에 공통으로 쓰는 분할
+// 컨트롤. 예전엔 화면마다 알약 버튼이 제각각 모양이라 역할이 안 읽혔어요.
+function Segmented<T extends string>({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (next: T) => void;
+  options: ReadonlyArray<{ key: T; label: string }>;
+  value: T;
+}) {
+  return (
+    <div
+      aria-label={label}
+      className="inline-flex rounded-md bg-[#f2f4f6] p-0.5"
+      role="group"
+    >
+      {options.map((opt) => (
+        <button
+          aria-pressed={value === opt.key}
+          className={`h-8 rounded-[6px] px-3 text-[13px] ${
+            value === opt.key
+              ? "bg-white font-semibold text-[#191f28] ring-1 ring-[#e5e8eb]"
+              : "font-medium text-[#6b7684]"
+          }`}
+          key={opt.key}
+          onClick={() => onChange(opt.key)}
+          type="button"
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 라벨 왼쪽 / 값 오른쪽의 키-값 목록. 3열 지표 카드는 "2,987,000원"처럼 긴
+// 값이 줄바꿈되고 마지막 줄이 비어 보였어요(bare=true면 바깥 카드 없이 줄만).
+function KeyValueList({
+  bare,
+  items,
+}: {
+  bare?: boolean;
+  items: Array<[string, string]>;
+}) {
+  return (
+    <dl
+      className={`divide-y divide-[#eef0f2] ${
+        bare ? "" : "rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]"
+      }`}
+    >
+      {items.map(([k, v]) => (
+        <div className="flex items-center justify-between gap-4 py-3" key={k}>
+          <dt className="text-[14px] text-[#6b7684]">{k}</dt>
+          <dd className="text-[15px] font-semibold tabular-nums text-[#191f28]">
+            {v}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 const SENTIMENT_LABEL: Record<NewsArticle["sentiment"], string> = {
   positive: "호재 키워드",
   negative: "악재 키워드",
@@ -1143,9 +1202,9 @@ function sortNewsArticles(
 // 덜 튀어 보여요.
 function StockNewsCardSkeleton() {
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
-      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+      <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
     </div>
   );
 }
@@ -1164,30 +1223,20 @@ function StockNewsCard({ name }: { name: string }) {
   );
 
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
         {articles.length > 0 ? (
-          <div className="flex gap-1">
-            {NEWS_SORT_OPTIONS.map((opt) => (
-              <button
-                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                  sortMode === opt.key
-                    ? "bg-[#191f28] text-white"
-                    : "bg-[#f2f4f6] text-[#8b95a1]"
-                }`}
-                key={opt.key}
-                onClick={() => setSortMode(opt.key)}
-                type="button"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="뉴스 정렬"
+            onChange={setSortMode}
+            options={NEWS_SORT_OPTIONS}
+            value={sortMode}
+          />
         ) : null}
       </div>
       {articles.length === 0 ? (
-        <p className="mt-3 text-[13px] text-[#8b95a1]">
+        <p className="mt-3 text-[13px] text-[#6b7684]">
           최근 관련 뉴스가 없어요.
         </p>
       ) : (
@@ -1200,16 +1249,15 @@ function StockNewsCard({ name }: { name: string }) {
                 rel="noreferrer"
                 target="_blank"
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${SENTIMENT_STYLE[a.sentiment]}`}
-                  >
-                    {SENTIMENT_LABEL[a.sentiment]} · {a.eventType}
+                <p className="text-[12px] text-[#6b7684]">
+                  <span className={SENTIMENT_STYLE[a.sentiment]}>
+                    {SENTIMENT_LABEL[a.sentiment]}
                   </span>
-                  <span className="text-[11px] font-semibold text-[#8b95a1]">
-                    {formatNewsDate(a.pubDate)}
-                  </span>
-                </div>
+                  {" · "}
+                  {a.eventType}
+                  {" · "}
+                  {formatNewsDate(a.pubDate)}
+                </p>
                 <p className="mt-1 line-clamp-2 text-[14px] font-semibold leading-5 text-[#191f28]">
                   {a.title}
                 </p>
@@ -1252,6 +1300,10 @@ function PriceLineChart({ bars }: { bars: DailyBar[] }) {
     .join(" ");
   const areaPath = `${linePath} L${xAt(bars.length - 1).toFixed(1)},${height} L${xAt(0).toFixed(1)},${height} Z`;
   const gradientId = "price-fill-gradient";
+  // 한국 시세 색 관례: 기간 시작 대비 올랐으면 빨강, 내렸으면 파랑. 예전엔
+  // 항상 파랑이라 오른 종목도 "하락"처럼 보였어요(2026-11-20 세션).
+  const rising = closes.length < 2 || closes[closes.length - 1] >= closes[0];
+  const lineColor = rising ? "#f04452" : "#3182f6";
 
   return (
     <svg
@@ -1262,15 +1314,15 @@ function PriceLineChart({ bars }: { bars: DailyBar[] }) {
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3182f6" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#3182f6" stopOpacity="0" />
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.16" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
       <path
         d={linePath}
         fill="none"
-        stroke="#3182f6"
+        stroke={lineColor}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
@@ -1384,9 +1436,9 @@ const CHARTS_DISPLAY_DAYS = 60;
 function StockChartsCardSkeleton() {
   return (
     <>
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
         <h2 className="text-base font-bold text-[#191f28]">주가</h2>
-        <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+        <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
       </div>
     </>
   );
@@ -1401,56 +1453,56 @@ function StockChartsCard({ ticker }: { ticker: string }) {
 
   return (
     <>
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-[#191f28]">주가</h2>
-          <span className="text-[11px] font-semibold text-[#8b95a1]">
+          <span className="text-[12px] font-semibold text-[#6b7684]">
             최근 {displayBars.length}거래일
           </span>
         </div>
         {displayBars.length < 2 ? (
-          <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 부족해요.</p>
+          <p className="mt-3 text-[13px] text-[#6b7684]">데이터가 부족해요.</p>
         ) : (
           <>
             <PriceLineChart bars={displayBars} />
-            <p className="mt-3 text-[11px] font-semibold text-[#8b95a1]">거래량</p>
+            <p className="mt-3 text-[12px] font-semibold text-[#6b7684]">거래량</p>
             <VolumeChart bars={displayBars} />
           </>
         )}
       </div>
 
-      <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
             {macdRebound ? <MacdReboundBadge /> : null}
           </div>
-          <span className="text-[11px] font-semibold text-[#8b95a1]">12·26·9</span>
+          <span className="text-[12px] font-semibold text-[#6b7684]">12·26·9</span>
         </div>
         {displayMacd.length < 2 ? (
-          <p className="mt-3 text-[13px] text-[#8b95a1]">
+          <p className="mt-3 text-[13px] text-[#6b7684]">
             데이터가 부족해요. (MACD는 최소 35거래일치 데이터가 필요해요)
           </p>
         ) : (
           <>
             <MacdChart points={displayMacd} />
             <div className="mt-2 flex flex-wrap gap-3">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4e5968]">
                 <span className="h-2 w-2 rounded-full" style={{ background: "#3182f6" }} />
                 MACD선
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4e5968]">
                 <span className="h-2 w-2 rounded-full" style={{ background: "#a16207" }} />
                 시그널선
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]">
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4e5968]">
                 <span className="h-2 w-2 rounded-full" style={{ background: "#f04452" }} />
                 모멘텀 +
               </span>
             </div>
           </>
         )}
-        <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+        <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
           단기(12일)·장기(26일) 지수이동평균의 차이(MACD선)와 그 9일
           이동평균(시그널선)이에요. MACD선이 시그널선을 위로 뚫으면 흔히
           "골든크로스", 아래로 뚫으면 "데드크로스"라고 부르지만, 이 화면은
@@ -1481,37 +1533,45 @@ function SectorPeersCard({ stock }: { stock: Stock }) {
   if (peers.length < 2) return null;
 
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <h2 className="text-base font-bold text-[#191f28]">업종 내 비교</h2>
-      <p className="mt-1 text-[11px] font-medium text-[#8b95a1]">
+      <p className="mt-1 text-[12px] font-medium text-[#6b7684]">
         {stock.sector} 시가총액 상위 종목
       </p>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[380px] text-[12px]">
+        {/* 폰 폭에선 PBR 열을 숨겨서(위 지표 목록에 이 종목 PBR이 있어요) 표가
+            옆으로 스크롤되지 않고 한 화면에 들어가게 했습니다. */}
+        <table className="w-full text-[13px]">
           <thead>
-            <tr className="text-left text-[#8b95a1]">
-              <th className="py-1.5 font-semibold">종목명</th>
-              <th className="py-1.5 text-right font-semibold">시가총액</th>
-              <th className="py-1.5 text-right font-semibold">PER</th>
-              <th className="py-1.5 text-right font-semibold">PBR</th>
+            <tr className="text-left text-[#6b7684]">
+              <th className="py-2 font-medium">종목명</th>
+              <th className="py-2 text-right font-medium">시가총액</th>
+              <th className="py-2 text-right font-medium">PER</th>
+              <th className="hidden py-2 text-right font-medium sm:table-cell">PBR</th>
             </tr>
           </thead>
           <tbody>
             {peers.map((p) => (
               <tr
-                className={`border-t border-[#f2f4f6] ${
-                  p.ticker === stock.ticker ? "bg-[#f2f7ff]" : ""
+                className={`border-t border-[#eef0f2] ${
+                  p.ticker === stock.ticker ? "bg-[#f7f8fa]" : ""
                 }`}
                 key={p.ticker}
               >
-                <td className="py-1.5 font-semibold text-[#191f28]">
+                <td
+                  className={`max-w-[120px] truncate py-2.5 ${
+                    p.ticker === stock.ticker
+                      ? "font-bold text-[#191f28]"
+                      : "font-medium text-[#191f28]"
+                  }`}
+                >
                   {p.name}
                 </td>
-                <td className="py-1.5 text-right text-[#4e5968]">{p.cap}</td>
-                <td className="py-1.5 text-right text-[#4e5968]">
+                <td className="py-2.5 text-right tabular-nums text-[#4e5968]">{p.cap}</td>
+                <td className="py-2.5 text-right tabular-nums text-[#4e5968]">
                   {p.per ? `${p.per}배` : "-"}
                 </td>
-                <td className="py-1.5 text-right text-[#4e5968]">
+                <td className="hidden py-2.5 text-right tabular-nums text-[#4e5968] sm:table-cell">
                   {p.pbr ? `${p.pbr}배` : "-"}
                 </td>
               </tr>
@@ -1535,9 +1595,9 @@ const FINANCIALS_DISPLAY_YEARS = 5;
 
 function FinancialsCardSkeleton() {
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
-      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+      <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
     </div>
   );
 }
@@ -1551,17 +1611,17 @@ function FinancialsCard({ ticker }: { ticker: string }) {
   const latest = recent[recent.length - 1];
 
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
 
       {recent.length === 0 ? (
-        <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 없어요.</p>
+        <p className="mt-3 text-[13px] text-[#6b7684]">데이터가 없어요.</p>
       ) : (
         <>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[420px] text-[12px]">
               <thead>
-                <tr className="text-left text-[#8b95a1]">
+                <tr className="text-left text-[#6b7684]">
                   <th className="py-1.5 font-semibold">결산연도</th>
                   <th className="py-1.5 text-right font-semibold">매출액</th>
                   <th className="py-1.5 text-right font-semibold">영업이익</th>
@@ -1592,37 +1652,22 @@ function FinancialsCard({ ticker }: { ticker: string }) {
           </div>
 
           {latest ? (
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <MetricCard
-                compact
-                label="영업이익률"
-                value={latest.opMarginPct !== null ? `${latest.opMarginPct}%` : "-"}
-                valueClassName={RESPONSIVE_TEXT.metricValue}
-              />
-              <MetricCard
-                compact
-                label="ROE"
-                value={latest.roe !== null ? `${latest.roe}%` : "-"}
-                valueClassName={RESPONSIVE_TEXT.metricValue}
-              />
-              <MetricCard
-                compact
-                label="부채비율"
-                value={latest.debtRatio !== null ? `${latest.debtRatio}%` : "-"}
-                valueClassName={RESPONSIVE_TEXT.metricValue}
-              />
-              <MetricCard
-                compact
-                label="EPS"
-                value={latest.eps !== null ? `${formatKRW(latest.eps)}원` : "-"}
-                valueClassName={RESPONSIVE_TEXT.metricValue}
+            <div className="mt-4 border-t border-[#eef0f2]">
+              <KeyValueList
+                bare
+                items={[
+                  ["영업이익률", latest.opMarginPct !== null ? `${latest.opMarginPct}%` : "-"],
+                  ["ROE", latest.roe !== null ? `${latest.roe}%` : "-"],
+                  ["부채비율", latest.debtRatio !== null ? `${latest.debtRatio}%` : "-"],
+                  ["EPS", latest.eps !== null ? `${formatKRW(latest.eps)}원` : "-"],
+                ]}
               />
             </div>
           ) : null}
         </>
       )}
 
-      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
         KIS 종목별 재무제표(연간) 기준이에요. 완결된 결산연도까지만
         반영되고, 진행 중인 회계연도는 제외했어요. 이 화면도 계산된 값을
         그대로 보여줄 뿐 매매 판단을 내리지 않아요.
@@ -1656,9 +1701,9 @@ const INVESTOR_TREND_DISPLAY_LIMIT = 30;
 
 function InvestorTrendCardSkeleton() {
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <h2 className="text-base font-bold text-[#191f28]">투자자 매매동향</h2>
-      <p className="mt-3 text-[13px] text-[#8b95a1]">불러오는 중...</p>
+      <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
     </div>
   );
 }
@@ -1719,7 +1764,7 @@ function InvestorTrendChart({ points }: { points: InvestorTrendPoint[] }) {
       <div className="mt-2 flex flex-wrap gap-3">
         {INVESTOR_SERIES.map((s) => (
           <span
-            className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4e5968]"
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4e5968]"
             key={s.label}
           >
             <span
@@ -1731,7 +1776,7 @@ function InvestorTrendChart({ points }: { points: InvestorTrendPoint[] }) {
         ))}
       </div>
       {points.length > 0 ? (
-        <div className="mt-1 flex justify-between text-[10px] text-[#8b95a1]">
+        <div className="mt-1 flex justify-between text-[10px] text-[#6b7684]">
           <span>{points[0].label}</span>
           <span>{points[points.length - 1].label}</span>
         </div>
@@ -1745,7 +1790,7 @@ function InvestorTrendTable({ points }: { points: InvestorTrendPoint[] }) {
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[420px] text-[12px]">
         <thead>
-          <tr className="text-left text-[#8b95a1]">
+          <tr className="text-left text-[#6b7684]">
             <th className="py-1.5 font-semibold">기간</th>
             <th className="py-1.5 text-right font-semibold">종가</th>
             {INVESTOR_SERIES.map((s) => (
@@ -1766,7 +1811,7 @@ function InvestorTrendTable({ points }: { points: InvestorTrendPoint[] }) {
                 const v = s.value(p);
                 return (
                   <td
-                    className={`py-1.5 text-right font-semibold ${v >= 0 ? "text-[#f04452]" : "text-[#3182f6]"}`}
+                    className={`py-1.5 text-right font-semibold ${v >= 0 ? "text-[#f04452]" : "text-[#1b64da]"}`}
                     key={s.label}
                   >
                     {formatNetAmountEok(v)}
@@ -1794,53 +1839,41 @@ function InvestorTrendCard({ ticker }: { ticker: string }) {
   );
 
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-[#191f28]">투자자 매매동향</h2>
-        <div className="flex gap-1">
-          {(["chart", "table"] as const).map((mode) => (
-            <button
-              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                viewMode === mode
-                  ? "bg-[#191f28] text-white"
-                  : "bg-[#f2f4f6] text-[#8b95a1]"
-              }`}
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              type="button"
-            >
-              {mode === "chart" ? "차트" : "테이블"}
-            </button>
-          ))}
-        </div>
+        <Segmented<InvestorViewMode>
+          label="보기 방식"
+          onChange={setViewMode}
+          options={[
+            { key: "chart", label: "차트" },
+            { key: "table", label: "테이블" },
+          ]}
+          value={viewMode}
+        />
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {INVESTOR_TREND_PERIODS.map((p) => (
-          <button
-            className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-              period === p.value
-                ? "bg-[#191f28] text-white"
-                : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
-            }`}
-            key={p.value}
-            onClick={() => setPeriod(p.value)}
-            type="button"
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="mt-3">
+        <Segmented<InvestorTrendPeriod>
+          label="기간"
+          onChange={setPeriod}
+          options={INVESTOR_TREND_PERIODS.map((p) => ({
+            key: p.value,
+            label: p.label,
+          }))}
+          value={period}
+        />
       </div>
 
       {points.length === 0 ? (
-        <p className="mt-3 text-[13px] text-[#8b95a1]">데이터가 없어요.</p>
+        <p className="mt-3 text-[13px] text-[#6b7684]">데이터가 없어요.</p>
       ) : viewMode === "chart" ? (
         <InvestorTrendChart points={points} />
       ) : (
         <InvestorTrendTable points={points} />
       )}
 
-      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
         KIS 종목별 투자자매매동향(일별) 기준 순매수 거래대금이에요. 당일
         데이터는 장 종료 후 반영됩니다.
       </p>
@@ -1867,7 +1900,7 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           left={<ChevronLeft />}
           onLeftClick={() => router.back()}
         />
-        <div className="px-5 py-16 text-center text-sm font-semibold text-[#8b95a1]">
+        <div className="px-5 py-16 text-center text-sm font-semibold text-[#6b7684]">
           종목을 찾을 수 없어요.
         </div>
       </AppShell>
@@ -1901,16 +1934,16 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
         <StatusPill />
 
         <div>
-          <p className="text-sm font-bold text-[#8b95a1]">
+          <p className="text-sm font-bold text-[#6b7684]">
             {stock.sector} · {stock.ticker}
           </p>
-          <p className="mt-1 text-[30px] font-extrabold tracking-[-0.03em] text-[#191f28]">
+          <p className="mt-1 text-[30px] font-bold tracking-[-0.03em] text-[#191f28]">
             {formatKRW(stock.price)}원
           </p>
           <p
-            className={`mt-1 text-sm font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+            className={`mt-1 text-sm font-bold ${up ? "text-[#f04452]" : "text-[#1b64da]"}`}
           >
-            {up ? "▲" : "▼"} {Math.abs(stock.chg)}% 오늘
+            {up ? "▲" : "▼"} {Math.abs(stock.chg).toFixed(2)}% 오늘
           </p>
           {heart.error ? (
             <p className="mt-1 text-xs font-semibold text-[#f04452]">
@@ -1921,9 +1954,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
         <ErrorBoundary
           fallback={(error) => (
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
               <h2 className="text-base font-bold text-[#191f28]">주가</h2>
-              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+              <p className="mt-3 text-[13px] leading-5 text-[#6b7684]">
                 {error.message || "일봉 데이터를 불러오지 못했어요."}
               </p>
             </div>
@@ -1935,33 +1968,31 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           </Suspense>
         </ErrorBoundary>
 
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-[#191f28]">
               조건 충족 현황
             </h2>
-            <span
-              className={`rounded-full px-3 py-1 text-sm font-extrabold ${recommendationStyle(rec.label)}`}
-            >
+            <span className="text-sm font-semibold text-[#191f28]">
               {rec.label}
             </span>
           </div>
           <p className="mt-2 text-[13px] leading-5 text-[#4e5968]">
             {rec.reason}
           </p>
-          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
             아래 {SCREENER_TOTAL_RULES}개 공개 지표 조건식과 업종 평균 대비
             PER·PBR만으로 계산한 결과입니다.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-[#191f28]">
               스크리너 조건 충족 현황
             </h2>
             <span
-              className={`text-sm font-extrabold ${score >= SCREENER_PASS_THRESHOLD ? "text-[#00a878]" : "text-[#8b95a1]"}`}
+              className={`text-sm font-bold ${score >= SCREENER_PASS_THRESHOLD ? "text-[#0b7a5a]" : "text-[#6b7684]"}`}
             >
               {score}/{SCREENER_TOTAL_RULES}
             </span>
@@ -1979,70 +2010,45 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
                 >
                   {c.pass ? (
                     <Check
-                      className="h-2.5 w-2.5 text-[#00a878]"
+                      className="h-2.5 w-2.5 text-[#0b7a5a]"
                       strokeWidth={3}
                     />
                   ) : (
                     <span className="h-1 w-1 rounded-full bg-[#c3c9d1]" />
                   )}
                 </span>
-                <span className={c.pass ? "text-[#333d4b]" : "text-[#8b95a1]"}>
+                <span className={c.pass ? "text-[#333d4b]" : "text-[#6b7684]"}>
                   {c.label}
                 </span>
               </li>
             ))}
           </ul>
-          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[11px] leading-5 text-[#8b95a1]">
+          <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
             위 {SCREENER_TOTAL_RULES}개 규칙은 전부 공개 지표로 계산됩니다. AI의
             판단이 아니라 조건식 결과이며, {SCREENER_PASS_THRESHOLD}개 이상 충족
             시 홈 화면의 &quot;스크리너 통과&quot;에 노출됩니다.
           </p>
         </div>
 
-        <div
-          className={`grid gap-3 ${stock.pbr ? "grid-cols-3" : "grid-cols-2"}`}
-        >
-          <MetricCard
-            compact
-            label="시가총액"
-            value={stock.cap}
-            valueClassName={RESPONSIVE_TEXT.metricValue}
-          />
-          <MetricCard
-            compact
-            label="PER"
-            value={`${stock.per}배`}
-            valueClassName={RESPONSIVE_TEXT.metricValue}
-          />
-          {stock.pbr ? (
-            <MetricCard
-              compact
-              label="PBR"
-              value={`${stock.pbr}배`}
-              valueClassName={RESPONSIVE_TEXT.metricValue}
-            />
-          ) : null}
-          <MetricCard
-            compact
-            label="52주 최고"
-            value={`${formatKRW(stock.hi)}원`}
-            valueClassName={RESPONSIVE_TEXT.metricValue}
-          />
-          <MetricCard
-            compact
-            label="52주 최저"
-            value={`${formatKRW(stock.lo)}원`}
-            valueClassName={RESPONSIVE_TEXT.metricValue}
-          />
-        </div>
+        <KeyValueList
+          items={[
+            ["시가총액", stock.cap],
+            ["PER", `${stock.per}배`],
+            ...(stock.pbr
+              ? ([["PBR", `${stock.pbr}배`]] as Array<[string, string]>)
+              : []),
+            ["52주 최고", `${formatKRW(stock.hi)}원`],
+            ["52주 최저", `${formatKRW(stock.lo)}원`],
+          ]}
+        />
 
         <SectorPeersCard stock={stock} />
 
         <ErrorBoundary
           fallback={(error) => (
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
               <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
-              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+              <p className="mt-3 text-[13px] leading-5 text-[#6b7684]">
                 {error.message || "재무 정보를 불러오지 못했어요."}
               </p>
             </div>
@@ -2056,11 +2062,11 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
         <ErrorBoundary
           fallback={(error) => (
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
               <h2 className="text-base font-bold text-[#191f28]">
                 투자자 매매동향
               </h2>
-              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+              <p className="mt-3 text-[13px] leading-5 text-[#6b7684]">
                 {error.message || "투자자매매동향을 불러오지 못했어요."}
               </p>
             </div>
@@ -2074,9 +2080,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
 
         <ErrorBoundary
           fallback={(error) => (
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+            <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
               <h2 className="text-base font-bold text-[#191f28]">관련 뉴스</h2>
-              <p className="mt-3 text-[13px] leading-5 text-[#8b95a1]">
+              <p className="mt-3 text-[13px] leading-5 text-[#6b7684]">
                 {error.message || "뉴스를 불러오지 못했어요."}
               </p>
             </div>
@@ -2127,7 +2133,7 @@ export function SearchScreen() {
       />
       <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
         <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
-          <Search className="h-4 w-4 text-[#8b95a1]" />
+          <Search className="h-4 w-4 text-[#6b7684]" />
           <input
             autoFocus
             className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
@@ -2137,16 +2143,25 @@ export function SearchScreen() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* 업종이 25개 넘게 나와서 줄바꿈으로 깔면 결과 목록이 화면 아래로
+            400px쯤 밀렸어요(2026-11-20 세션). 한 줄 가로 스크롤로 바꾸고,
+            화면 가장자리까지 스크롤되게 -mx-5/px-5로 여백을 맞췄습니다. */}
+        <div
+          aria-label="업종 필터"
+          className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:flex-wrap lg:px-0"
+          role="group"
+        >
           {sectorOptions.map((sec) => (
             <button
-              className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+              aria-pressed={sector === sec}
+              className={`h-9 shrink-0 rounded-md px-3 text-[13px] font-medium ${
                 sector === sec
                   ? "bg-[#191f28] text-white"
-                  : "bg-white text-[#6b7684] ring-1 ring-[#e5e8eb]"
+                  : "border border-[#e5e8eb] bg-white text-[#4e5968]"
               }`}
               key={sec}
               onClick={() => setSector(sec)}
+              type="button"
             >
               {sec}
             </button>
@@ -2157,6 +2172,7 @@ export function SearchScreen() {
           emptyText="일치하는 종목이 없어요."
           q={debouncedQuery}
           sector={sector}
+          stickyTop="top-14"
         />
       </section>
     </AppShell>
@@ -2247,27 +2263,29 @@ export function AlertSettingsScreen() {
     <AppShell>
       <TopBar title="알림" left={<ChevronLeft />} onLeftClick={() => router.back()} />
       <section className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
-        <div className="rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-base font-bold text-[#191f28]">공시 알림</h2>
-              <p className="mt-1 text-[13px] leading-5 text-[#8b95a1]">
+              <p className="mt-1 text-[13px] leading-5 text-[#6b7684]">
                 실적·자본변동 등 중요한 공시가 등록되면 휴대폰 알림으로
                 알려드려요. 관심종목 등록 여부와 무관하게 앱에서 다루는
                 시가총액 상위 200종목이 대상이에요.
               </p>
             </div>
             <button
-              aria-label={enabled ? "알림 끄기" : "알림 켜기"}
+              aria-checked={!!enabled}
+              aria-label="공시 알림"
               className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${
-                enabled ? "bg-[#3182f6]" : "bg-[#e5e8eb]"
+                enabled ? "bg-[var(--brand)]" : "bg-[#8b95a1]"
               }`}
               disabled={enabled === null || saving}
+              role="switch"
               onClick={toggle}
               type="button"
             >
               <span
-                className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${
                   enabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />
@@ -2277,13 +2295,13 @@ export function AlertSettingsScreen() {
             <p className="mt-3 text-[13px] font-semibold text-[#f04452]">{error}</p>
           ) : null}
         </div>
-        <p className="mt-3 text-[11px] leading-5 text-[#8b95a1]">
-          휴대폰 자체 알림 권한이 꺼져있으면 이 설정과 무관하게 알림이 안 와요
-          — 기기 설정에서도 알림 권한을 확인해주세요.
+        <p className="mt-3 break-keep text-[12px] leading-5 text-[#6b7684]">
+          휴대폰 자체 알림 권한이 꺼져 있으면 이 설정과 상관없이 알림이 안 와요.
+          기기 설정에서도 알림 권한을 확인해 주세요.
         </p>
 
         <button
-          className="mt-4 w-full rounded-lg bg-[#191f28] py-3 text-sm font-bold text-white disabled:opacity-50"
+          className="mt-4 h-12 w-full rounded-lg border border-[#d1d6db] bg-white text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6] disabled:opacity-50"
           disabled={testing}
           onClick={sendTestPush}
           type="button"
@@ -2293,7 +2311,7 @@ export function AlertSettingsScreen() {
         {testStatus ? (
           <p
             className={`mt-2 text-[13px] font-semibold ${
-              testStatus.ok ? "text-[#00a878]" : "text-[#f04452]"
+              testStatus.ok ? "text-[#0b7a5a]" : "text-[#f04452]"
             }`}
           >
             {testStatus.message}
@@ -2445,26 +2463,26 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
     <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
       <div className="flex items-center justify-between">
         <WsStatusPill />
-        <p className="text-sm font-bold text-[#8b95a1]">
+        <p className="text-sm font-bold text-[#6b7684]">
           {items.length}/{WATCHLIST_LIMIT}개
         </p>
       </div>
 
       <div className="relative">
         <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
-          <Search className="h-4 w-4 text-[#8b95a1]" />
+          <Search className="h-4 w-4 text-[#6b7684]" />
           <input
             className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
             onBlur={() => setInputFocused(false)}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setInputFocused(true)}
-            placeholder="종목명 또는 코드로 검색, 또는 눌러서 전체 목록 보기"
+            placeholder="종목명 또는 코드 검색"
             ref={searchInputRef}
             value={query}
           />
         </div>
         {candidates.length ? (
-          <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-lg ring-1 ring-[#e5e8eb]">
+          <div className="absolute z-10 mt-1 max-h-72 w-full space-y-1 overflow-y-auto rounded-lg bg-white p-2 shadow-[0_4px_16px_rgba(25,31,40,0.06)] ring-1 ring-[#e5e8eb]">
             {candidates.map((s) => (
               <button
                 className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[#191f28] hover:bg-[#f2f4f6] disabled:opacity-50"
@@ -2478,11 +2496,11 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
               >
                 <span>
                   {s.name}{" "}
-                  <span className="text-xs font-medium text-[#8b95a1]">
+                  <span className="text-xs font-medium text-[#6b7684]">
                     {s.ticker}
                   </span>
                 </span>
-                <span className="text-xs font-bold text-[#3182f6]">추가</span>
+                <span className="text-xs font-bold text-[var(--brand)]">추가</span>
               </button>
             ))}
           </div>
@@ -2518,13 +2536,12 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
         <p className="text-xs font-semibold text-[#f04452]">{error}</p>
       ) : null}
 
-      <p className="text-xs font-medium leading-5 text-[#8b95a1]">
-        종목명이나 코드로 검색해서 관심종목에 담을 수 있어요. 앱에서 다루는
-        시가총액 상위 200종목이 대상이고, 담아둔 종목은 체결가가 바뀔 때마다
-        화면에 바로 반영돼요. 최대 {WATCHLIST_LIMIT}개까지 담을 수 있어요.
+      <p className="text-xs font-medium leading-5 text-[#6b7684]">
+        시가총액 상위 200종목 중에서 최대 {WATCHLIST_LIMIT}개까지 담을 수
+        있어요. 담아둔 종목은 체결가가 바뀔 때마다 바로 반영돼요.
       </p>
 
-      <div className="space-y-2">
+      <div className="rounded-xl bg-white px-4">
         {items.length === 0 && !pendingAdd ? (
           <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
         ) : (
@@ -2566,21 +2583,17 @@ function WatchlistRowSkeleton({
   ticker: string;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb]">
+    <div className="flex items-center gap-1 border-b border-[#eef0f2] py-3">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="truncate text-base font-bold text-[#191f28]">
-            {name}
-          </h3>
-          <span className="shrink-0 text-xs font-medium text-[#8b95a1]">
-            {ticker}
-          </span>
-        </div>
-        <div className="mt-2 h-3 w-24 animate-pulse rounded-full bg-[#f2f4f6]" />
+        <h3 className="truncate text-[16px] font-semibold leading-6 text-[#191f28]">
+          {name}
+        </h3>
+        <p className="mt-0.5 text-[13px] text-[#6b7684]">{ticker}</p>
+        <div className="mt-2 h-3 w-24 animate-pulse rounded bg-[#f2f4f6]" />
       </div>
       <div className="shrink-0 space-y-2 text-right">
-        <div className="ml-auto h-4 w-16 animate-pulse rounded-full bg-[#eef0f2]" />
-        <div className="ml-auto h-3 w-10 animate-pulse rounded-full bg-[#f2f4f6]" />
+        <div className="ml-auto h-4 w-16 animate-pulse rounded bg-[#eef0f2]" />
+        <div className="ml-auto h-3 w-10 animate-pulse rounded bg-[#f2f4f6]" />
       </div>
     </div>
   );
@@ -2605,8 +2618,8 @@ function WatchlistRow({
   // 띄지 않고, hover/press 시에만 빨갛게 반응하는 "고스트" 버튼 스타일.
   if (!stock) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-2xl bg-white p-4 ring-1 ring-[#e5e8eb]">
-        <p className="min-w-0 truncate text-sm font-semibold text-[#8b95a1]">
+      <div className="flex items-center justify-between gap-2 border-b border-[#eef0f2] py-4">
+        <p className="min-w-0 truncate text-sm text-[#6b7684]">
           {item.name ?? item.ticker} · 시세 정보 없음
         </p>
         <DeleteWatchlistButton
@@ -2622,7 +2635,7 @@ function WatchlistRow({
   const up = stock.chg >= 0;
 
   return (
-    <div className="flex items-center gap-1 rounded-2xl bg-white p-3 pl-4 ring-1 ring-[#e5e8eb] transition active:scale-[0.99]">
+    <div className="flex items-center gap-1 border-b border-[#eef0f2] py-3">
       <Link
         aria-disabled={busy}
         className={`min-w-0 flex-1 ${busy ? "pointer-events-none opacity-60" : ""}`}
@@ -2635,35 +2648,30 @@ function WatchlistRow({
           if (busy) e.preventDefault();
         }}
       >
-        <div className="flex items-center gap-2">
-          <h3 className="truncate text-base font-bold text-[#191f28]">
-            {stock.name}
-          </h3>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              pass
-                ? "bg-[#e6f9f1] text-[#00a878]"
-                : "bg-[#f2f4f6] text-[#8b95a1]"
-            }`}
-          >
-            스크리너 {score}/{SCREENER_TOTAL_RULES}
-            {pass ? " 통과" : ""}
-          </span>
-          {stock.macdRebound ? <MacdReboundBadge /> : null}
-        </div>
-        <p className="mt-0.5 text-xs font-medium text-[#8b95a1]">
+        <h3 className="truncate text-[16px] font-semibold leading-6 text-[#191f28]">
+          {stock.name}
+        </h3>
+        <p className="mt-0.5 truncate text-[13px] text-[#6b7684]">
           {stock.sector} · {stock.ticker}
+        </p>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#6b7684]">
+          <ScoreMeter pass={pass} score={score} />
+          <span className="sr-only">스크리너</span>
+          <span className={pass ? "font-semibold text-[#191f28]" : undefined}>
+            {score}/{SCREENER_TOTAL_RULES}
+          </span>
+          {stock.macdRebound ? <span>· 반등 조짐</span> : null}
         </p>
       </Link>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-[#191f28]">
+        <p className="text-[15px] font-semibold tabular-nums text-[#191f28]">
           {formatKRW(stock.price)}
         </p>
         <p
-          className={`text-xs font-bold ${up ? "text-[#f04452]" : "text-[#3182f6]"}`}
+          className={`mt-0.5 text-[13px] font-medium tabular-nums ${up ? "text-[#e03131]" : "text-[#1b64da]"}`}
         >
-          {up ? "+" : ""}
-          {stock.chg}%
+          {up ? "+" : "-"}
+          {Math.abs(stock.chg).toFixed(2)}%
         </p>
       </div>
       <DeleteWatchlistButton

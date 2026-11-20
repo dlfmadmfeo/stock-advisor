@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
 // 계정/데이터 삭제 안내 — Google Play 데이터 보안 양식에 넣는 공개 웹 링크
 // (2026-09-25 세션). 앱을 이미 지웠거나 로그인할 수 없는 사람도 볼 수 있어야
@@ -12,9 +13,16 @@ const CONTACT_EMAIL = "dlfmadmfeo@gmail.com";
 
 export default function AccountDeletionPage() {
   return (
-    <main className="mx-auto max-w-2xl px-5 py-12 text-[#191f28] lg:px-8">
-      <h1 className="text-2xl font-extrabold tracking-tight">계정 및 데이터 삭제 안내</h1>
-      <p className="mt-2 text-sm font-medium text-[#8b95a1]">주식 어드바이저 (개발자: 개인)</p>
+    <main className="mx-auto max-w-2xl px-5 pb-12 pt-3 text-[#191f28] lg:px-8">
+      <Link
+        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
+        href="/notifications"
+      >
+        <ChevronLeft className="h-5 w-5" />
+        홈으로
+      </Link>
+      <h1 className="mt-4 text-2xl font-bold tracking-tight">계정 및 데이터 삭제 안내</h1>
+      <p className="mt-2 text-sm font-medium text-[#6b7684]">주식 어드바이저 (개발자: 개인)</p>
 
       <p className="mt-6 text-sm leading-6 text-[#4e5968]">
         주식 어드바이저 계정과 계정에 연결된 데이터를 언제든 삭제할 수 있어요. 아래 두 가지
@@ -34,7 +42,7 @@ export default function AccountDeletionPage() {
         </ol>
         <p className="text-sm leading-6 text-[#4e5968]">
           탈퇴하면 바로 삭제돼요. 비밀번호를 잊었다면{" "}
-          <Link className="font-semibold text-[#3182f6] underline" href="/forgot-password">
+          <Link className="font-semibold text-[var(--brand)] underline" href="/forgot-password">
             비밀번호 찾기
           </Link>
           로 재설정한 뒤 탈퇴할 수 있어요.
@@ -48,7 +56,7 @@ export default function AccountDeletionPage() {
           &quot;계정 삭제 요청&quot;이라고 보내주세요. 본인 확인 후 지체 없이 삭제해드려요.
         </p>
         <p className="text-sm leading-6 text-[#4e5968]">
-          <a className="font-semibold text-[#3182f6] underline" href={`mailto:${CONTACT_EMAIL}`}>
+          <a className="font-semibold text-[var(--brand)] underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
         </p>
@@ -65,7 +73,7 @@ export default function AccountDeletionPage() {
         <p className="text-sm leading-6 text-[#4e5968]">
           위 정보는 서비스 데이터베이스에서 삭제되며, 삭제 후에는 복구할 수 없어요. 이 서비스는
           그 밖에 보관하는 개인정보가 없어요. 자세한 내용은{" "}
-          <Link className="font-semibold text-[#3182f6] underline" href="/privacy">
+          <Link className="font-semibold text-[var(--brand)] underline" href="/privacy">
             개인정보처리방침
           </Link>
           을 확인해주세요.

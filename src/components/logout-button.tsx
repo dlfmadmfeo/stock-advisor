@@ -34,11 +34,11 @@ export function LogoutConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#191f28]/45 px-6">
-      <div className="w-full max-w-[280px] rounded-2xl bg-white p-5 text-center">
+      <div className="w-full max-w-[280px] rounded-lg bg-white p-5 text-center">
         <p className="text-sm font-bold text-[#191f28]">
           로그아웃 하시겠어요?
         </p>
-        <p className="mt-1 text-xs font-medium text-[#8b95a1]">
+        <p className="mt-1 text-xs font-medium text-[#6b7684]">
           다시 로그인해야 이용할 수 있어요.
         </p>
         <div className="mt-4 flex gap-2">

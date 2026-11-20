@@ -1,5 +1,5 @@
 import { AppShell, BackTopBar } from "@/components/mobile-screens";
-import { EmptyState } from "@/components/ui-primitives";
+import Link from "next/link";
 import { AiPicksContent } from "@/components/ai-picks-content";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -29,7 +29,22 @@ export default async function AiPicksPage() {
             initialPicks={(batch?.payload as AiPick[] | undefined) ?? null}
           />
         ) : (
-          <EmptyState text="아직은 관리자만 사용할 수 있는 기능이에요." />
+          // 일반 계정은 "관리자만"이라는 내부 사정 대신 지금 쓸 수 없다는 사실과
+          // 다음에 갈 곳(홈)을 알려줘요. 막다른 화면으로 두지 않기 위해서예요.
+          <div className="py-16 text-center">
+            <h2 className="text-[17px] font-bold text-[#191f28]">
+              아직 열리지 않은 기능이에요
+            </h2>
+            <p className="mt-2 text-sm text-[#6b7684]">
+              AI 추천은 일부 계정에서만 쓸 수 있어요.
+            </p>
+            <Link
+              className="mt-6 inline-flex h-11 items-center rounded-lg border border-[#d1d6db] px-5 text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6]"
+              href="/notifications"
+            >
+              홈으로 가기
+            </Link>
+          </div>
         )}
       </section>
     </AppShell>
