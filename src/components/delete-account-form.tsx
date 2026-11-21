@@ -90,7 +90,7 @@ export function DeleteAccountForm() {
         <div className="relative">
           <input
             autoComplete="current-password"
-            className={`h-[50px] w-full rounded-[13px] border-[1.5px] bg-white pl-4 pr-11 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:ring-4 ${
+            className={`h-[50px] w-full rounded-md border bg-white pl-4 pr-11 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:ring-4 ${
               error
                 ? "border-[#f04452] focus:border-[#f04452] focus:ring-[#f04452]/10"
                 : "border-[#e5e8eb] focus:border-[#f04452] focus:ring-[#f04452]/10"
@@ -132,7 +132,7 @@ export function DeleteAccountForm() {
       </label>
 
       <button
-        className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#f04452] text-[15px] font-bold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-md bg-[#f04452] text-[15px] font-bold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         disabled={!canSubmit}
         type="submit"
       >

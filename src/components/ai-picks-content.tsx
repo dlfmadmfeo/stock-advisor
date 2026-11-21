@@ -49,7 +49,7 @@ export function AiPicksContent({
           매수·매도 판단이 아니라 데이터 사이의 관계를 요약한 참고 자료예요.
         </p>
         <button
-          className="mt-3 inline-flex h-11 items-center gap-1.5 rounded-lg bg-[var(--brand)] px-4 text-[14px] font-semibold text-white active:bg-[var(--brand-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 inline-flex h-11 items-center gap-1.5 rounded-md bg-[var(--brand)] px-4 text-[14px] font-semibold text-white active:bg-[var(--brand-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={loading}
           onClick={handleGenerate}
           type="button"

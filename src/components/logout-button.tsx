@@ -43,14 +43,14 @@ export function LogoutConfirmModal({
         </p>
         <div className="mt-4 flex gap-2">
           <button
-            className="h-10 flex-1 rounded-lg bg-[#f2f4f6] text-xs font-bold text-[#4e5968]"
+            className="h-10 flex-1 rounded-md bg-[#f2f4f6] text-xs font-bold text-[#4e5968]"
             onClick={onCancel}
             type="button"
           >
             취소
           </button>
           <button
-            className="h-10 flex-1 rounded-lg bg-[#f04452] text-xs font-bold text-white"
+            className="h-10 flex-1 rounded-md bg-[#f04452] text-xs font-bold text-white"
             onClick={async () => {
               // session-guard.tsx가 이 직후의 세션 null 전이를 "직접
               // 로그아웃"으로 알아보고 만료 안내를 건너뛰게 하는 플래그.
@@ -84,7 +84,7 @@ export function LogoutButton() {
   return (
     <>
       <button
-        className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-[#f0999b] bg-white text-sm font-bold text-[#f04452] active:scale-[0.98]"
+        className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-[#f0999b] bg-white text-sm font-bold text-[#f04452] active:scale-[0.98]"
         onClick={() => setConfirmOpen(true)}
         type="button"
       >

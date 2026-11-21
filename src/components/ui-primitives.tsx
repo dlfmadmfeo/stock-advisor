@@ -41,7 +41,7 @@ export function TopBar({
   rightHref?: string;
 }) {
   const buttonClass =
-    "grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5";
+    "grid h-11 w-11 place-items-center rounded-md text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5";
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[#eef0f2] bg-white px-3 lg:px-8">
       <div className="flex w-11 items-center justify-start">
@@ -83,7 +83,7 @@ export function TopBar({
 
 export function IconButton({ children }: { children: React.ReactNode }) {
   return (
-    <button className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5">
+    <button className="grid h-11 w-11 place-items-center rounded-md text-[#333d4b] active:bg-[#f2f4f6] [&_svg]:h-5 [&_svg]:w-5">
       {children}
     </button>
   );
@@ -217,7 +217,7 @@ export function MenuList({ items }: { items: Array<[IconComponent, string, strin
 
 export function EmptyState({ text }: { text: string }) {
   return (
-    <p className="rounded-xl bg-white px-4 py-14 text-center text-sm text-[#6b7684]">
+    <p className="rounded-lg bg-white px-4 py-14 text-center text-sm text-[#6b7684]">
       {text}
     </p>
   );

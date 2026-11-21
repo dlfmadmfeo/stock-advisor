@@ -47,7 +47,7 @@ export function UserMenu() {
     <div className="relative" ref={rootRef}>
       <button
         aria-label="프로필 메뉴 열기"
-        className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6]"
+        className="grid h-11 w-11 place-items-center rounded-md text-[#333d4b] active:bg-[#f2f4f6]"
         onClick={() => setOpen((v) => !v)}
         type="button"
       >

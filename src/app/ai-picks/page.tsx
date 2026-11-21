@@ -39,7 +39,7 @@ export default async function AiPicksPage() {
               AI 추천은 일부 계정에서만 쓸 수 있어요.
             </p>
             <Link
-              className="mt-6 inline-flex h-11 items-center rounded-lg border border-[#d1d6db] px-5 text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6]"
+              className="mt-6 inline-flex h-11 items-center rounded-md border border-[#d1d6db] px-5 text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6]"
               href="/notifications"
             >
               홈으로 가기

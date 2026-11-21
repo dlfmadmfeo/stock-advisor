@@ -11,7 +11,11 @@
   --brand-strong: #006e49; /* 눌렀을 때 */
   --brand-fill: #0fa070; /* 막대처럼 글자가 아닌 채움(3:1 이상이면 돼서 더 밝게) */
   --brand-fill-soft: #4cbf97; /* 3/4처럼 한 단계 연한 채움 */
-  --radius: 0.875rem;
+  /* 반지름 기준값. 아래 @theme에서 sm=4px, md=6px, lg=8px, xl=12px로 파생돼요.
+     카드·시트는 lg(8px), 버튼·입력창은 md(6px)로 씁니다(2026-11-21 세션 —
+     예전엔 이 값이 14px라 rounded-lg가 14px, rounded-xl이 18px로 나와서
+     카드가 템플릿처럼 너무 둥글었어요). */
+  --radius: 0.5rem;
   --background: #f5f6f8;
   --foreground: oklch(0.235 0.015 65);
   --card: oklch(1 0 0);

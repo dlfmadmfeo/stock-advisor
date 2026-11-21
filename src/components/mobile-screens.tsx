@@ -182,7 +182,7 @@ export function NotificationsScreen() {
             페이지 배경은 연한 회청색, 그 위에 흰 시트, 맨 위 요약만 단색 파랑
             면으로 둡니다. 그라데이션/글로우 없이 단색이라 안티슬롭 규칙과도
             맞고, 글자는 흰색 대비 6:1 이상이 되도록 파랑을 약간 진하게 썼어요. */}
-        <div className="rounded-xl bg-white p-5 ring-1 ring-[#e5e8eb]">
+        <div className="rounded-lg bg-white p-5 ring-1 ring-[#e5e8eb]">
           <p className="text-[13px] font-medium text-[#6b7684]">
             {stocks.length > 0
               ? `${stocks.length}종목 중 스크리너 통과`
@@ -309,7 +309,7 @@ export function CategoryScreen() {
         <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {filters.map((filter) => (
             <button
-              className="flex h-12 w-full items-center justify-between rounded-lg bg-white px-4 text-[15px] font-semibold text-[#333d4b] ring-1 ring-[#e5e8eb] opacity-60"
+              className="flex h-12 w-full items-center justify-between rounded-md bg-white px-4 text-[15px] font-semibold text-[#333d4b] ring-1 ring-[#e5e8eb] opacity-60"
               disabled
               key={filter}
             >
@@ -322,7 +322,7 @@ export function CategoryScreen() {
         </div>
 
         <button
-          className="mt-6 h-13 w-full rounded-lg bg-[#3182f6] text-base font-bold text-white shadow-[0_8px_20px_rgba(49,130,246,0.22)]"
+          className="mt-6 h-13 w-full rounded-md bg-[#3182f6] text-base font-bold text-white shadow-[0_8px_20px_rgba(49,130,246,0.22)]"
           onClick={() => router.push("/search")}
         >
           결과 {resultCount}개 보기
@@ -414,7 +414,7 @@ export function AnalysisScreen() {
                 <Link
                   key={h.ticker}
                   href={`/stock/${h.ticker}`}
-                  className="flex items-center justify-between rounded-xl bg-[#f7f8fa] px-3 py-2.5"
+                  className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-3 py-2.5"
                 >
                   <span className="text-sm font-bold text-[#191f28]">
                     {s.name} · {h.qty}주
@@ -494,7 +494,7 @@ function HomeHeader() {
       <div className="-mr-2.5 flex items-center">
         <button
           aria-label="종목 검색"
-          className="grid h-11 w-11 place-items-center rounded-lg text-[#333d4b] active:bg-[#f2f4f6]"
+          className="grid h-11 w-11 place-items-center rounded-md text-[#333d4b] active:bg-[#f2f4f6]"
           onClick={() => router.push("/search")}
           type="button"
         >
@@ -517,7 +517,7 @@ function HomeWatchlistLink() {
 
   return (
     <Link
-      className="mt-3 flex min-h-16 items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-[#e5e8eb] active:bg-[#f7f8fa]"
+      className="mt-3 flex min-h-16 items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb] active:bg-[#f7f8fa]"
       href={loggedIn ? "/watchlist" : "/login"}
     >
       <span className="min-w-0">
@@ -546,7 +546,7 @@ function QuickActions() {
         const TypedIcon = Icon as IconComponent;
         return (
           <Link
-            className="flex flex-col items-center justify-center rounded-xl px-3 py-3 text-center active:scale-[0.98] lg:h-24 lg:justify-center lg:gap-1.5 lg:hover:bg-[#f7f8fa]"
+            className="flex flex-col items-center justify-center rounded-lg px-3 py-3 text-center active:scale-[0.98] lg:h-24 lg:justify-center lg:gap-1.5 lg:hover:bg-[#f7f8fa]"
             href={href as string}
             key={label as string}
           >
@@ -762,7 +762,7 @@ function PagedStockList({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         {Array.from({ length: 5 }).map((_, i) => (
           <StockRowSkeleton key={i} />
@@ -772,7 +772,7 @@ function PagedStockList({
   }
   if (error) {
     return (
-      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         <EmptyState text="종목을 불러오지 못했어요." />
       </div>
@@ -780,7 +780,7 @@ function PagedStockList({
   }
   if (!stocks.length) {
     return (
-      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         <EmptyState text={emptyText} />
       </div>
@@ -788,7 +788,7 @@ function PagedStockList({
   }
 
   return (
-    <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
+    <div className="rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]">
       {sortTabs}
       {stocks.map((s) => (
         <StockRow
@@ -867,7 +867,7 @@ function DesktopSidebar() {
           const active = pathname === item.href;
           return (
             <Link
-              className={`flex h-11 items-center gap-3 rounded-lg px-3 text-sm ${
+              className={`flex h-11 items-center gap-3 rounded-md px-3 text-sm ${
                 active
                   ? "bg-[#f2f4f6] font-semibold text-[#191f28]"
                   : "font-medium text-[#4e5968] hover:bg-[#f7f8fa]"
@@ -1104,7 +1104,7 @@ function Segmented<T extends string>({
       {options.map((opt) => (
         <button
           aria-pressed={value === opt.key}
-          className={`h-8 rounded-[6px] px-3 text-[13px] ${
+          className={`h-8 rounded-[4px] px-3 text-[13px] ${
             value === opt.key
               ? "bg-white font-semibold text-[#191f28] ring-1 ring-[#e5e8eb]"
               : "font-medium text-[#6b7684]"
@@ -2138,7 +2138,7 @@ export function SearchScreen() {
         onLeftClick={() => router.back()}
       />
       <section className="space-y-4 px-5 pb-8 pt-3 lg:max-w-[720px] lg:px-8">
-        <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+        <div className="flex items-center gap-2 rounded-md bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
           <Search className="h-4 w-4 text-[#6b7684]" />
           <input
             autoFocus
@@ -2307,7 +2307,7 @@ export function AlertSettingsScreen() {
         </p>
 
         <button
-          className="mt-4 h-12 w-full rounded-lg border border-[#d1d6db] bg-white text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6] disabled:opacity-50"
+          className="mt-4 h-12 w-full rounded-md border border-[#d1d6db] bg-white text-[15px] font-semibold text-[#191f28] active:bg-[#f2f4f6] disabled:opacity-50"
           disabled={testing}
           onClick={sendTestPush}
           type="button"
@@ -2475,7 +2475,7 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
       </div>
 
       <div className="relative">
-        <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
+        <div className="flex items-center gap-2 rounded-md bg-white px-4 py-3 ring-1 ring-[#e5e8eb]">
           <Search className="h-4 w-4 text-[#6b7684]" />
           <input
             className="w-full bg-transparent text-sm font-medium text-[#191f28] outline-none placeholder:text-[#b0b8c1]"
@@ -2547,7 +2547,7 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
         있어요. 담아둔 종목은 체결가가 바뀔 때마다 바로 반영돼요.
       </p>
 
-      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
+      <div className="rounded-lg bg-white px-4 ring-1 ring-[#e5e8eb]">
         {items.length === 0 && !pendingAdd ? (
           <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
         ) : (

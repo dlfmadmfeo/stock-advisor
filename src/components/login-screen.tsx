@@ -291,7 +291,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               <div className="relative">
                 <input
                   autoComplete="email"
-                  className="h-[50px] w-full rounded-lg border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
+                  className="h-[50px] w-full rounded-md border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
                   id="login-email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -321,7 +321,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               <div className="relative">
                 <input
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  className="h-[50px] w-full rounded-lg border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
+                  className="h-[50px] w-full rounded-md border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
                   id="login-password"
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={
@@ -384,7 +384,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 <div className="relative">
                   <input
                     autoComplete="new-password"
-                    className={`h-[50px] w-full rounded-lg border bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:bg-white focus:ring-1 ${
+                    className={`h-[50px] w-full rounded-md border bg-[#f9fafb] pl-4 pr-10 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:bg-white focus:ring-1 ${
                       passwordMismatch
                         ? "border-[#f04452] bg-[#fff6f6] focus:border-[#f04452] focus:ring-[#f04452]"
                         : "border-[#e5e8eb] focus:border-[var(--brand)] focus:ring-[var(--brand)]"
@@ -466,7 +466,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             )}
 
             <button
-              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white active:bg-[var(--brand-strong)] disabled:opacity-70"
+              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-md bg-[var(--brand)] text-[15px] font-bold text-white active:bg-[var(--brand-strong)] disabled:opacity-70"
               disabled={submitting}
               type="submit"
             >
@@ -485,7 +485,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
             {/* 정식 출시로 데모 로그인 버튼 비노출 (2026-11-01 세션)
             {mode === "login" ? (
               <button
-                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
+                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
                 disabled={submitting}
                 onClick={handleDemoLogin}
                 type="button"
@@ -511,7 +511,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
 
             <div className="flex gap-2.5">
               <button
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-md border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
                 onClick={() => showToast("카카오 로그인은 아직 준비 중이에요.")}
                 type="button"
               >
@@ -527,7 +527,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 카카오
               </button>
               <button
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-md border border-[#e5e8eb] bg-white text-[12.5px] font-bold text-[#6b7684]"
                 onClick={() => showToast("Apple 로그인은 아직 준비 중이에요.")}
                 type="button"
               >
@@ -593,7 +593,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 메일의 링크를 눌러야 로그인할 수 있어요.
               </p>
               <Link
-                className="mt-8 flex h-12 w-full items-center justify-center rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white"
+                className="mt-8 flex h-12 w-full items-center justify-center rounded-md bg-[var(--brand)] text-[15px] font-bold text-white"
                 href="/login"
               >
                 로그인 화면으로

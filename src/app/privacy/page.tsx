@@ -17,7 +17,7 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-5 pb-12 pt-3 text-[#191f28] lg:px-8">
       {/* 앱(웹뷰) 안에서 열었을 때 돌아갈 곳이 없어서 상단에 링크를 뒀어요. */}
       <Link
-        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
+        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
         href="/notifications"
       >
         <ChevronLeft className="h-5 w-5" />

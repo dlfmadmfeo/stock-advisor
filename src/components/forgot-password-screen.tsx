@@ -74,7 +74,7 @@ export function ForgotPasswordScreen() {
               보내드렸어요.
             </p>
             <Link
-              className="mt-8 flex h-12 w-full items-center justify-center rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white"
+              className="mt-8 flex h-12 w-full items-center justify-center rounded-md bg-[var(--brand)] text-[15px] font-bold text-white"
               href="/login"
             >
               로그인 화면으로
@@ -97,7 +97,7 @@ export function ForgotPasswordScreen() {
               <div className="relative">
                 <input
                   autoComplete="email"
-                  className="h-[50px] w-full rounded-lg border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
+                  className="h-[50px] w-full rounded-md border border-[#e5e8eb] bg-[#f9fafb] pl-4 pr-4 text-[14.5px] text-[#191f28] outline-none transition-colors placeholder:text-[#b0b8c1] focus:border-[var(--brand)] focus:bg-white focus:ring-1 focus:ring-[var(--brand)]"
                   id="forgot-email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -108,7 +108,7 @@ export function ForgotPasswordScreen() {
             </div>
 
             <button
-              className="mt-7 flex h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand)] text-[15px] font-bold text-white active:bg-[var(--brand-strong)] disabled:opacity-70"
+              className="mt-7 flex h-[52px] w-full items-center justify-center gap-2 rounded-md bg-[var(--brand)] text-[15px] font-bold text-white active:bg-[var(--brand-strong)] disabled:opacity-70"
               disabled={submitting}
               type="submit"
             >

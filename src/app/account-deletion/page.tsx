@@ -15,7 +15,7 @@ export default function AccountDeletionPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 pb-12 pt-3 text-[#191f28] lg:px-8">
       <Link
-        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
+        className="-ml-2 inline-flex h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-[#6b7684] active:bg-[#f2f4f6]"
         href="/notifications"
       >
         <ChevronLeft className="h-5 w-5" />
