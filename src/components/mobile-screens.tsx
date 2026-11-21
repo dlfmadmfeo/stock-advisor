@@ -1434,6 +1434,18 @@ function MacdChart({ points }: { points: MacdPoint[] }) {
 
 const CHARTS_DISPLAY_DAYS = 60;
 
+// MACD 설명 문구(고정 텍스트). 데이터 로딩 전 스켈레톤과 로딩 후 카드가 같이 씁니다.
+function MacdExplainer() {
+  return (
+    <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
+      단기(12일)·장기(26일) 지수이동평균의 차이(MACD선)와 그 9일
+      이동평균(시그널선)이에요. MACD선이 시그널선을 위로 뚫으면 흔히
+      "골든크로스", 아래로 뚫으면 "데드크로스"라고 부르지만, 이 화면은
+      계산된 값을 그대로 보여줄 뿐 매매 판단을 내리지 않아요.
+    </p>
+  );
+}
+
 // 실제 카드(주가+거래량, MACD) 높이만큼 자리를 미리 잡아둡니다. 예전엔 작은 카드
 // 하나만 보여줘서, 일봉 데이터가 도착하면 아래 카드들이 한꺼번에 밀려 내려갔어요
 // (Lighthouse CLS 0.3대). 높이는 폰 폭(390px)에서 잰 값이에요.
@@ -1448,11 +1460,20 @@ function StockChartsCardSkeleton() {
         <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
       </div>
       <div
-        className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
+        className="flex flex-col rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
         style={{ minHeight: 285 }}
       >
-        <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
+          <span className="text-[12px] font-semibold text-[#6b7684]">12·26·9</span>
+        </div>
         <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
+        {/* 설명 문단은 데이터와 상관없는 고정 문구라 스켈레톤에도 넣어서 첫 HTML에
+            포함시킵니다. 데이터가 도착한 뒤에야 나타나면, 이 문단이 첫 화면에서
+            가장 큰 텍스트라 LCP가 데이터 도착 시점(약 3초)으로 밀렸어요. */}
+        <div className="mt-auto">
+          <MacdExplainer />
+        </div>
       </div>
     </>
   );
@@ -1516,12 +1537,7 @@ function StockChartsCard({ ticker }: { ticker: string }) {
             </div>
           </>
         )}
-        <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
-          단기(12일)·장기(26일) 지수이동평균의 차이(MACD선)와 그 9일
-          이동평균(시그널선)이에요. MACD선이 시그널선을 위로 뚫으면 흔히
-          "골든크로스", 아래로 뚫으면 "데드크로스"라고 부르지만, 이 화면은
-          계산된 값을 그대로 보여줄 뿐 매매 판단을 내리지 않아요.
-        </p>
+        <MacdExplainer />
       </div>
     </>
   );
