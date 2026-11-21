@@ -62,7 +62,10 @@ export function LogoutConfirmModal({
                 // 만료" 안내가 뜨면 안 됨 — 마커도 같이 지움.
                 clearReturningUserMark();
                 queryClient.setQueryData(SESSION_QUERY_KEY, null);
-                router.push("/login");
+                // push가 아니라 replace: 마이페이지 같은 로그아웃 전 화면이
+                // 기록에 남으면, 로그인 화면에서 뒤로가기를 눌렀을 때 그 화면이
+                // 다시 나타났어요(2026-11-22 모바일 확인).
+                router.replace("/login");
               }
             }}
             type="button"

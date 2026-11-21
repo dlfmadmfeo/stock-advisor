@@ -21,6 +21,14 @@ import { SESSION_QUERY_KEY, useSession } from "@/lib/use-session";
 // 이 경로들에서는 세션이 없어도 정상 상태라 리다이렉트하지 않음.
 const SKIP_PATHS = new Set(["/login", "/signup", "/privacy"]);
 
+// 로그인해야만 볼 수 있는 화면(서버가 비로그인 접속을 /login으로 보내는 곳 +
+// 홈). 종목 상세처럼 비로그인도 볼 수 있는 화면은 넣지 않습니다.
+const MEMBER_ONLY_PATHS = ["/notifications", "/mypage", "/alerts", "/devices"];
+
+function isMemberOnlyPath(pathname: string): boolean {
+  return MEMBER_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 // 2026-09-13 세션: "직접 로그아웃했는데도 세션 만료 문구가 뜬다"는 제보로
 // 추가. logout-button.tsx가 authClient.signOut() 성공 직후 세션 쿼리
 // 캐시를 null로 직접 밀어넣는데(react-query 캐시 갱신), 이 훅 입장에선
@@ -103,6 +111,17 @@ export function SessionGuard() {
     if (wasLoggedIn.current && !SKIP_PATHS.has(pathname)) {
       wasLoggedIn.current = false;
       router.push("/login?expired=1");
+      return;
+    }
+
+    // 로그아웃한 뒤 뒤로가기로 로그인 필요한 화면(홈 등)이 다시 나타난 경우.
+    // 이 화면들은 브라우저 기록/Next 캐시에서 그대로 복원돼서 서버가 로그인
+    // 여부를 다시 확인해 주지 않아요. 방금 로그아웃한 쪽은 위 두 분기에서
+    // 이미 걸러졌으니(wasLoggedIn=false), 여기는 "세션이 없는데 회원 전용
+    // 화면에 있음"만 남습니다. replace라서 이 화면이 기록에서 로그인으로
+    // 바뀌어요(2026-11-22 모바일 확인).
+    if (isMemberOnlyPath(pathname)) {
+      router.replace("/login");
     }
   }, [session, isFetched, pathname, router]);
 
