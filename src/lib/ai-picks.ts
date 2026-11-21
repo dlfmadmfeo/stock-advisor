@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { fetchFinancials } from "@/lib/kis";
+import { fetchFinancials } from "@/lib/dart-financials";
 import { fetchStockNews } from "@/lib/naver-news";
 import {
   getRecommendation,
@@ -139,7 +139,9 @@ export async function generateAiPicks(): Promise<AiPickResult> {
         fetchFinancials(s.ticker).catch(() => null),
         fetchStockNews(s.name, 5).catch(() => null),
       ]);
-      const latestFinancial = financials?.[0] ?? null;
+      // fetchFinancials는 오래된 연도부터 정렬해서 주기 때문에 "최신"은 마지막 원소예요.
+      // 예전엔 [0]을 써서 가장 오래된 연도를 Claude에게 보내고 있었습니다.
+      const latestFinancial = financials?.length ? financials[financials.length - 1] : null;
 
       return {
         ticker: s.ticker,

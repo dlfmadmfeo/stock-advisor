@@ -182,7 +182,7 @@ export function NotificationsScreen() {
             페이지 배경은 연한 회청색, 그 위에 흰 시트, 맨 위 요약만 단색 파랑
             면으로 둡니다. 그라데이션/글로우 없이 단색이라 안티슬롭 규칙과도
             맞고, 글자는 흰색 대비 6:1 이상이 되도록 파랑을 약간 진하게 썼어요. */}
-        <div className="rounded-xl bg-white p-5">
+        <div className="rounded-xl bg-white p-5 ring-1 ring-[#e5e8eb]">
           <p className="text-[13px] font-medium text-[#6b7684]">
             {stocks.length > 0
               ? `${stocks.length}종목 중 스크리너 통과`
@@ -204,7 +204,7 @@ export function NotificationsScreen() {
                 role="img"
               >
                 <div
-                  className="h-full bg-[var(--brand)]"
+                  className="h-full bg-[var(--brand-fill)]"
                   style={{
                     width: `${Math.round((passed.length / stocks.length) * 100)}%`,
                   }}
@@ -517,7 +517,7 @@ function HomeWatchlistLink() {
 
   return (
     <Link
-      className="mt-3 flex min-h-16 items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 active:bg-[#f7f8fa]"
+      className="mt-3 flex min-h-16 items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-[#e5e8eb] active:bg-[#f7f8fa]"
       href={loggedIn ? "/watchlist" : "/login"}
     >
       <span className="min-w-0">
@@ -762,7 +762,7 @@ function PagedStockList({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl bg-white px-4">
+      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         {Array.from({ length: 5 }).map((_, i) => (
           <StockRowSkeleton key={i} />
@@ -772,7 +772,7 @@ function PagedStockList({
   }
   if (error) {
     return (
-      <div className="rounded-xl bg-white px-4">
+      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         <EmptyState text="종목을 불러오지 못했어요." />
       </div>
@@ -780,7 +780,7 @@ function PagedStockList({
   }
   if (!stocks.length) {
     return (
-      <div className="rounded-xl bg-white px-4">
+      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
         {sortTabs}
         <EmptyState text={emptyText} />
       </div>
@@ -788,7 +788,7 @@ function PagedStockList({
   }
 
   return (
-    <div className="rounded-xl bg-white px-4">
+    <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
       {sortTabs}
       {stocks.map((s) => (
         <StockRow
@@ -909,10 +909,10 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
 function ScoreMeter({ pass, score }: { pass: boolean; score: number }) {
   const full = score >= SCREENER_TOTAL_RULES;
   const fill = !pass
-    ? "bg-[#9aa4b0]"
+    ? "bg-[#b8c0ca]"
     : full
-      ? "bg-[var(--brand)]"
-      : "bg-[#4aa88c]";
+      ? "bg-[var(--brand-fill)]"
+      : "bg-[var(--brand-fill-soft)]";
   return (
     <span aria-hidden="true" className="flex gap-0.5">
       {Array.from({ length: SCREENER_TOTAL_RULES }).map((_, i) => (
@@ -1586,9 +1586,9 @@ function SectorPeersCard({ stock }: { stock: Stock }) {
 // ---------------------------------------------------------------------------
 // 재무 정보(연도별 매출/영업이익/순이익 + ROE/부채비율 등) — 종목 상세 화면
 // (2026-08-31 세션 추가). StockNewsCard/InvestorTrendCard와 같은 Suspense
-// 패턴. use-financials.ts가 완결된 회계연도만 걸러서 주기 때문에(kis.ts
-// fetchFinancials 주석 참고 — 진행 중인 연도는 증가율이 왜곡돼서 아예 뺌)
-// 여기선 그냥 최근 N개만 자르면 됩니다. 다른 카드들처럼 계산된 숫자만
+// 패턴. 데이터는 DART 사업보고서 기반(dart-financials.ts)이라 완결된 회계연도만
+// 오기 때문에(진행 중인 연도는 사업보고서 자체가 없음) 여기선 그냥 최근 N개만
+// 자르면 됩니다. KIS 재무 API가 막혀서 2026-11에 DART로 옮겼어요. 다른 카드들처럼 계산된 숫자만
 // 보여주고 "저평가/고평가"·"매수 신호" 같은 해석은 넣지 않습니다.
 // ---------------------------------------------------------------------------
 const FINANCIALS_DISPLAY_YEARS = 5;
@@ -1615,11 +1615,14 @@ function FinancialsCard({ ticker }: { ticker: string }) {
       <h2 className="text-base font-bold text-[#191f28]">재무 정보</h2>
 
       {recent.length === 0 ? (
-        <p className="mt-3 text-[13px] text-[#6b7684]">데이터가 없어요.</p>
+        <p className="mt-3 break-keep text-[13px] leading-5 text-[#6b7684]">
+          공시된 재무제표가 없어요. ETF나 신규 상장 종목은 재무 정보가 없을
+          수 있어요.
+        </p>
       ) : (
         <>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] text-[12px]">
+          <div className="mt-3">
+            <table className="w-full text-[13px] tabular-nums">
               <thead>
                 <tr className="text-left text-[#6b7684]">
                   <th className="py-1.5 font-semibold">결산연도</th>
@@ -1667,11 +1670,14 @@ function FinancialsCard({ ticker }: { ticker: string }) {
         </>
       )}
 
-      <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
-        KIS 종목별 재무제표(연간) 기준이에요. 완결된 결산연도까지만
-        반영되고, 진행 중인 회계연도는 제외했어요. 이 화면도 계산된 값을
-        그대로 보여줄 뿐 매매 판단을 내리지 않아요.
-      </p>
+      {recent.length > 0 ? (
+        <p className="mt-3 border-t border-[#f2f4f6] pt-3 text-[12px] leading-5 text-[#6b7684]">
+          금융감독원 전자공시(DART) 사업보고서의 연결재무제표 기준이에요. ROE는
+          기말 자본으로, 영업이익률·부채비율은 공시 숫자로 직접 계산했고, 금융
+          회사처럼 해당 항목이 없으면 &quot;-&quot;로 보여줘요. 완결된 결산연도까지만
+          반영하고, 계산된 값을 그대로 보여줄 뿐 매매 판단을 내리지 않아요.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -2541,7 +2547,7 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
         있어요. 담아둔 종목은 체결가가 바뀔 때마다 바로 반영돼요.
       </p>
 
-      <div className="rounded-xl bg-white px-4">
+      <div className="rounded-xl bg-white px-4 ring-1 ring-[#e5e8eb]">
         {items.length === 0 && !pendingAdd ? (
           <EmptyState text="아직 관심종목이 없어요. 위에서 검색해서 추가해보세요." />
         ) : (

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { fetchFinancials, kisConfigured } from "@/lib/kis";
+import { dartFinancialsConfigured, fetchFinancials } from "@/lib/dart-financials";
 
 const TICKER_RE = /^\d{6}$/;
 
 // ---------------------------------------------------------------------------
 // 종목별 연도별 재무 정보(매출/영업이익/순이익/ROE/부채비율 등) 프록시.
-// investor-trend route와 같은 패턴(TICKER_RE 검증, kisConfigured 체크,
+// 데이터 출처는 DART(dart-financials.ts) — KIS 재무 API가 2026-11부터 막혀서 옮김.
+// investor-trend route와 같은 패턴(TICKER_RE 검증, 설정 키 체크,
 // 실패는 항상 non-2xx + no-store — revalidate가 실패까지 캐시해버리는 걸
 // 막기 위해서, 2026-08-24 세션에 investor-trend에서 겪은 버그 참고).
 //
@@ -35,17 +36,19 @@ export async function GET(
     );
   }
 
-  if (!kisConfigured()) {
+  if (!dartFinancialsConfigured()) {
     return noStoreJson(
       {
         ok: false,
-        message: "KIS_APP_KEY / KIS_APP_SECRET이 없어요 (.env.local 확인).",
+        message: "DART_API_KEY가 없어요 (.env.local 확인).",
         years: [],
       },
       503,
     );
   }
 
+  // 빈 배열은 오류가 아니에요 — ETF처럼 공시된 재무제표가 없는 종목이라 화면에서
+  // "데이터가 없어요"로 보여줍니다. 실제 실패일 때만 null이 와서 502로 응답해요.
   const years = await fetchFinancials(ticker);
   if (years === null) {
     return noStoreJson(
