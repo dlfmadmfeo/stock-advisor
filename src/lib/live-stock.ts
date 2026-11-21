@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useAdvisorStore, type LiveQuote } from "@/stores/use-advisor-store";
 import { getStock as getSampleStock, type Stock } from "@/lib/stocks";
 import { sectorAveragePbr, sectorAveragePer } from "@/lib/screener";
+import { useStockSeed } from "@/components/stock-seed";
 
 // 실시간 시세(/api/quotes)가 성공한 종목은 값을 덮어쓰고, 실패한 종목은
 // stocks.ts의 스냅샷 값을 그대로 씁니다. liveStatus로 어느 쪽인지 판별합니다.
@@ -31,9 +32,16 @@ export function mergeLive(base: Stock, live?: LiveQuote): Stock {
 export function useLiveStock(ticker: string): Stock | undefined {
   const live = useAdvisorStore((s) => s.liveQuotes[ticker]);
   const universeStocks = useAdvisorStore((s) => s.universeStocks);
+  const universeStatus = useAdvisorStore((s) => s.universeStatus);
+  const seed = useStockSeed();
+  // 서버가 첫 HTML에 담아준 DB 값(종목 상세 페이지). 스토어 유니버스가 아직
+  // 로딩 중일 때만 쓰고, 로딩이 끝나면 스토어 값으로 넘어갑니다.
+  const seeded =
+    universeStatus === "loading" && seed?.stock.ticker === ticker ? seed.stock : undefined;
   // DB 유니버스(배치 결과)에 없는 티커면(예: 예시 포트폴리오에만 있는 종목)
   // stocks.ts 샘플로 한 번 더 찾아봅니다.
-  const base = universeStocks.find((s) => s.ticker === ticker) ?? getSampleStock(ticker);
+  const base =
+    seeded ?? universeStocks.find((s) => s.ticker === ticker) ?? getSampleStock(ticker);
   if (!base) return undefined;
   return mergeLive(base, live);
 }
@@ -49,7 +57,13 @@ function useMergedStocks(baseStocks: Stock[], liveQuotes: Record<string, LiveQuo
 export function useLiveStocks(): Stock[] {
   const liveQuotes = useAdvisorStore((s) => s.liveQuotes);
   const universeStocks = useAdvisorStore((s) => s.universeStocks);
-  return useMergedStocks(universeStocks, liveQuotes);
+  const universeStatus = useAdvisorStore((s) => s.universeStatus);
+  const seed = useStockSeed();
+  // 종목 상세 페이지: 스토어가 아직 샘플(loading)이면 서버가 읽어 둔 같은 업종
+  // 종목을 씁니다. 업종 평균·업종 내 비교는 같은 업종 종목만 있으면 계산돼요.
+  const base =
+    universeStatus === "loading" && seed ? seed.sectorStocks : universeStocks;
+  return useMergedStocks(base, liveQuotes);
 }
 
 // PagedStockList(react-query로 페이지 단위로 받아온 종목 목록)도 같은

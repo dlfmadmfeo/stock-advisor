@@ -13,6 +13,42 @@ export type UniverseResult = {
   updatedAt: string | null;
 };
 
+// DB 행 → 화면용 Stock. 종목 상세 페이지(서버 렌더링)도 같은 변환을 쓰도록
+// export 합니다.
+export function rowToStock(r: {
+  ticker: string;
+  name: string;
+  sector: string;
+  price: number;
+  chg: number;
+  cap: string;
+  per: number | null;
+  pbr: number | null;
+  hi: number;
+  lo: number;
+  ma5over20: boolean;
+  volRatio: number;
+  rsi: number;
+  macdRebound: boolean;
+}): Stock {
+  return {
+    ticker: r.ticker,
+    name: r.name,
+    sector: r.sector,
+    price: r.price,
+    chg: r.chg,
+    cap: r.cap,
+    per: r.per ?? 0,
+    pbr: r.pbr ?? null,
+    hi: r.hi,
+    lo: r.lo,
+    ma5over20: r.ma5over20,
+    volRatio: r.volRatio,
+    rsi: r.rsi,
+    macdRebound: r.macdRebound,
+  };
+}
+
 export async function getUniverse(): Promise<UniverseResult> {
   try {
     const rows = await prisma.stock.findMany({ orderBy: { capEok: "desc" } });
@@ -20,22 +56,7 @@ export async function getUniverse(): Promise<UniverseResult> {
       return { stocks: STOCKS, status: "sample", updatedAt: null };
     }
 
-    const stocks: Stock[] = rows.map((r) => ({
-      ticker: r.ticker,
-      name: r.name,
-      sector: r.sector,
-      price: r.price,
-      chg: r.chg,
-      cap: r.cap,
-      per: r.per ?? 0,
-      pbr: r.pbr ?? null,
-      hi: r.hi,
-      lo: r.lo,
-      ma5over20: r.ma5over20,
-      volRatio: r.volRatio,
-      rsi: r.rsi,
-      macdRebound: r.macdRebound,
-    }));
+    const stocks: Stock[] = rows.map(rowToStock);
 
     const latest = rows.reduce<Date | null>(
       (acc, r) => (!acc || r.updatedAt > acc ? r.updatedAt : acc),

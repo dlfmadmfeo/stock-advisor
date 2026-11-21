@@ -1,36 +1,74 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { PushLoginGate } from "@/components/push-login-gate";
+import { StockSeedProvider } from "@/components/stock-seed";
 import { StockDetailScreen } from "@/components/mobile-screens";
-import { getSessionUser } from "@/lib/auth";
-import { RETURNING_USER_COOKIE } from "@/lib/returning-user-mark";
+import { SITE_NAME } from "@/lib/site";
+import { formatKRW } from "@/lib/stocks";
+import { getStockPageData, listStockTickers } from "@/lib/stock-page";
 
-// 2026-10-17 세션: 공시 푸시 알림을 눌러서 들어온 경우(Flutter 앱이 주소에
-// ?from=push를 붙여줌, main.dart의 _openStockFromNotification) 로그아웃
-// 상태면 종목 화면 대신 로그인 화면으로 보냅니다. 이 앱은 원래 손님도 종목
-// 화면을 구경할 수 있어서(로그인 필요한 건 하트/관심종목뿐) 일반 접근은 그대로
-// 두고, "알림을 눌렀는데 로그아웃돼 있다"는 상황에서만 안내가 필요해요 —
-// 알림은 로그인했던 계정에 묶여서 오는 거라 로그인 상태가 전제거든요.
+// 종목 상세는 로그인 없이 볼 수 있는 공개 페이지라 검색 노출과 첫 응답 속도가
+// 중요해서 서버에서 미리 만들어 둡니다(정적 생성 + 5분마다 갱신).
+// - 유니버스 종목(상위 200)은 빌드 때 미리 생성, 그 밖의 종목은 첫 요청 때 생성
+// - 주가 스냅샷은 배치가 하루 한 번 갱신하고, 실시간 값은 화면이 열린 뒤 덮어써요
 //
-// 안내 문구는 두 갈래: 재방문 마커가 남아있으면 세션이 저절로 만료된 것이라
-// 기존 "세션이 만료돼서 로그아웃됐어요"(?expired=1)를 그대로 쓰고, 마커가
-// 없으면(직접 로그아웃함) 만료가 아니니 "로그아웃된 상태예요"(?loggedout=1).
-export default async function StockPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ from?: string | string[] }>;
-}) {
-  const [{ ticker }, { from }] = await Promise.all([params, searchParams]);
+// 주의: 이 파일에서 searchParams / cookies() 같은 요청 정보를 읽으면 페이지가
+// 요청마다 새로 렌더링돼서 위 캐시가 꺼집니다. 공시 푸시(?from=push) 로그인
+// 확인은 PushLoginGate(브라우저)가 맡고 있어요.
+export const revalidate = 300;
 
-  if (from === "push") {
-    const user = await getSessionUser();
-    if (!user) {
-      const cookieStore = await cookies();
-      const wasLoggedIn = cookieStore.get(RETURNING_USER_COOKIE)?.value === "1";
-      redirect(wasLoggedIn ? "/login?expired=1" : "/login?loggedout=1");
-    }
+export async function generateStaticParams() {
+  const tickers = await listStockTickers();
+  return tickers.map(({ ticker }) => ({ ticker }));
+}
+
+type Params = { params: Promise<{ ticker: string }> };
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { ticker } = await params;
+  const data = await getStockPageData(ticker);
+  if (data.kind !== "found") {
+    // 없는 종목이거나 DB를 못 읽은 경우: 임시 문구가 색인되지 않게 합니다.
+    return { title: "종목 정보", robots: { index: false } };
   }
 
-  return <StockDetailScreen ticker={ticker} />;
+  const { stock } = data;
+  const title = `${stock.name}(${stock.ticker}) 주가·재무·지표`;
+  const sign = stock.chg >= 0 ? "+" : "-";
+  const description =
+    `${stock.name} ${stock.sector} 종목. 현재가 ${formatKRW(stock.price)}원 ` +
+    `(${sign}${Math.abs(stock.chg).toFixed(2)}%), 시가총액 ${stock.cap}, PER ${stock.per}배. ` +
+    `이동평균·거래량·RSI 등 공개 지표 기준 스크리너 조건 충족 현황과 재무 정보를 확인하세요.`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/stock/${stock.ticker}` },
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: "ko_KR",
+      title,
+      description,
+      url: `/stock/${stock.ticker}`,
+    },
+  };
+}
+
+export default async function StockPage({ params }: Params) {
+  const { ticker } = await params;
+  const data = await getStockPageData(ticker);
+  if (data.kind === "not-found") notFound();
+
+  const seed =
+    data.kind === "found"
+      ? { stock: data.stock, sectorStocks: data.sectorStocks }
+      : null;
+
+  return (
+    <StockSeedProvider seed={seed}>
+      <PushLoginGate />
+      <StockDetailScreen ticker={ticker} />
+    </StockSeedProvider>
+  );
 }

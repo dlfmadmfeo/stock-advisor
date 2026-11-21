@@ -53,6 +53,7 @@ test("merged stocks update when the DB snapshot changes without a new live quote
     react: { useMemo: (fn: () => unknown) => fn() },
     "@/stores/use-advisor-store": { useAdvisorStore: (fn: (s: unknown) => unknown) => fn({ liveQuotes: quotes }) },
     "@/lib/stocks": {}, "@/lib/screener": {},
+    "@/components/stock-seed": { useStockSeed: () => null },
   });
   const original = { ticker: "A", price: 100, macdRebound: false, sector: "old" };
   const render = (stocks: unknown[]) => mod.useMergedStocksWithLive(stocks) as typeof original[];
@@ -65,6 +66,29 @@ test("merged stocks update when the DB snapshot changes without a new live quote
   assert.notEqual(second[0], first[0]);
   const third = render([]);
   assert.equal(third.length, 0);
+});
+
+test("server-rendered stock seed is used only until the universe finishes loading", () => {
+  const sample = { ticker: "A", price: 1, sector: "s" };
+  const fromDb = { ticker: "A", price: 999, sector: "s" };
+  const seed = { stock: fromDb, sectorStocks: [fromDb] };
+  const load = (universeStatus: string, universeStocks: unknown[]) =>
+    loadModule("src/lib/live-stock.ts", {
+      react: { useMemo: (fn: () => unknown) => fn() },
+      "@/stores/use-advisor-store": {
+        useAdvisorStore: (fn: (s: unknown) => unknown) =>
+          fn({ liveQuotes: {}, universeStatus, universeStocks }),
+      },
+      "@/lib/stocks": { getStock: () => sample }, "@/lib/screener": {},
+      "@/components/stock-seed": { useStockSeed: () => seed },
+    });
+  // 로딩 중: 서버가 읽어 둔 DB 값이 샘플보다 우선
+  assert.equal((load("loading", [sample]).useLiveStock("A") as { price: number }).price, 999);
+  assert.equal((load("loading", [sample]).useLiveStocks() as { price: number }[])[0].price, 999);
+  // 로딩 끝난 뒤: 스토어 값을 사용
+  const loaded = { ticker: "A", price: 555, sector: "s" };
+  assert.equal((load("db", [loaded]).useLiveStock("A") as { price: number }).price, 555);
+  assert.equal((load("db", [loaded]).useLiveStocks() as { price: number }[])[0].price, 555);
 });
 
 for (const allFailed of [false, true]) {

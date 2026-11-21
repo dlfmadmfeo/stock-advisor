@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -1433,11 +1434,24 @@ function MacdChart({ points }: { points: MacdPoint[] }) {
 
 const CHARTS_DISPLAY_DAYS = 60;
 
+// 실제 카드(주가+거래량, MACD) 높이만큼 자리를 미리 잡아둡니다. 예전엔 작은 카드
+// 하나만 보여줘서, 일봉 데이터가 도착하면 아래 카드들이 한꺼번에 밀려 내려갔어요
+// (Lighthouse CLS 0.3대). 높이는 폰 폭(390px)에서 잰 값이에요.
 function StockChartsCardSkeleton() {
   return (
     <>
-      <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
+      <div
+        className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
+        style={{ minHeight: 258 }}
+      >
         <h2 className="text-base font-bold text-[#191f28]">주가</h2>
+        <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
+      </div>
+      <div
+        className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]"
+        style={{ minHeight: 285 }}
+      >
+        <h2 className="text-base font-bold text-[#191f28]">MACD</h2>
         <p className="mt-3 text-[13px] text-[#6b7684]">불러오는 중...</p>
       </div>
     </>
@@ -1887,6 +1901,23 @@ function InvestorTrendCard({ ticker }: { ticker: string }) {
   );
 }
 
+// 종목 상세의 데이터 카드(차트·재무·투자자동향·뉴스)는 서버에서 렌더링하지 않고
+// 브라우저에서만 불러옵니다. 이 카드들의 훅(useSuspenseQuery)은 서버 렌더링 때도
+// 실행돼서, 정적 생성(빌드/ISR) 중에 외부 API(KIS·DART·뉴스)와 우리 API를 종목마다
+// 호출하고 그 결과를 HTML에 굳혀버려요. 첫 HTML에는 스켈레톤만 담고(자리를 잡아서
+// 화면이 안 흔들리게), 데이터는 화면이 열린 뒤에 채웁니다.
+const subscribeNoop = () => () => {};
+function ClientSuspense({
+  fallback,
+  children,
+}: {
+  fallback: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const mounted = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  return mounted ? <Suspense fallback={fallback}>{children}</Suspense> : fallback;
+}
+
 export function StockDetailScreen({ ticker }: { ticker: string }) {
   const router = useRouter();
   const stock = useLiveStock(ticker);
@@ -1969,9 +2000,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           )}
           resetKey={stock.ticker}
         >
-          <Suspense fallback={<StockChartsCardSkeleton />}>
+          <ClientSuspense fallback={<StockChartsCardSkeleton />}>
             <StockChartsCard ticker={stock.ticker} />
-          </Suspense>
+          </ClientSuspense>
         </ErrorBoundary>
 
         <div className="rounded-lg bg-white p-4 ring-1 ring-[#e5e8eb]">
@@ -2061,9 +2092,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           )}
           resetKey={stock.ticker}
         >
-          <Suspense fallback={<FinancialsCardSkeleton />}>
+          <ClientSuspense fallback={<FinancialsCardSkeleton />}>
             <FinancialsCard ticker={stock.ticker} />
-          </Suspense>
+          </ClientSuspense>
         </ErrorBoundary>
 
         <ErrorBoundary
@@ -2079,9 +2110,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           )}
           resetKey={stock.ticker}
         >
-          <Suspense fallback={<InvestorTrendCardSkeleton />}>
+          <ClientSuspense fallback={<InvestorTrendCardSkeleton />}>
             <InvestorTrendCard ticker={stock.ticker} />
-          </Suspense>
+          </ClientSuspense>
         </ErrorBoundary>
 
         <ErrorBoundary
@@ -2095,9 +2126,9 @@ export function StockDetailScreen({ ticker }: { ticker: string }) {
           )}
           resetKey={stock.ticker}
         >
-          <Suspense fallback={<StockNewsCardSkeleton />}>
+          <ClientSuspense fallback={<StockNewsCardSkeleton />}>
             <StockNewsCard name={stock.name} />
-          </Suspense>
+          </ClientSuspense>
         </ErrorBoundary>
       </section>
     </AppShell>
