@@ -4,7 +4,7 @@
 조건별 종목 검색과 관심종목 관리, DART 공시 푸시 알림을 지원합니다.
 
 - **웹**: [서비스 바로가기](https://stock-advisor2.vercel.app)
-- **Android**: [APK 다운로드](https://github.com/dlfmadmfeo/stock-advisor/releases/tag/app-v1.0.0) (Flutter WebView 앱)
+- **Android**: [Google Play](https://play.google.com/store/apps/details?id=com.junhee.stockadvisor) (Flutter WebView 앱)
 
 > 이 프로젝트는 투자 자문업으로 등록된 서비스가 아니며, 매수·매도를
 > 추천하지 않습니다. 공개된 지표를 기계적으로 계산해서 보여줄 뿐이고,
@@ -20,7 +20,7 @@ PER·PBR을 바탕으로 완전충족/조건충족/보류/주의 등급을 표�
 
 ### 종목 상세
 
-- 재무 정보 요약 (매출·영업이익·순이익 추이)
+- 재무 정보 요약 (매출·영업이익·순이익 추이, ROE·부채비율, DART 사업보고서 기준)
 - 주가 라인차트, 거래량 차트, MACD 지표
 - MACD 히스토그램이 음수(하락 모멘텀)지만 최근 며칠 연속 0에 가까워지는
   "반등 조짐" 종목 감지
@@ -38,8 +38,7 @@ PER·PBR을 바탕으로 완전충족/조건충족/보류/주의 등급을 표�
 
 ### 인증
 
-이메일과 비밀번호로 가입하고 로그인합니다. 미리 등록된 데모 계정으로
-로그인해 서비스를 둘러볼 수도 있습니다. 유니버스 새로고침은 관리자만
+이메일과 비밀번호로 가입하고 로그인합니다. 유니버스 새로고침은 관리자만
 실행할 수 있습니다.
 
 ## 기술 스택
@@ -60,6 +59,9 @@ PER·PBR을 바탕으로 완전충족/조건충족/보류/주의 등급을 표�
 - 종목 유니버스(시가총액 상위 200종목)와 스크리너 지표는 배치 작업이
   KIS API를 호출해 계산한 뒤 MySQL에 저장하고, 화면은 이 스냅샷을 페이지
   단위로 조회합니다.
+- 종목 재무 정보는 DART 단일회사 재무제표로 조회합니다. 종목코드를 DART
+  회사코드로 매핑하고, 영업이익률·ROE·부채비율·증가율은 공시 숫자로 직접
+  계산합니다. (KIS 재무 API가 응답하지 않아 DART로 옮겼습니다.)
 - 관심종목 실시간 시세는 별도의 Spring 백엔드(`stock-advisor-server`)가
   KIS 웹소켓을 구독해서 처리하고, 이 저장소는 그 결과를 병합해서
   보여주는 구조입니다.
@@ -94,7 +96,6 @@ npm run dev
 ```
 
 [http://localhost:3000](http://localhost:3000)에서 확인할 수 있습니다.
-데모 로그인은 해당 계정이 DB에 등록되어 있어야 동작합니다.
 
 ### 테스트
 
@@ -137,11 +138,11 @@ npx prisma generate
 | `KIS_APP_KEY` / `KIS_APP_SECRET` | KIS Open API 앱 키/시크릿 |
 | `KIS_ENV` | `real`(실전) 또는 `virtual`(모의투자) |
 
-### DART 공시 알림
+### DART 공시 알림·재무 정보
 
 | 변수 | 용도 |
 | --- | --- |
-| `DART_API_KEY` | 전자공시시스템(DART) Open API 키 |
+| `DART_API_KEY` | 전자공시시스템(DART) Open API 키 (공시 알림, 종목 재무 정보) |
 | `CRON_SECRET` | `/api/cron/dart-poll` 인증 토큰. 배포 환경과 GitHub Actions Secrets에 같은 값으로 등록 |
 | `FIREBASE_SERVICE_ACCOUNT` | FCM 푸시 발송용 Firebase 서비스 계정 JSON을 한 줄 문자열로 |
 
