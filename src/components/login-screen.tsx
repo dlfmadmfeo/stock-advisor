@@ -178,7 +178,10 @@ export function LoginScreen({ mode }: { mode: Mode }) {
       // 시 "만료됨" 안내 여부를 이걸로 판단합니다.
       markReturningUser();
       setSuccess(true);
-      setTimeout(() => router.push("/notifications"), 1100);
+      // push가 아니라 replace: 로그인 화면이 뒤로가기 히스토리에 남으면, 홈에서
+      // 뒤로가기를 눌렀을 때 캐시된 /login?expired=1이 복원돼서 이미 로그인한
+      // 상태인데도 "세션이 만료됐어요" 안내가 다시 떴어요(2026-11-21 모바일 확인).
+      setTimeout(() => router.replace("/notifications"), 1100);
     } catch {
       showToast("서버에 연결할 수 없어요.");
     } finally {
