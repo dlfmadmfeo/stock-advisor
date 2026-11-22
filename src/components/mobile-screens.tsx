@@ -604,7 +604,7 @@ function PagedStockList({
 }: {
   screenerOnly?: boolean;
   macdReboundOnly?: boolean;
-  // 넘기면 목록 위 줄에 "반등 조짐만" 스위치가 같이 나와요(홈 전용).
+  // 넘기면 목록 위 줄에 "MACD 반등 기대" 스위치가 같이 나와요(홈 전용).
   onMacdReboundChange?: (next: boolean) => void;
   sector?: string;
   q?: string;
@@ -703,7 +703,7 @@ function PagedStockList({
           role="switch"
           type="button"
         >
-          MACD 반등 조짐만
+          MACD 반등 기대
           <span
             className={`relative h-5 w-9 rounded-full transition-colors ${
               macdReboundOnly ? "bg-[var(--brand)]" : "bg-[#8b95a1]"
@@ -973,7 +973,7 @@ const StockRow = memo(function StockRow({
           </span>
           <span className="truncate">
             · {rec.label}
-            {stock.macdRebound ? " · 반등 조짐" : ""}
+            {stock.macdRebound ? " · 반등 기대" : ""}
           </span>
         </p>
       </div>
@@ -1002,7 +1002,7 @@ function MacdReboundBadge({ className }: { className?: string }) {
     <span
       className={`shrink-0 text-xs font-medium text-[var(--brand)] ${className ?? ""}`}
     >
-      반등 조짐
+      반등 기대
     </span>
   );
 }
@@ -2713,7 +2713,7 @@ function WatchlistRow({
           <span className={pass ? "font-semibold text-[#191f28]" : undefined}>
             {score}/{SCREENER_TOTAL_RULES}
           </span>
-          {stock.macdRebound ? <span>· 반등 조짐</span> : null}
+          {stock.macdRebound ? <span>· 반등 기대</span> : null}
         </p>
       </Link>
       <div className="shrink-0 text-right">

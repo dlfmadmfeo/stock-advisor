@@ -81,13 +81,18 @@ export const auth = betterAuth({
     }),
   },
   session: {
-    // 세션 만료: 운영은 정식 값 1시간, 로컬 개발(npm run dev)만 5분입니다.
+    // 세션 만료: 운영은 30일, 로컬 개발(npm run dev)만 5분입니다.
+    // 30일은 로그인 화면의 "로그인 상태 유지"(rememberMe)를 체크했을 때의
+    // 값이에요. 체크를 해제하면 better-auth가 알아서 세션 쿠키(브라우저를
+    // 닫으면 삭제) + 서버 만료 1일로 짧게 발급합니다. 사용 중에는 updateAge
+    // (기본 1일)마다 만료일이 뒤로 밀려서, 30일 안에 한 번이라도 접속하면
+    // 계속 유지돼요.
     // 만료/콜드스타트 만료 감지(returning-user-mark.ts)와 푸시 탭 후
     // "로그아웃됐어요" 흐름을 로컬에서 반복 테스트하려고 개발 모드에서만 짧게
     // 두는 거예요. 예전엔 5분을 운영에 그대로 배포한 채 되돌리는 걸 깜빡해서
     // 열흘 넘게 실가입자들이 5분마다 로그아웃된 사고가 있었는데, NODE_ENV로
     // 나눠 두면 그런 일이 안 생겨요(운영 빌드는 항상 production).
-    expiresIn: process.env.NODE_ENV === "development" ? 60 * 5 : 60 * 60,
+    expiresIn: process.env.NODE_ENV === "development" ? 60 * 5 : 60 * 60 * 24 * 30,
   },
   // Prisma User.isAdmin 컬럼을 better-auth 세션에도 실어옵니다(2026-08-23
   // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요

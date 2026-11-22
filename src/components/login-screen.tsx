@@ -148,6 +148,8 @@ export function LoginScreen({ mode }: { mode: Mode }) {
           : await authClient.signIn.email({
               email: targetEmail,
               password: targetPassword,
+              // 체크 해제 시 세션 쿠키로 발급(브라우저 닫으면 로그아웃, 서버 만료 1일).
+              rememberMe: remember,
             });
       if (error) {
         // 인증 전 계정의 로그인 — better-auth가 인증 메일을 새로 보냈어요
