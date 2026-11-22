@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/auth-error-message";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { intentionalLogout } from "@/components/session-guard";
 import { clearReturningUserMark } from "@/lib/returning-user-mark";
@@ -51,7 +52,7 @@ export function DeleteAccountForm() {
         setError(
           deleteError.code === "INVALID_PASSWORD"
             ? "비밀번호가 맞지 않아요."
-            : (deleteError.message ?? "탈퇴에 실패했어요. 잠시 후 다시 시도해주세요."),
+            : authErrorMessage(deleteError, "탈퇴에 실패했어요. 잠시 후 다시 시도해주세요."),
         );
         return;
       }

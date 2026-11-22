@@ -70,6 +70,7 @@ import {
   type IconComponent,
 } from "@/components/ui-primitives";
 import {
+  SCREENER_RULE_LABELS,
   getRecommendation,
   passesScreener,
   screenerChecks,
@@ -163,6 +164,43 @@ const categorySectors = ["반도체", "금융", "바이오", "플랫폼"];
 
 const filters = ["시가총액", "최근 수익률", "PER", "배당수익률", "투자 성향"];
 
+// 홈 요약 카드 안의 "어떤 기준인가요?" 펼침. 통과 개수만 보여주면 4개가 뭔지
+// 종목 상세에 들어가야만 알 수 있어서, 홈에서 바로 볼 수 있게 했어요. 기본은
+// 접어 두고(목록이 아래로 밀리지 않게), 문구는 상세 화면과 같은
+// SCREENER_RULE_LABELS를 씁니다. 색은 쓰지 않고 글자 위계로만 구분해요.
+function ScreenerCriteria() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2">
+      <button
+        aria-controls="screener-criteria"
+        aria-expanded={open}
+        className="flex h-11 items-center gap-1 text-[13px] font-medium text-[#333d4b]"
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+      >
+        {SCREENER_TOTAL_RULES}개 기준 보기
+        <ChevronDown
+          className={`h-4 w-4 text-[#6b7684] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open ? (
+        <ol
+          className="space-y-2 border-t border-[#e5e8eb] pt-3 text-[13px] leading-5 text-[#333d4b]"
+          id="screener-criteria"
+        >
+          {SCREENER_RULE_LABELS.map((label, i) => (
+            <li className="flex gap-2" key={label}>
+              <span className="w-4 shrink-0 tabular-nums text-[#6b7684]">{i + 1}</span>
+              <span className="break-keep">{label}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
 export function NotificationsScreen() {
   const stocks = useLiveStocks();
   const passed = stocks.filter((s) => passesScreener(s));
@@ -218,6 +256,7 @@ export function NotificationsScreen() {
             이상 충족한 종목이에요. 수익률 예측이 아니며, 종목을 누르면 충족한
             조건을 볼 수 있어요.
           </p>
+          <ScreenerCriteria />
         </div>
 
         <HomeWatchlistLink />

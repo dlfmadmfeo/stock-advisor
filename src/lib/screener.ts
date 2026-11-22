@@ -15,24 +15,26 @@ export type ScreenerRule = {
   pass: boolean;
 };
 
+// 규칙 문구는 한 곳에서 만들어서, 종목 상세의 충족 현황(screenerChecks)과
+// 홈의 "스크리너 기준" 안내가 항상 같은 문장을 쓰게 합니다. 순서와 개수는
+// screenerChecks가 반환하는 배열과 같아야 해요(SCREENER_TOTAL_RULES).
+const t = SCREENER_THRESHOLDS;
+export const SCREENER_RULE_LABELS: readonly string[] = [
+  "5일 이동평균이 20일 이동평균 위 (골든크로스 상태)",
+  `거래량이 최근 20일 평균 대비 ${Math.round(t.volumeRatioMin * 100)}% 이상`,
+  `52주 저점 대비 +${Math.round((t.reboundFromLowRatio - 1) * 100)}% 이상 반등, 또는 52주 고점 대비 -${Math.round((1 - t.reboundFromHighRatio) * 100)}% 이내`,
+  `RSI(14) ${t.rsiMin}~${t.rsiMax} 구간 (과매수·과매도 아님)`,
+];
+
 export function screenerChecks(s: Stock): ScreenerRule[] {
-  const t = SCREENER_THRESHOLDS;
   const recovered = s.price >= s.lo * t.reboundFromLowRatio || s.price >= s.hi * t.reboundFromHighRatio;
-  return [
-    { label: "5일 이동평균이 20일 이동평균 위 (골든크로스 상태)", pass: s.ma5over20 },
-    {
-      label: `거래량이 최근 20일 평균 대비 ${Math.round(t.volumeRatioMin * 100)}% 이상`,
-      pass: s.volRatio >= t.volumeRatioMin,
-    },
-    {
-      label: `52주 저점 대비 +${Math.round((t.reboundFromLowRatio - 1) * 100)}% 이상 반등, 또는 52주 고점 대비 -${Math.round((1 - t.reboundFromHighRatio) * 100)}% 이내`,
-      pass: recovered,
-    },
-    {
-      label: `RSI(14) ${t.rsiMin}~${t.rsiMax} 구간 (과매수·과매도 아님)`,
-      pass: s.rsi >= t.rsiMin && s.rsi <= t.rsiMax,
-    },
+  const passes = [
+    s.ma5over20,
+    s.volRatio >= t.volumeRatioMin,
+    recovered,
+    s.rsi >= t.rsiMin && s.rsi <= t.rsiMax,
   ];
+  return SCREENER_RULE_LABELS.map((label, i) => ({ label, pass: passes[i] }));
 }
 
 export function screenerScore(s: Stock): number {

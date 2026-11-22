@@ -40,6 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { markReturningUser } from "@/lib/returning-user-mark";
+import { authErrorMessage, isValidEmail } from "@/lib/auth-error-message";
 // 데모 로그인 버튼 비노출로 미사용 (2026-11-01 세션)
 // import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
 import {
@@ -54,6 +55,9 @@ import {
 } from "lucide-react";
 
 type Mode = "login" | "signup";
+
+// "로그인 상태 유지" 체크 여부를 기억해 두는 localStorage 키.
+const REMEMBER_STORAGE_KEY = "sa_remember_me";
 
 // reset-password-screen.tsx도 같은 값을 씀(서버 쪽 auth.ts의
 // minPasswordLength: 4와 반드시 맞춰야 해요 — 화면 문구용 상수라 자동으로
@@ -88,6 +92,28 @@ export function LoginScreen({ mode }: { mode: Mode }) {
   function showToast(message: string) {
     setToast(message);
     setTimeout(() => setToast(null), 2200);
+  }
+
+  // "로그인 상태 유지" 선택을 기억해요. 상태 기본값이 true라서 저장해 두지
+  // 않으면 해제하고 나가도 다음에 로그인 화면이 열릴 때마다 다시 체크된
+  // 채로 시작합니다. 서버 렌더와 어긋나지 않게 마운트 후에 읽어요.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(REMEMBER_STORAGE_KEY) === "0") {
+        setRemember(false);
+      }
+    } catch {
+      // 저장소를 못 쓰는 환경(시크릿 모드 등)에서는 기본값(체크)을 그대로 씁니다.
+    }
+  }, []);
+
+  function changeRemember(next: boolean) {
+    setRemember(next);
+    try {
+      window.localStorage.setItem(REMEMBER_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      // 저장 실패는 무시 — 이번 화면에서만 적용됩니다.
+    }
   }
 
   // 세션이 만료돼서 session-guard.tsx가 /login?expired=1로 보낸 경우, 왜
@@ -158,7 +184,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
           showToast("이메일 인증이 필요해요. 인증 메일을 다시 보냈으니 메일함을 확인해주세요.");
           return;
         }
-        showToast(error.message ?? "요청에 실패했어요.");
+        showToast(authErrorMessage(error, "요청에 실패했어요. 잠시 후 다시 시도해주세요."));
         return;
       }
       // 2026-09-14 세션: requireEmailVerification이 켜지면(auth.ts) 회원가입
@@ -195,6 +221,10 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     e.preventDefault();
     if (!email || !password) {
       showToast("이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      showToast("올바른 이메일 형식이 아니에요. 예: you@example.com");
       return;
     }
     if (isSignup) {
@@ -243,6 +273,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
         data-testid="login-webview"
       >
         <form
+          noValidate
           className="animate-auth-mode-in flex h-full flex-col overflow-y-auto px-6 pb-8 pt-10"
           onSubmit={handleSubmit}
         >
@@ -429,7 +460,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                 <input
                   checked={remember}
                   className="h-4 w-4 rounded border-[#c3c9d1] text-[var(--brand)] focus:ring-[var(--brand)]/30"
-                  onChange={(e) => setRemember(e.target.checked)}
+                  onChange={(e) => changeRemember(e.target.checked)}
                   type="checkbox"
                 />
                 로그인 상태 유지

@@ -16,6 +16,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Info, Loader2, Mail } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { isValidEmail } from "@/lib/auth-error-message";
 
 export function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -30,7 +31,15 @@ export function ForgotPasswordScreen() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || submitting) return;
+    if (submitting) return;
+    if (!email) {
+      showToast("이메일을 입력해주세요.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      showToast("올바른 이메일 형식이 아니에요. 예: you@example.com");
+      return;
+    }
     setSubmitting(true);
     try {
       await authClient.requestPasswordReset({
@@ -81,7 +90,7 @@ export function ForgotPasswordScreen() {
             </Link>
           </div>
         ) : (
-          <form className="flex flex-1 flex-col px-6 pb-8 pt-6" onSubmit={handleSubmit}>
+          <form className="flex flex-1 flex-col px-6 pb-8 pt-6" noValidate onSubmit={handleSubmit}>
             <h1 className="text-[19px] font-bold tracking-tight text-[#191f28]">
               비밀번호 찾기
             </h1>

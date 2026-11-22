@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle, Eye, EyeOff, Info, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/auth-error-message";
 import { MIN_PASSWORD_LENGTH } from "@/components/login-screen";
 
 export function ResetPasswordScreen() {
@@ -53,7 +54,7 @@ export function ResetPasswordScreen() {
     try {
       const { error } = await authClient.resetPassword({ newPassword: password, token });
       if (error) {
-        showToast(error.message ?? "재설정에 실패했어요.");
+        showToast(authErrorMessage(error, "재설정에 실패했어요. 다시 시도해주세요."));
         return;
       }
       router.push("/login?reset=1");
