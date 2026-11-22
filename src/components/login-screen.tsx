@@ -39,7 +39,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
-import { markReturningUser } from "@/lib/returning-user-mark";
+import { markReturningUser, markSessionOnly } from "@/lib/returning-user-mark";
 import { authErrorMessage, isValidEmail } from "@/lib/auth-error-message";
 // 데모 로그인 버튼 비노출로 미사용 (2026-11-01 세션)
 // import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
@@ -205,6 +205,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
       // 세션 쿠키보다 오래 남는 마커 — src/app/page.tsx가 콜드 스타트
       // 시 "만료됨" 안내 여부를 이걸로 판단합니다.
       markReturningUser();
+      markSessionOnly(!remember);
       setSuccess(true);
       // push가 아니라 replace: 로그인 화면이 뒤로가기 히스토리에 남으면, 홈에서
       // 뒤로가기를 눌렀을 때 캐시된 /login?expired=1이 복원돼서 이미 로그인한

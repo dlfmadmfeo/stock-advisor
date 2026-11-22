@@ -24,4 +24,20 @@ export function markReturningUser() {
 
 export function clearReturningUserMark() {
   document.cookie = `${RETURNING_USER_COOKIE}=; path=/; max-age=0`;
+  document.cookie = `${SESSION_ONLY_COOKIE}=; path=/; max-age=0`;
+}
+
+// "로그인 상태 유지"를 끄고 로그인했다는 표시. better-auth의 dont_remember
+// 쿠키는 HttpOnly라 앱(Flutter)이 믿고 쓰기 어렵고, 다시 "유지"로 로그인해도
+// 안 지워지는 문제가 있어서 별도로 둡니다. 앱은 시작할 때 이 표시와 로그인
+// 쿠키가 같이 있으면 로그인을 풀어서 로그인 화면으로 보냅니다(MainActivity.kt).
+// 로그인할 때마다 지금 선택에 맞게 세우거나 지워요.
+export const SESSION_ONLY_COOKIE = "sa_session_only";
+
+export function markSessionOnly(sessionOnly: boolean) {
+  if (sessionOnly) {
+    document.cookie = `${SESSION_ONLY_COOKIE}=1; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
+  } else {
+    document.cookie = `${SESSION_ONLY_COOKIE}=; path=/; max-age=0`;
+  }
 }
