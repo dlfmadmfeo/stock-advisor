@@ -286,8 +286,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               주식 어드바이저
             </h1>
             <p className="mt-1.5 text-balance break-keep text-[13px] leading-5 text-[#6b7684]">
-              막연한 종목 감이 아니라, 공개 지표로 투명하게 걸러낸 결과만
-              보여드려요.
+              공개 지표로 투명하게 걸러낸 결과만 보여드려요.
             </p>
           </div>
 
