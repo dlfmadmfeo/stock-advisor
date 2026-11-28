@@ -34,10 +34,8 @@ export async function askClaude(system: string, prompt: string): Promise<string 
     if (!res.ok) return null;
 
     const data = await res.json();
-    // claude-sonnet-5는 기본적으로 확장 사고(extended thinking) 블록을 먼저
-    // 반환해서 content[0]이 {type:"thinking"}이고 실제 답변은 그 뒤에 있는
-    // {type:"text"} 블록이에요 — index 0을 그냥 쓰면 항상 undefined였습니다
-    // (실측 확인, 2026-09-13 세션).
+    // 확장 사고(thinking) 블록이 먼저 올 수 있어 content[0]이 아니라 type이 "text"인
+    // 블록을 찾는다.
     const blocks: Array<{ type: string; text?: string }> = data?.content ?? [];
     const textBlock = blocks.find((b) => b.type === "text");
     return typeof textBlock?.text === "string" ? textBlock.text : null;

@@ -9,9 +9,7 @@ const sourceLabel: Record<string, string> = {
   "yahoo-fallback": "KIS 실패 → Yahoo로 대체 (가격만, 지표는 예시값)",
 };
 
-// 이 두 표시는 KIS/Yahoo/웹소켓 같은 내부 연동 상태라 일반 사용자에겐
-// 의미가 없는 개발자용 문구예요(2026-11-20 세션). 관리자 계정에서만
-// 보이게 하고, 알약 배지 대신 점 + 글자로 단순하게 보여줍니다.
+// 내부 연동 상태(KIS/Yahoo/웹소켓) 표시라 관리자 계정에서만 보여준다.
 function StatusLine({
   dotClass,
   textClass = "text-[#6b7684]",

@@ -1,16 +1,10 @@
 // ---------------------------------------------------------------------------
 // 유니버스 갱신 로직 (서버 전용). scripts/refresh-universe.ts(CLI)와
-// /api/universe/refresh(버튼 클릭)가 이 함수를 공유합니다.
+// /api/universe/refresh(버튼)가 함께 쓴다.
 //
-// 종목 목록은 KIS 종목마스터 파일(kospi_code.mst)에서 뽑습니다 — 순위분석
-// API(FHPST01740000)는 실측 결과 상위 30건까지만 줘서(kis.ts의
-// fetchMarketCapRanking 주석 참고) 200종목을 못 채웠는데, 마스터 파일 자체에
-// 시가총액이 이미 들어있어서 그걸로 내림차순 정렬 후 상위 N개를 뽑으면 순위
-// API 없이도 진짜 ~200개를 채울 수 있습니다. (kospi-master.ts 참고 — 이
-// 세션에서는 네트워크가 막혀 있어서 다운로드/파싱을 실측하지 못했습니다.)
-//
-// 종목별로는 여전히 일봉/주봉/현재가를 개별 조회해서 스크리너 지표를 계산하고
-// MySQL(Prisma) Stock 테이블에 upsert 합니다.
+// 종목 목록은 KIS 종목마스터 파일(kospi_code.mst)의 시가총액으로 정렬해 상위 N개를
+// 뽑는다(순위 API는 30건까지만 주기 때문, kis.ts fetchMarketCapRanking 참고).
+// 종목별로 일봉/주봉/현재가를 조회해 스크리너 지표를 계산하고 Stock 테이블에 upsert한다.
 // ---------------------------------------------------------------------------
 
 import { prisma } from "./db";
@@ -36,11 +30,8 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// CONCURRENCY(4)개 종목을 동시에 upsert하다 보면 MySQL이 순간적으로
-// "Lock wait timeout"을 낼 수 있어요(여러 요청이 같은 테이블/인접 row에
-// 몰릴 때 InnoDB가 잠깐 대기시키는 것 — 2026-08-24 세션에 프로덕션에서
-// 실제로 겪음). 이런 건 몇 초 뒤에 다시 시도하면 대부분 풀리는 일시적
-// 현상이라, 종목 하나 스킵시키는 대신 짧게 재시도합니다.
+// 여러 종목을 동시에 upsert하면 MySQL이 일시적으로 "Lock wait timeout"을 낼 수 있어,
+// 종목을 건너뛰지 않고 짧게 재시도한다.
 async function withLockRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -71,14 +62,9 @@ export function labelToRank(label: string): number {
   }
 }
 
-// 2단계 패스: 200종목을 다 저장한 "다음"에 업종 평균 PER/PBR을 계산해서
-// 각 종목의 완전충족/조건충족/보류/주의 등급을 다시 매기고 recommendationRank로
-// 저장합니다(2026-08-23 세션, "등급순 정렬" 추가하면서 도입). getRecommendation이
-// sectorAvgPer/sectorAvgPbr을 요구하는데, 그건 "같은 업종의 다른 종목들" 데이터가
-// 있어야 계산되는 값이라 processTicker() 안에서(종목 하나씩 저장하는 시점에는)
-// 는 아직 못 구함 — 그래서 screenerScore와 달리 배치 안에서 별도 후처리 단계로
-// 뺐습니다. KIS API를 추가로 부르지 않고(DB에 이미 저장된 값만 읽음) 순수
-// 계산 + DB 업데이트라 몇 초 안에 끝나요.
+// 2단계 패스: 전 종목 저장 후 업종 평균 PER/PBR을 계산해 등급(recommendationRank)을
+// 다시 매긴다. 업종 평균은 다른 종목 데이터가 모두 있어야 계산되므로 processTicker()
+// 안에서는 구할 수 없다. DB 값만 읽어 계산하므로 KIS 호출은 추가로 없다.
 async function updateRecommendationRanks(): Promise<void> {
   const rows = await prisma.stock.findMany();
   const stocks: (Stock & { updatedAt: Date })[] = rows.map((r) => ({
@@ -231,13 +217,9 @@ export type RefreshResult = {
 // 한 번 죽었을 때 영구히 새로고침이 막혀버려요.
 const STALE_LOCK_MS = 10 * 60 * 1000;
 
-// route.ts의 메모리 변수(let isRunning) 대신 DB row로 락을 관리합니다.
-// Vercel 서버리스 인스턴스마다 메모리가 따로 놀아서 메모리 변수로는 실제
-// 동시 실행을 못 막았어요(2026-08-24 세션, 프로덕션에서 MySQL "Lock wait
-// timeout" 에러로 발견 — 두 refreshUniverse()가 진짜 동시에 같은 테이블에
-// upsert하다가 난 에러). updateMany의 WHERE 조건에 맞는 row가 있어야만
-// UPDATE가 성공하는 걸 이용한 원자적 조건부 획득이라, 여러 인스턴스가
-// 동시에 호출해도 딱 하나만 count===1을 받습니다.
+// DB row로 락을 관리한다(서버리스 인스턴스 간 메모리 미공유). updateMany의 WHERE
+// 조건이 맞을 때만 UPDATE가 성공하는 점을 이용해, 동시에 호출돼도 하나만
+// count===1을 받는다.
 async function acquireRefreshLock(): Promise<boolean> {
   await prisma.refreshLock.upsert({
     where: { id: 1 },
@@ -263,13 +245,10 @@ async function releaseRefreshLock(): Promise<void> {
   });
 }
 
-// 새로고침 버튼(클라이언트)이 "지금 진짜로 갱신 중인지" 물어볼 때 씀.
-// 예전엔 이 진행 상태를 클라이언트 store에만 들고 있어서, 앱을 껐다 켜면
-// (WebView 프로세스가 죽으니 store도 초기화됨) 서버는 계속 돌고 있어도
-// 버튼은 그냥 "새로고침" 상태로 돌아왔었어요(2026-08-24 세션, 제보로
-// 발견) — 클라이언트가 자기 기억이 아니라 서버(DB 락)한테 직접 물어보게
-// 바꿔서 고침. acquireRefreshLock과 같은 stale 기준을 씀 — 10분 넘게
-// isRunning=true인 락은 크래시로 못 푼 걸로 보고 "실행 중 아님"으로 취급.
+// 새로고침 버튼이 현재 갱신 중인지 서버(DB 락)에 확인할 때 쓴다. 앱을 다시 켜면
+// 클라이언트 상태가 초기화되므로 서버 상태를 기준으로 한다. acquireRefreshLock과
+// 같은 기준으로, 10분 넘게 isRunning=true인 락은 비정상 종료로 보고 실행 중이 아닌
+// 것으로 취급한다.
 export async function isRefreshRunning(): Promise<boolean> {
   const lock = await prisma.refreshLock.findUnique({ where: { id: 1 } });
   if (!lock?.isRunning) return false;

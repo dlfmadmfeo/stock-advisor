@@ -1,20 +1,8 @@
 // ---------------------------------------------------------------------------
-// 화면 공용 UI 조각 (2026-08-14 세션, 서버 컴포넌트 분리 확장).
-//
-// ⚠️ "use client" 없음 — 의도적입니다. 원래 mobile-screens.tsx 안에 있던
-// 컴포넌트들인데, 전부 훅/상태 없이 props만 받는 순수 표시용이라 여기로
-// 옮겼습니다. mobile-screens.tsx는 파일 전체가 "use client"라서, 여기 있는
-// 것들이 그 안에 남아있으면 실제로는 정적인데도 무조건 클라이언트 번들에
-// 포함됐어요.
-//
-// 이 파일을 분리해두면, 서버 컴포넌트인 page.tsx가 TopBar 같은 걸 직접
-// import해서 클라이언트 JS 없이 렌더링할 수 있습니다 (예: src/app/mypage,
-// src/app/devices). 뒤로가기 버튼처럼 useRouter가 필요한 경우엔
-// mobile-screens.tsx의 BackTopBar(클라이언트)가 이 TopBar를 감싸서 씁니다.
-//
-// 반대로 CategoryScreen처럼 여전히 클라이언트인 화면들도 이 파일에서
-// import해서 그대로 씁니다 — 정의 위치만 옮긴 거라 기존 화면 동작은
-// 전혀 안 바뀌어요.
+// 화면 공용 UI 조각. 훅·상태 없이 props만 받는 표시용 컴포넌트라 "use client" 없이
+// 둔다. 서버 컴포넌트 page.tsx(예: src/app/mypage, src/app/devices)가 클라이언트 JS
+// 없이 직접 렌더링할 수 있고, useRouter가 필요한 경우는 mobile-screens.tsx의
+// BackTopBar가 TopBar를 감싸서 쓴다.
 // ---------------------------------------------------------------------------
 
 import Link from "next/link";
@@ -34,9 +22,7 @@ export function TopBar({
   left?: React.ReactNode;
   right?: React.ReactNode;
   onLeftClick?: () => void;
-  // 관심종목 하트처럼 우측에 클릭 가능한 아이콘이 필요한 화면용
-  // (2026-08-29 세션). onLeftClick과 대칭되는 패턴 — rightHref(링크)와는
-  // 달리 클릭 시 페이지 이동 없이 동작만 실행해야 하는 경우에 씁니다.
+  // 우측 클릭 아이콘(예: 관심종목 하트)용. rightHref와 달리 페이지 이동 없이 동작만 실행한다.
   onRightClick?: () => void;
   rightHref?: string;
 }) {
@@ -99,13 +85,9 @@ export function MetricCard({
   label: string;
   value: string;
   positive?: boolean;
-  // 기본은 text-xl. 금액이 커서(예: "20,467,000원") 좁은 2컬럼 카드에서
-  // "원"이 다음 줄로 밀려나던 화면(자산 화면 피드백, 2026-08-23 세션)처럼
-  // 더 작은 크기가 필요한 곳에서만 넘겨서 씀 — 다른 MetricCard(종목 상세의
-  // PER/PBR 등, 값이 짧음)는 기존 크기 그대로 유지.
+  // 기본은 text-xl. 좁은 2컬럼 카드에서 큰 금액이 줄바꿈되는 곳에서만 작은 크기를 넘긴다.
   valueClassName?: string;
-  // 종목 상세 화면처럼 카드가 한 줄에 3~5개씩 붙는 곳은 지금 패딩(p-4)이
-  // 과하다는 피드백(2026-08-24 세션)으로 추가 — true면 패딩을 한 단계 줄임.
+  // 카드가 한 줄에 3~5개 들어가는 곳(종목 상세)에서 패딩을 한 단계 줄인다.
   compact?: boolean;
 }) {
   return (
@@ -187,12 +169,8 @@ export function SectionTitle({
   );
 }
 
-// 세로 목록형 메뉴(2026-09-12 세션, 마이페이지 리디자인). 원래 3열
-// 아이콘 그리드(MenuGrid)였는데 "개인정보처리방침"처럼 라벨이 조금만
-// 길어도 두 줄로 깨졌고, 항목이 3의 배수가 아니면 마지막 줄이 어중간하게
-// 비어 보였어요. 설정 화면에 흔한 세로 리스트(아이콘 + 라벨 + 화살표)로
-// 바꾸니 라벨 길이에 상관없이 한 줄로 안정적으로 들어가고, 항목이
-// 몇 개든 카드 하나로 자연스럽게 이어져요.
+// 세로 목록형 메뉴(아이콘 + 라벨 + 화살표). 라벨 길이나 항목 수와 관계없이
+// 한 줄씩 안정적으로 배치된다.
 export function MenuList({ items }: { items: Array<[IconComponent, string, string]> }) {
   return (
     <div className="overflow-hidden rounded-lg bg-white ring-1 ring-[#e5e8eb]">

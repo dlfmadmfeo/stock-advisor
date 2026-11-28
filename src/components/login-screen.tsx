@@ -1,36 +1,13 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 로그인/회원가입 화면 (2026-08-14 세션 추가, 이후 mind-budget 스타일로
-// 재작업했다가 2026-08-19 세션에 다시 리디자인).
+// 로그인/회원가입 화면. /login과 /signup은 별도 라우트이고, 이 컴포넌트는 mode를
+// prop으로 받는다(새로고침하거나 주소로 바로 들어와도 맞는 화면이 뜨도록).
 //
-// 2026-08-18 세션: /api/auth/login, /api/auth/signup을 진짜로 호출하도록
-// 바꿨어요. User 테이블(email unique)이 생기면서 회원가입도 실제로 동작.
-//
-// 2026-08-19 세션: 바이올렛/인디고 그라데이션(mind-budget 톤)이 앱 나머지
-// 화면(#191f28/#3182f6 토스블루 톤)이랑 안 맞아서, 토스블루로 통일해서
-// 다시 그렸습니다(HTML 목업으로 먼저 미리보기 확인 후 반영). 이번에 같이
-// 추가된 것들:
-//  - 상단 탭(로그인/회원가입)으로 모드 전환 — 기존엔 하단 텍스트 링크만 있었음
-//  - 회원가입 전용: 비밀번호 확인 필드(불일치 시 실시간 에러), 비밀번호 길이
-//    진행 표시(strength bar — 서버가 길이만 검사해서 "8자 이상"만 반영,
-//    "영문/숫자 포함" 같은 실제로 안 지켜지는 요구사항은 안 보여줌),
-//    약관 동의 체크박스(제출 전 필수, 예전엔 문구만 있고 체크박스가 없었음)
-//  - 카카오/Apple 버튼을 다시 노출(그동안 주석 처리돼 있었음) — 실제 연동은
-//    없고 "준비 중" 토스트만 띄움
-//
-// 어떤 라우트도 아직 이 화면 뒤에 보호돼 있지는 않습니다(로그인 안 해도
-// /watchlist 같은 화면 URL로 바로 들어갈 수 있음 — 별도 작업 필요. 단
-// /watchlist는 서버 컴포넌트에서 세션 체크해서 /login으로 리다이렉트하도록
-// 이미 고쳐둠, watchlist-data.ts 참고).
-//
-// 2026-08-20 세션: 로그인/회원가입을 한 화면 안에서 mode state로 탭
-// 전환하던 방식에서, /login과 /signup을 서로 다른 라우트로 분리했어요.
-// 이 컴포넌트는 이제 mode를 내부 state가 아니라 prop으로 받고(각 라우트의
-// page.tsx가 넘겨줌), 탭/하단 링크는 setMode 대신 실제 페이지 이동(Link)을
-// 씁니다 — 그래서 /login, /signup 각각 주소창에 직접 쳐서 들어가거나
-// 새로고침해도 항상 맞는 화면이 떠요(예전 방식은 항상 /login 하나로만
-// 들어가서 새로고침하면 회원가입 탭이 로그인 탭으로 리셋됐었음).
+//  - 상단 탭으로 로그인/회원가입 페이지 이동
+//  - 회원가입: 비밀번호 확인(불일치 시 즉시 표시), 길이 진행 표시(서버가 검사하는
+//    "8자 이상"만 반영), 약관 동의 체크박스(제출 전 필수)
+//  - 카카오/Apple 버튼은 실연동 전까지 숨김
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from "react";
@@ -41,7 +18,7 @@ import { authClient } from "@/lib/auth-client";
 import { SESSION_QUERY_KEY } from "@/lib/use-session";
 import { markReturningUser, markSessionOnly } from "@/lib/returning-user-mark";
 import { authErrorMessage, isValidEmail } from "@/lib/auth-error-message";
-// 데모 로그인 버튼 비노출로 미사용 (2026-11-01 세션)
+// 데모 로그인 버튼을 숨겨서 사용하지 않음
 // import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo-account";
 import {
   AlertCircle,
@@ -116,10 +93,9 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     }
   }
 
-  // 세션이 만료돼서 session-guard.tsx가 /login?expired=1로 보낸 경우, 왜
-  // 로그인 화면으로 왔는지 알려줍니다(2026-09-13 세션). useSearchParams 대신
-  // window.location을 직접 읽어요 — Suspense 경계 추가 없이 클라이언트에서만
-  // 한 번 확인하면 되는 값이라 이 방법이 더 간단합니다.
+  // 세션 만료로 session-guard.tsx가 /login?expired=1로 보낸 경우 안내를 보여준다.
+  // 클라이언트에서 한 번만 확인하면 되는 값이라 useSearchParams(Suspense 경계 필요)
+  // 대신 window.location을 읽는다.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("expired") === "1") {
@@ -147,17 +123,11 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // mode/email/password를 state에서 읽지 않고 인자로 받는 이유: 데모 로그인
-  // 버튼이 setEmail/setPassword로 state를 채우는 것과 동시에 바로 로그인
-  // 요청까지 보내야 하는데, React state 업데이트는 비동기라 그 직후에
-  // email/password state를 읽으면 아직 빈 문자열일 수 있음. 그래서 실제
-  // 로그인 로직은 인자로 받은 값을 쓰게 분리함.
+  // mode/email/password를 인자로 받는 이유: 값을 state에 채우는 것과 동시에 로그인
+  // 요청을 보내는 경우, state 업데이트가 비동기라 직후에 읽으면 빈 값일 수 있다.
   //
-  // 2026-08-20 세션: fetch(`/api/auth/${mode}`) 직접 호출하던 걸
-  // better-auth 클라이언트(authClient)로 교체. authClient.signUp.email에는
-  // name이 필수라서(better-auth User 모델 공통 필드), 화면엔 별도 입력란이
-  // 없으니 이메일 앞부분을 이름으로 씀 — 나중에 실제 닉네임 입력을
-  // 받고 싶으면 여기 name만 바꾸면 됨.
+  // better-auth 클라이언트로 요청한다. signUp.email은 name이 필수인데 별도 입력란이
+  // 없어서 이메일 앞부분을 이름으로 쓴다.
   async function submitLogin(targetMode: Mode, targetEmail: string, targetPassword: string) {
     setSubmitting(true);
     try {
@@ -187,29 +157,22 @@ export function LoginScreen({ mode }: { mode: Mode }) {
         showToast(authErrorMessage(error, "요청에 실패했어요. 잠시 후 다시 시도해주세요."));
         return;
       }
-      // 2026-09-14 세션: requireEmailVerification이 켜지면(auth.ts) 회원가입
-      // 직후에도 세션이 안 만들어져요(token: null) — 이메일 인증 전까지는
-      // 로그인도 막혀요. 이 경우엔 홈으로 안 보내고 "메일함 확인해주세요"
-      // 안내만 보여줍니다.
+      // 이메일 인증이 필요하면(auth.ts requireEmailVerification) 가입 직후에도 세션이
+      // 생기지 않으므로(token: null), 홈으로 보내지 않고 메일 확인 안내를 보여준다.
       if (targetMode === "signup" && !data?.token) {
         setVerificationPending(true);
         return;
       }
-      // 2026-08-20 세션: query-provider.tsx의 전역 staleTime(15초) 때문에,
-      // 로그인 직전에 다른 화면에서 이미 세션 쿼리가 "비로그인"으로
-      // 캐시돼있으면 로그인에 성공해도 15초 동안 그 캐시가 그대로 보여서
-      // 헤더가 "게스트님"으로 남아있는 버그가 있었음. logout-button.tsx가
-      // 로그아웃 후 캐시를 직접 갱신하는 것처럼, 로그인/회원가입 성공
-      // 직후에도 세션 쿼리를 무효화해서 즉시 새로 불러오게 함.
+      // 전역 staleTime(15초) 동안 이전의 "비로그인" 세션 캐시가 남아 헤더가 갱신되지
+      // 않을 수 있으므로, 로그인·회원가입 직후 세션 쿼리를 무효화한다.
       await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
       // 세션 쿠키보다 오래 남는 마커 — src/app/page.tsx가 콜드 스타트
       // 시 "만료됨" 안내 여부를 이걸로 판단합니다.
       markReturningUser();
       markSessionOnly(!remember);
       setSuccess(true);
-      // push가 아니라 replace: 로그인 화면이 뒤로가기 히스토리에 남으면, 홈에서
-      // 뒤로가기를 눌렀을 때 캐시된 /login?expired=1이 복원돼서 이미 로그인한
-      // 상태인데도 "세션이 만료됐어요" 안내가 다시 떴어요(2026-11-21 모바일 확인).
+      // replace로 이동: 로그인 화면이 기록에 남으면 홈에서 뒤로가기 시 캐시된
+      // /login?expired=1이 복원돼 만료 안내가 다시 뜬다.
       setTimeout(() => router.replace("/notifications"), 1100);
     } catch {
       showToast("서버에 연결할 수 없어요.");
@@ -246,7 +209,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
     await submitLogin(mode, email, password);
   }
 
-  // 데모 로그인 버튼과 함께 비노출 (2026-11-01 세션, 버튼 쪽 주석 참고)
+  // 데모 로그인 버튼과 함께 숨김
   // function handleDemoLogin() {
   //   setEmail(DEMO_EMAIL);
   //   setPassword(DEMO_PASSWORD);
@@ -477,11 +440,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
                     }}
                     type="checkbox"
                   />
-                  {/* 2026-09-13 세션: 예전엔 <b>로만 굵게 표시돼서 눌러도
-                      아무 반응이 없었어요(사용자 지적으로 발견) — 실제로
-                      읽어볼 방법이 없는 채로 동의를 받고 있었던 셈. 정식
-                      이용약관 문서는 아직 따로 없어서(개인정보처리방침만
-                      존재), 지금은 두 문구 다 /privacy로 연결합니다. */}
+                  {/* 별도 이용약관 문서가 없어 두 링크 모두 /privacy로 연결한다. */}
                   <span>
                     <Link className="font-bold text-[#191f28] underline" href="/privacy">
                       이용약관
@@ -518,7 +477,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
               )}
             </button>
 
-            {/* 정식 출시로 데모 로그인 버튼 비노출 (2026-11-01 세션)
+            {/* 데모 로그인 버튼(정식 출시 후 숨김)
             {mode === "login" ? (
               <button
                 className="flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[#c9d1db] text-[12.5px] font-bold text-[#6b7684] transition-colors active:bg-[#f2f4f6] disabled:opacity-60"
@@ -537,7 +496,7 @@ export function LoginScreen({ mode }: { mode: Mode }) {
 
           {/* 소셜 로그인 + 하단 */}
           <div className="mt-auto space-y-5 pt-8">
-            {/* 카카오/Apple 로그인 실연동 전까지 비노출 (2026-08-22 세션)
+            {/* 카카오/Apple 로그인(실연동 전까지 숨김)
             <div className="relative flex items-center justify-center">
               <div className="h-px w-full bg-[#f2f4f6]" />
               <span className="absolute bg-white px-3 text-[12px] font-semibold text-[#6b7684]">

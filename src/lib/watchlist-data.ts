@@ -1,19 +1,11 @@
 import { prisma } from "@/lib/db";
 
 // ---------------------------------------------------------------------------
-// 관심종목 조회 로직 (2026-08-18 세션, SSR 쿠키 문제 수정하며 분리). 서버
-// 전용 모듈이라 "use client" 파일(use-watchlist.ts)에서 직접 import하면 안
-// 됩니다 — 대신 이 함수는 API 라우트(/api/watchlist)랑 서버 컴포넌트
-// (app/watchlist/page.tsx)에서 각각 직접 호출해서 같은 로직을 공유해요.
+// 서버 전용 관심종목 조회 로직. API 라우트(/api/watchlist)와 서버 컴포넌트
+// (app/watchlist/page.tsx)가 함께 쓴다. "use client" 파일에서 import하면 안 된다.
 //
-// 원래는 페이지가 클라이언트 컴포넌트(WatchlistBody)의 useSuspenseQuery로
-// /api/watchlist를 fetch했는데, 이 fetch가 Next.js의 최초 서버 렌더 패스
-// 에서도 한 번 실행돼요(use-watchlist.ts 주석 참고). 그때는 Node 서버가
-// 스스로에게 HTTP 요청을 보내는 거라 브라우저 쿠키(세션)가 자동으로 안
-// 실려서, 로그인한 상태여도 그 자체 요청은 401을 받았어요(관심종목이
-// 유저별로 바뀌면서 새로 생긴 문제). 그래서 이제 페이지가 이 함수를 직접
-// 호출해서 initialData로 넘겨주고, useSuspenseQuery는 그 데이터를 그대로
-// 쓰다가 브라우저에서만 다시 fetch(그땐 쿠키가 정상적으로 실림)합니다.
+// 페이지가 클라이언트 fetch에만 의존하면 서버 렌더 중 쿠키 없는 자기 호출로 401이
+// 나므로, 페이지가 이 함수를 직접 호출해 initialData로 넘긴다.
 // ---------------------------------------------------------------------------
 
 export type WatchlistItem = {

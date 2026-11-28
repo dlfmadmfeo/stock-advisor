@@ -1,64 +1,40 @@
 // ---------------------------------------------------------------------------
 // 백테스트 CLI (수동 실행: `pnpm backtest`)
 //
-// 기술 지표 4개(골든크로스/거래량비율/52주 반등/RSI)만으로 판정한 "매수" 신호가
-// 실제로 그 뒤 수익이 났는지 확인. PER/PBR 업종 밸류에이션은 룩어헤드 편향
-// 문제로 1차에서는 뺐어요 (src/lib/backtest.ts 상단 주석 참고).
+// 기술 지표 4개(골든크로스/거래량비율/52주 반등/RSI)로 판정한 매수 신호가 이후
+// 수익으로 이어졌는지 확인한다. PER/PBR 업종 밸류에이션은 룩어헤드 편향 때문에
+// 제외했다(src/lib/backtest.ts 상단 참고). refresh-universe.ts와 같이 tsx 단독 실행 +
+// .env.local 직접 로딩을 쓴다.
 //
-// 매일 도는 배치가 아니라 필요할 때 한 번 돌려서 콘솔로 결과를 보는
-// 분석 도구입니다. refresh-universe.ts와 같은 방식으로 tsx 단독 실행 +
-// .env.local 직접 로딩을 씁니다.
-//
-// 대상 종목 우선순위: --tickers(직접 지정) > --universe(DB 유니버스 전체, 최대
-// 200개 — refresh-universe를 먼저 한 번 돌려서 DB가 채워져 있어야 함) > 기본값
-// (샘플 10종목, stocks.ts).
+// 대상 종목 우선순위: --tickers > --universe(DB 유니버스, 최대 200개) > 샘플 10종목.
 //
 // 사용법:
-//   pnpm backtest                       # 기본값 (holdDays=10, days=500, 샘플 10종목)
-//   pnpm backtest -- --universe          # DB에 있는 유니버스 전체 대상
-//   pnpm backtest -- --universe --limit=50   # 유니버스 중 시총 상위 50개만
-//   pnpm backtest -- --hold=20          # 20거래일 보유로 변경
-//   pnpm backtest -- --days=800         # 더 긴 과거 기간
+//   pnpm backtest                            # 기본값 (holdDays=10, days=500, 샘플 10종목)
+//   pnpm backtest -- --universe              # DB 유니버스 전체
+//   pnpm backtest -- --universe --limit=50   # 시총 상위 50개만
+//   pnpm backtest -- --hold=20               # 20거래일 보유
+//   pnpm backtest -- --days=800              # 더 긴 과거 기간
 //   pnpm backtest -- --tickers=005930,000660
-//   pnpm backtest -- --end=2024-06-30 --days=250   # 특정 기간(이 예시는
-//     2024-06-30까지의 약 1년) — 지금 실행하면 항상 "최근 N일"만 보게 되는데,
-//     상승장 구간 하나만 보고 판단하면 편향될 수 있어서 하락장/횡보장 구간도
-//     따로 --end로 지정해서 같은 규칙이 다른 국면에서도 통하는지 봐야 함.
-//   pnpm backtest -- --tp=3 --sl=-2    # 익절/손절 켜기 (기본은 꺼짐 — 고정 holdDays 청산)
-//     ⚠️ +3%/-2%로 한 번 시도했었는데, 손절선이 익절선보다 진입가에 더 가까워서
-//     구조적으로 먼저 닿기 쉬웠고(손절 5206건 vs 익절 3442건) 승률 39.8%,
-//     우위 -2.06%p(p≈0)로 baseline보다 확실히 나빴습니다. 그래서 기본값을
-//     "익절/손절 없음"으로 되돌렸어요. 다시 시도한다면 손익비를 더 신중하게
-//     설계해야 합니다(예: 손절폭을 익절폭만큼 넓히거나 변동성 기반으로 조정).
+//   pnpm backtest -- --end=2024-06-30 --days=250
+//     특정 국면(하락장·횡보장)에서도 같은 규칙이 통하는지 보기 위한 기간 지정
+//   pnpm backtest -- --tp=3 --sl=-2          # 익절/손절 (기본은 꺼짐, 고정 holdDays 청산)
+//     +3%/-2%는 손절선이 더 가까워 손절이 먼저 닿기 쉬웠고(손절 5206건 vs 익절 3442건)
+//     승률 39.8%, baseline 대비 -2.06%p로 나빠 기본값에서 뺐다.
 //
-// 2026-08-14 세션 추가 — 승률 개선 실험용 3개 옵션 (전부 기본 꺼짐, 조합 가능):
-//   pnpm backtest -- --universe --strongOnly   # "강한 매수"(4/4)만 신호로 인정
-//     ⚠️ 백테스트는 룩어헤드 편향 때문에 밸류에이션 없이 판정하므로("매수"(3/4+저평가)
-//     등급은 밸류에이션 확인이 필요해 백테스트에서 애초에 안 뜸) 지금은 이 옵션을 켜도
-//     결과가 안 바뀔 가능성이 높습니다 — byStrength.normal의 count가 0이면 그 뜻.
-//   pnpm backtest -- --universe --confirm      # 이틀 연속 신호 떠야 진입 (휩쏘 필터)
-//   pnpm backtest -- --universe --trendMa=60   # MA60(장기 이평선) 위일 때만 매수
-//   pnpm backtest -- --universe --confirm --trendMa=60   # 조합해서 같이 테스트 가능
+// 승률 개선 실험 옵션 (기본 꺼짐, 조합 가능):
+//   --strongOnly   4/4 신호만 인정 (백테스트는 밸류에이션 없이 판정하므로 결과 차이가
+//                  작을 수 있다. byStrength.normal count가 0이면 그 경우)
+//   --confirm      이틀 연속 신호일 때만 진입 (휩쏘 필터)
+//   --trendMa=60   MA60 위일 때만 진입
 //
-// 2026-08-14 세션 추가 — 급락 후 안정화(드롭 리버설) 신호 (완전히 다른 전략,
-// 기존 4개 기술지표 대신 이걸로 신호를 냄. indicators.ts의 detectDropReversal 참고):
-//   pnpm backtest -- --universe --dropReversal
-//     ⚠️ --strongOnly는 dropReversal엔 개념이 없어서 무시됩니다(항상 신호 유지).
-//     ⚠️ --trendMa와 같이 켜면 앞뒤가 안 맞을 수 있어요(급락 직후는 보통 장기
-//     이평선 아래라서 필터에 거의 다 걸러짐) — 따로따로 테스트 권장.
-//     --confirm과는 궁합이 맞을 수 있음(안정화가 2일 연속 확인돼야 진입).
-//     임계값(하락폭 10%, 저점 이후 2~8일 등)은 CLI 옵션이 아니라
-//     src/lib/indicators.ts의 DROP_REVERSAL_DEFAULTS를 직접 수정하세요.
+// 급락 후 안정화 신호 (기존 4개 지표 대신 사용, indicators.ts detectDropReversal):
+//   --dropReversal
+//     --strongOnly는 무시된다. --trendMa와 함께 쓰면 대부분 걸러지므로 따로 테스트하고,
+//     --confirm과는 함께 쓸 수 있다. 임계값은 indicators.ts의 DROP_REVERSAL_DEFAULTS에서 바꾼다.
 //
-// ⚠️ 종목 수가 많아지면 시간이 오래 걸려요. 종목 하나당 500일치를 받으려면
-// (95일씩 쪼개서) 약 5~6번 KIS를 호출하는데, kis.ts의 전역 rate limiter가
-// 초당 6건으로 막아놔서 200종목이면 대략 3~4분 정도 걸릴 걸로 예상돼요
-// (실측은 못 해봤어요 — 직접 돌려보면서 감 잡아야 함).
-//
-// ⚠️ 이 세션은 KIS를 직접 호출해 검증 못 했어요. fetchDailyBarsHistory의
-// 페이지네이션 가정(kis.ts 주석 참고)이 실제와 다르면 종목별 usableDays가
-// 비정상적으로 적게 나올 수 있어요 — 그런 경우 kis.ts의 HISTORY_CHUNK_DAYS나
-// 파싱 로직부터 의심하고 콘솔에 찍히는 원본 응답을 한 번 확인해보세요.
+// 종목 하나당 500일치를 받는 데 KIS 호출이 5~6번 필요하고 kis.ts의 rate limiter가
+// 초당 6건이라, 200종목이면 수 분이 걸린다. 종목별 usableDays가 비정상적으로 적으면
+// kis.ts의 HISTORY_CHUNK_DAYS와 파싱 로직을 먼저 확인한다.
 // ---------------------------------------------------------------------------
 
 import fs from "node:fs";
@@ -132,7 +108,7 @@ async function main() {
   const takeProfitPct = tpArg ? Number(tpArg) : null;
   const stopLossPct = slArg ? Number(slArg) : null;
 
-  // 2026-08-14 세션 추가: 승률 개선 실험용 옵션 (전부 기본값 = 기존 동작).
+  // 승률 개선 실험용 옵션 (기본값이면 기존 동작과 같다).
   const strongOnly = hasFlag("strongOnly");
   const requireConfirmation = hasFlag("confirm");
   const trendMaArg = parseArg("trendMa", "");

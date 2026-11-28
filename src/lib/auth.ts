@@ -7,15 +7,9 @@ import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
 import { afterAccountDelete, beforeAccountDelete } from "@/lib/account-deletion";
 
 // ---------------------------------------------------------------------------
-// 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식 대신 better-auth
-// 라이브러리로 교체했어요. Lucia(이전에 우리가 쓰던 방식과 같은 "직접
-// 구현" 철학)가 공식적으로 유지보수를 중단하고 better-auth로 넘어가라고
-// 안내한 게 계기 — 소셜 로그인(카카오/Apple)도 나중에 플러그인으로 붙이기
-// 쉬워짐. Prisma 어댑터를 써서 기존 MySQL DB를 그대로 씁니다.
-//
-// 주의: 예전 User.passwordHash(scrypt 직접 구현)로 저장돼 있던 비밀번호는
-// better-auth의 Account.password 저장 방식과 호환되지 않아요. 이미 가입한
-// 계정이 있었다면 다시 가입해야 합니다.
+// 인증은 better-auth와 Prisma 어댑터로 처리한다(기존 MySQL DB 사용).
+// 직접 구현했던 scrypt+HMAC 세션 방식에서 옮겼으며, 이전 User.passwordHash로
+// 저장된 비밀번호는 호환되지 않는다.
 // ---------------------------------------------------------------------------
 
 export const auth = betterAuth({
@@ -39,19 +33,12 @@ export const auth = betterAuth({
       : undefined,
   emailAndPassword: {
     enabled: true,
-    // 2026-09-25 세션: 회원가입 이메일 인증 활성화. 이 값이 true면 인증 전
-    // 계정은 로그인이 거부돼요(sign-in.mjs가 emailVerified === false면 403)
-    // — 켜기 전에 기존 가입자 전원(관리자/데모/실가입자)을 emailVerified=true로
-    // 미리 바꿔뒀어요(데모 계정은 가짜 도메인이라 인증 자체가 불가능). 앞으로
-    // 이 플래그를 다시 끌 일이 있더라도 그 3명은 이미 인증 처리된 상태예요.
+    // 회원가입 이메일 인증. 인증 전 계정은 로그인이 거부된다(403).
+    // 기존 가입자는 활성화 전에 emailVerified=true로 처리했다.
     requireEmailVerification: true,
     minPasswordLength: 4,
-    // 2026-09-13 세션: "비밀번호 찾기" 버튼이 그동안 토스트만 띄우고 실제
-    // 재설정은 안 됐음(메일 발송 수단이 없었음) — 이메일 발송 연결하면서
-    // 실제 동작하게 함. email.ts가 설정 안 됐으면 조용히 false만 반환하니,
-    // 여기서 별도 에러 처리는 안 함(better-auth가 알아서 성공 응답을
-    // 돌려주고, 실제 발송 실패는 로그로만 남음 — 이메일 존재 여부를 응답으로
-    // 노출 안 하는 게 보안상 맞음).
+    // 비밀번호 재설정 메일. 메일 설정이 없으면 email.ts가 false만 반환하고, 응답은
+    // 항상 성공으로 돌려준다(이메일 가입 여부를 응답으로 노출하지 않기 위해).
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
     },
@@ -81,26 +68,18 @@ export const auth = betterAuth({
     }),
   },
   session: {
-    // 세션 만료: 운영은 30일, 로컬 개발(npm run dev)만 5분입니다.
-    // 30일은 로그인 화면의 "로그인 상태 유지"(rememberMe)를 체크했을 때의
-    // 값이에요. 체크를 해제하면 better-auth가 알아서 세션 쿠키(브라우저를
-    // 닫으면 삭제) + 서버 만료 1일로 짧게 발급합니다. 사용 중에는 updateAge
-    // (기본 1일)마다 만료일이 뒤로 밀려서, 30일 안에 한 번이라도 접속하면
-    // 계속 유지돼요.
-    // 만료/콜드스타트 만료 감지(returning-user-mark.ts)와 푸시 탭 후
-    // "로그아웃됐어요" 흐름을 로컬에서 반복 테스트하려고 개발 모드에서만 짧게
-    // 두는 거예요. 예전엔 5분을 운영에 그대로 배포한 채 되돌리는 걸 깜빡해서
-    // 열흘 넘게 실가입자들이 5분마다 로그아웃된 사고가 있었는데, NODE_ENV로
-    // 나눠 두면 그런 일이 안 생겨요(운영 빌드는 항상 production).
+    // 세션 만료: 운영 30일, 로컬 개발(npm run dev)만 5분.
+    // 30일은 "로그인 상태 유지"를 선택했을 때의 값이고, 선택하지 않으면 better-auth가
+    // 세션 쿠키(브라우저 종료 시 삭제)와 서버 만료 1일로 발급한다. updateAge(기본 1일)
+    // 마다 만료일이 연장된다. 개발 모드만 짧게 둔 것은 만료 흐름을 반복 테스트하기
+    // 위해서이며, NODE_ENV로 나눠 운영에 짧은 값이 배포되지 않게 했다.
     expiresIn: process.env.NODE_ENV === "development" ? 60 * 5 : 60 * 60 * 24 * 30,
   },
-  // Prisma User.isAdmin 컬럼을 better-auth 세션에도 실어옵니다(2026-08-23
-  // 세션). input:false라서 회원가입/프로필 수정 API로는 이 필드를 못 건드려요
-  // — DB에서 직접 켜야만 관리자가 됨(스스로 관리자 체크박스를 켜는 걸 막음).
+  // User.isAdmin을 세션에 포함한다. input:false라 회원가입·프로필 API로는 바꿀 수
+  // 없고, DB에서 직접 설정해야 관리자가 된다.
   user: {
-    // 회원 탈퇴(2026-09-25 세션, Google Play 계정 삭제 요구사항). 클라이언트가
-    // 비밀번호를 같이 보내야만 삭제돼요(delete-user 엔드포인트가 검증). 데모/관리자
-    // 계정 보호와 실시간 구독 정리는 account-deletion.ts 참고.
+    // 회원 탈퇴(Google Play 계정 삭제 요구사항). 비밀번호를 함께 보내야 삭제된다.
+    // 데모·관리자 계정 보호와 실시간 구독 정리는 account-deletion.ts 참고.
     deleteUser: {
       enabled: true,
       beforeDelete: async (user) => {
@@ -120,10 +99,7 @@ export const auth = betterAuth({
   },
 });
 
-// 서버 컴포넌트/라우트 핸들러에서 로그인한 유저(민감 정보 제외)를 조회.
-// 예전 auth.ts의 getSessionUser()와 같은 이름/반환 형태를 유지해서, 이 함수를
-// 쓰던 watchlist/page.tsx, api/watchlist/route.ts, api/watchlist/[ticker]/
-// route.ts는 그대로 두고 이 함수 내부 구현만 better-auth로 바꿨어요.
+// 서버 컴포넌트·라우트 핸들러에서 로그인한 유저(민감 정보 제외)를 조회한다.
 export async function getSessionUser(): Promise<{ id: string; email: string; isAdmin: boolean } | null> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return null;

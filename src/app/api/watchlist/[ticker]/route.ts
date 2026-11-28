@@ -6,18 +6,10 @@ import { getSessionUser } from "@/lib/auth";
 const REALTIME_SERVER_URL = process.env.REALTIME_SERVER_URL ?? "http://localhost:8081";
 const TICKER_RE = /^\d{6}$/;
 
-// 2026-08-14 세션: 프론트(WatchlistBody.addTicker)가 티커를 body 대신 URL
-// 경로에 넣는 방식으로 바뀌면서, 원래 src/app/api/watchlist/route.ts에
-// 있던 POST 핸들러를 이쪽(경로 기반)으로 옮겨왔습니다. DELETE랑 같은
-// 위치(경로에 ticker)에 있는 게 REST스럽게 더 일관돼서 이대로 유지.
+// 관심종목 추가(POST)·삭제(DELETE). 티커는 URL 경로로 받는다.
 //
-// 2026-08-18 세션: 회원가입/로그인 도입하면서 Watchlist가 (userId, ticker)
-// 유니크로 바뀜. Spring(stock-advisor-server)은 어느 유저 건지 알 방법이
-// 없어서(내부 API에 userId를 안 실음) 더 이상 Watchlist 테이블에 못 씀 —
-// WatchlistController.add()/remove()에서 DB 쓰기 코드를 제거했어요. 그래서
-// DB 쓰기는 이제 항상 여기(Next.js/Prisma)가 맡고, Spring은 실시간
-// 구독(웹소켓)만 관리합니다. (예전엔 Spring이 먼저 써서 여기선 Spring
-// 실패했을 때만 대신 썼는데, 그 전제가 없어졌어요.)
+// Watchlist는 (userId, ticker) 단위로 저장한다. DB 쓰기는 여기(Next.js/Prisma)서만
+// 하고, Spring 서버(stock-advisor-server)는 유저를 모르므로 KIS 실시간 구독만 관리한다.
 export async function POST(_req: Request, { params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
 

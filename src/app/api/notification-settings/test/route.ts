@@ -4,10 +4,8 @@ import { getSessionUser } from "@/lib/auth";
 import { fcmConfigured, sendPush } from "@/lib/fcm";
 
 // ---------------------------------------------------------------------------
-// "알림" 탭의 "테스트 알림 보내기" 버튼용 (2026-08-31 세션). DART 공시를
-// 기다리지 않고, 지금 로그인한 유저 본인의 PushToken으로 바로 푸시를
-// 하나 쏴봅니다 — 발송 로직 자체는 dart-poll.ts의 notifyNewFilings가
-// 쓰는 sendPush()를 그대로 재사용.
+// "테스트 알림 보내기" 버튼용. 로그인한 유저 본인의 PushToken으로 바로 푸시를
+// 보낸다(dart-poll.ts와 같은 sendPush() 사용).
 // ---------------------------------------------------------------------------
 export async function POST() {
   const user = await getSessionUser();

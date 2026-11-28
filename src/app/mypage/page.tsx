@@ -9,18 +9,9 @@ import { prisma } from "@/lib/db";
 import { formatKstDate } from "@/lib/format-kst";
 import { accountDeletionBlockReason } from "@/lib/account-deletion";
 
-// watchlist/alerts와 같은 이유로 로그인 안 했으면 /login으로 보냅니다.
-//
-// 2026-09-12 세션: 이 화면 전체가 "김투자님"/"kimtuja@example.com"/"VIP"/
-// "투자 경력 2년 3개월"/"총 자산 32,450,000원" 같은 완전한 정적 목업이라
-// 누가 로그인하든 항상 똑같이 보였어요(사용자 지적으로 발견). 게다가
-// "거래내역/입출금/추천이력/보안설정" 메뉴는 이 앱에 애초에 없는
-// 기능이고(이 앱은 증권 계좌 연동이 없는 공개 지표 스크리너예요),
-// 버튼 자체에 onClick/href도 없어서 눌러도 아무 일도 안 났습니다.
-// 실제 세션/DB 값과, 실제로 존재하는 기능(관심종목/알림 설정/개인정보
-// 처리방침)으로만 다시 구성했고, 같은 세션에서 시각적으로도 한 번 더
-// 다듬었습니다 — 프로필/통계를 카드 하나로 묶고, 메뉴는 라벨 길이에
-// 안 흔들리는 세로 리스트로.
+// 비로그인이면 /login으로 보낸다(watchlist·alerts와 동일).
+// 프로필과 통계는 실제 세션·DB 값으로 보여주고, 메뉴는 앱에 있는 기능
+// (관심종목, 알림 설정, 개인정보처리방침)만 둔다.
 export default async function MyPagePage() {
   const user = await getSessionUser();
   if (!user) {
@@ -43,10 +34,7 @@ export default async function MyPagePage() {
     <AppShell>
       <TopBar title="마이페이지" />
       <section className="px-5 pb-8 pt-3 lg:max-w-[640px] lg:px-8">
-        {/* 프로필 + 통계를 카드 하나로 묶음 — 예전엔 "누구인지"(아바타/이메일)와
-            "내 지표"(관심종목 수 등)가 각각 다른 카드로 떨어져 있어서 한
-            화면인데 두 덩어리처럼 보였어요. 안쪽 구분선(border-t)만으로
-            나눠서 시각적으로는 하나의 프로필 단위로 읽히게 했습니다. */}
+        {/* 프로필과 통계를 카드 하나로 묶고, 안쪽 구분선으로만 나눈다. */}
         <div className="overflow-hidden rounded-lg bg-white ring-1 ring-[#e5e8eb]">
           <div className="flex items-center gap-3 p-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-sm font-bold text-white">
@@ -104,9 +92,7 @@ export default async function MyPagePage() {
 
         <LogoutButton />
 
-        {/* 회원 탈퇴(2026-09-25 세션) — 로그아웃 버튼과 헷갈리지 않게 눈에 덜
-            띄는 텍스트 링크로 둠. 탈퇴가 막힌 계정(데모/관리자)에는 아예 안
-            보여줌. */}
+        {/* 회원 탈퇴: 로그아웃 버튼과 구분되는 텍스트 링크. 탈퇴가 막힌 계정(데모·관리자)에는 숨긴다. */}
         {accountDeletionBlockReason(user) ? null : (
           <div className="mt-5 text-center">
             <Link className="text-[12px] font-semibold text-[#6b7684] underline" href="/mypage/delete">

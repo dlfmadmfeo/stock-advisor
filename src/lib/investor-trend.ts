@@ -118,12 +118,9 @@ export function aggregateInvestorTrend(
   return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
 }
 
-// ⚠️ KIS 응답의 순매수 거래대금(frgn_ntby_tr_pbmn 등) 단위를 문서로 확인 못
-// 했어요 — 실측 값(예: 삼성전자 하루 순매수 -1,801,118)을 "억원" 단위로
-// 해석하면 하루 순매수가 -180만억원(=1경8천조)이 되어 말이 안 되고, "천원"
-// 단위로 보면 -18억원 정도가 나와서 훨씬 그럴듯해요. 그래서 천원 단위로
-// 가정하고 억원으로 변환합니다 — 실제 화면에서 다른 사이트(네이버 증권 등)
-// 수치랑 비교해서 확인해보고 다르면 이 divisor만 고치면 됩니다.
+// 순매수 거래대금(frgn_ntby_tr_pbmn 등)은 문서에 단위가 없어 실측값으로 판단했다.
+// 억원으로 보면 비현실적인 값이 나오고 천원으로 보면 타당한 범위라, 천원 단위로
+// 보고 억원으로 변환한다.
 const RAW_UNIT_TO_EOK = 100_000; // 천원 -> 억원 (1억원 = 100,000천원)
 
 export function formatNetAmountEok(rawThousandWon: number): string {

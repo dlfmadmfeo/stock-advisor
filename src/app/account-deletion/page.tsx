@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-// 계정/데이터 삭제 안내 — Google Play 데이터 보안 양식에 넣는 공개 웹 링크
-// (2026-09-25 세션). 앱을 이미 지웠거나 로그인할 수 없는 사람도 볼 수 있어야
-// 해서 로그인 여부와 무관한 독립 정적 페이지로 둡니다(privacy 페이지와 동일).
+// 계정·데이터 삭제 안내(Google Play 데이터 보안 양식의 공개 링크). 앱을 지웠거나
+// 로그인할 수 없는 사람도 볼 수 있도록 로그인과 무관한 정적 페이지로 둔다.
 export const metadata: Metadata = {
   title: "계정 및 데이터 삭제 안내 | 주식 어드바이저",
 };

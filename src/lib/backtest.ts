@@ -13,7 +13,7 @@ import type { Stock } from "./stocks";
 // 두 군데로 갈라지면 나중에 화면 로직만 바꾸고 백테스트는 옛날 기준으로 도는
 // 사고가 나기 쉬움).
 //
-// ⚠️ 1차 범위: PER/PBR 업종 상대 밸류에이션은 뺐습니다. 과거 특정 날짜 시점의
+// 주의: 1차 범위: PER/PBR 업종 상대 밸류에이션은 뺐습니다. 과거 특정 날짜 시점의
 // PER/PBR을 구하려면 그 시점의 시가총액·순이익·순자산이 다 필요한데, 지금
 // 갖고 있는 건 "지금 시점"의 PER/PBR뿐이라 과거로 끌어다 쓰면 미래 데이터를
 // 과거에 쓰는 룩어헤드 편향이 생겨요. 그래서 getRecommendation을
@@ -44,8 +44,7 @@ export type BacktestOptions = {
   // 같은 날 둘 다 닿을 수 있는 경우(변동성 큰 날) 보수적으로 손절을 먼저 체크합니다.
   takeProfitPct?: number | null;
   stopLossPct?: number | null;
-  // ⚠️ 아래 4개는 2026-08-14 세션에서 승률 개선 실험용으로 추가한 옵션입니다.
-  // 전부 기본 꺼짐(기존 동작과 동일) — CLI에서 명시적으로 켜야 합니다.
+  // 아래 4개는 승률 개선 실험용 옵션이다. 기본은 꺼져 있고 CLI에서 켠다.
 
   // true면 "강한 매수"(4/4 지표 전부 충족)만 신호로 인정하고 "매수"(3/4+저평가)는
   // 무시합니다. 단, 백테스트는 룩어헤드 편향 때문에 밸류에이션 없이 getRecommendation을
@@ -60,7 +59,7 @@ export type BacktestOptions = {
   // 양수를 주면(예: 60) 그 기간 이동평균 위에 있을 때만 매수를 허용합니다(장기 추세
   // 필터). 기존 4개 지표는 MA5/MA20(단기)까지만 보는데, 장기 하락 추세(예: MA60 아래)
   // 안에서 발생하는 단기 반등 신호를 걸러내려는 목적. null/0/미지정이면 비활성화.
-  // ⚠️ dropReversal 모드와는 논리적으로 상충합니다(급락 직후엔 보통 MA 아래에
+  // 주의: dropReversal 모드와는 논리적으로 상충합니다(급락 직후엔 보통 MA 아래에
   // 있음) — 같이 켜면 신호가 거의 안 나올 수 있어요.
   trendFilterMaPeriod?: number | null;
 
@@ -97,7 +96,7 @@ export type BacktestResult = {
   // 일으켰던 지표라 참고용으로만 남겨둡니다).
   baselineAvgReturnPct: number | null;
   edgeVsBaselinePct: number | null; // avgReturnPct - baselineAvgReturnPct (양수면 신호가 baseline보다 나음)
-  buyAndHoldReturnPct: number | null; // ⚠️ 전체 기간(usableDays 전부) 단순 보유 수익률 — holdDays 단위 수익률과 기간이 달라 직접 비교하면 안 됨. 참고용.
+  buyAndHoldReturnPct: number | null; // 주의: 전체 기간(usableDays 전부) 단순 보유 수익률 — holdDays 단위 수익률과 기간이 달라 직접 비교하면 안 됨. 참고용.
   trades: BacktestTrade[];
   // 통계 검정(전체 집계에서 t-검정 할 때 풀링용)을 위한 원본 baseline 수익률
   // 배열. UI에는 안 쓰고 aggregateResults 내부 계산용입니다.
@@ -149,7 +148,7 @@ export function backtestTicker(
   dailyBars: DailyBar[],
   options: BacktestOptions = {},
 ): BacktestResult {
-  // ⚠️ 기본값은 익절/손절 없음(고정 holdDays 청산)입니다. +3%/-2%로 시도해봤더니
+  // 주의: 기본값은 익절/손절 없음(고정 holdDays 청산)입니다. +3%/-2%로 시도해봤더니
   // 손절선이 익절선보다 진입가에 더 가까워서(구조적으로 먼저 닿기 쉬움) 승률
   // 39.8%, 우위 -2.06%p(p≈0, 통계적으로 확실히 나쁨)로 오히려 baseline보다
   // 못한 결과가 나와서 기본값을 되돌렸습니다. 다시 실험해보고 싶으면 CLI에서
@@ -423,7 +422,7 @@ export type AggregateBacktestResult = {
   // 같아서 직접 비교 가능한 공정한 기준선입니다.
   overallBaselineAvgReturnPct: number | null;
   overallEdgeVsBaselinePct: number | null;
-  avgBuyAndHoldReturnPct: number | null; // ⚠️ 참고용 — 기간이 달라 overallAvgReturnPct와 직접 비교 금지
+  avgBuyAndHoldReturnPct: number | null; // 주의: 참고용 — 기간이 달라 overallAvgReturnPct와 직접 비교 금지
   // 신호 거래 수익률 전체(풀링) vs baseline 수익률 전체(풀링)를 Welch's
   // t-test로 비교한 결과. null이면 표본이 너무 작아 검정 불가.
   significance: TTestResult | null;

@@ -34,17 +34,11 @@ model Stock {
   // 규칙과 별개의 독립 신호라 screenerScore에는 안 들어가고 필터 전용.
   macdRebound   Boolean  @default(false)
   screenerScore Int      @default(0) // 4개 규칙 중 몇 개 통과했는지(0~4). "스크리너 많이 통과한 순" 정렬용.
-  // 완전충족/조건충족/보류/주의(screener.ts getRecommendation) 등급을 숫자로
-  // 캐시한 값. 3=완전충족, 2=조건충족, 1=보류, 0=주의 — 높을수록 좋음(desc
-  // 정렬하면 완전충족이 먼저 나오게, screenerScore랑 같은 관례). 업종 평균
-  // PER/PBR이 있어야 계산되는 값이라(다른 종목들 데이터가 다 있어야 함)
-  // refreshUniverse()가 200종목을 전부 저장한 "다음" 2차 패스에서 한 번에
-  // 채웁니다(2026-08-23 세션) — screenerScore처럼 종목 하나만 보고 그 자리에서
-  // 못 정함. 화면에 보이는 배지 자체는 이 컬럼을 안 쓰고 여전히 클라이언트가
-  // 실시간 데이터로 즉석 계산함(관심종목은 웹소켓으로 계속 갱신되니까 그게 더
-  // 정확함) — 이 컬럼은 오직 "등급순 정렬"(서버 페이지네이션)에만 씀. 그래서
-  // screenerScore와 마찬가지로 "마지막 새로고침 시점 기준" 스냅샷이라는 한계는
-  // 그대로 있음.
+  // 등급(screener.ts getRecommendation)을 숫자로 캐시한 값. 3=완전충족, 2=조건충족,
+  // 1=보류, 0=주의(desc 정렬 시 완전충족이 먼저). 업종 평균 PER/PBR이 필요해
+  // refreshUniverse()가 전 종목 저장 후 2차 패스에서 채운다. 화면 배지는 실시간 데이터로
+  // 클라이언트가 계산하고, 이 컬럼은 서버 페이지네이션의 등급순 정렬에만 쓴다
+  // (마지막 새로고침 시점 기준 스냅샷).
   recommendationRank Int @default(0)
   updatedAt     DateTime @updatedAt
 
@@ -55,29 +49,19 @@ model Stock {
   @@index([macdRebound])
 }
 
-// "유니버스 새로고침"이 동시에 두 번 안 돌게 막는 락. 예전엔 route.ts의
-// 메모리 변수(let isRunning)로 했는데, 이건 Vercel 서버리스 인스턴스마다
-// 따로 놀아서(같은 요청이 다른 인스턴스로 가면 그쪽은 isRunning=false로
-// 시작함) 실제로 동시 실행을 못 막았어요 — 진짜로 두 refreshUniverse()가
-// 같은 Stock 테이블에 동시에 upsert하면서 MySQL "Lock wait timeout" 에러가
-// 났던 게 이 문제 때문(2026-08-24 세션, 프로덕션에서 "다시 시도해달라는
-// 에러" 제보로 발견). 여러 인스턴스가 공유하는 건 DB뿐이라, 락도 DB에 둬야
-// 진짜로 막을 수 있음 — 싱글턴 row 하나(id=1)를 조건부 UPDATE로 원자적으로
-// 뺏어오는 방식(refresh-universe.ts의 acquireRefreshLock 참고).
+// 유니버스 새로고침 동시 실행을 막는 락. 서버리스 인스턴스는 메모리를 공유하지 않아
+// 메모리 변수로는 막을 수 없으므로(동시 upsert 시 MySQL Lock wait timeout 발생),
+// 싱글턴 row(id=1)를 조건부 UPDATE로 원자적으로 획득한다
+// (refresh-universe.ts acquireRefreshLock 참고).
 model RefreshLock {
   id        Int      @id @default(1)
   isRunning Boolean  @default(false)
   updatedAt DateTime @updatedAt
 }
 
-// KIS 접근토큰(OAuth) 캐시. RefreshLock과 같은 이유로 DB에 둡니다 — kis.ts가
-// 예전엔 이 토큰을 서버 프로세스 메모리(cachedToken)에만 캐싱했는데, Vercel
-// 서버리스는 콜드스타트마다 새 인스턴스라 메모리가 매번 비어있어서 요청마다
-// 토큰을 새로 발급받으려 했어요. 근데 KIS는 토큰 발급을 "분당 1회"로
-// 제한해서(EGW00133 에러), 여러 인스턴스가 짧은 시간에 겹치면 발급 자체가
-// 실패했어요(2026-08-24 세션, 투자자매매동향이 "자꾸 실패한다"는 제보로
-// 발견 — 근본 원인이 이거였음). 토큰 유효기간이 보통 24시간이라 DB에
-// 캐싱해두면 인스턴스가 몇 개든 하루에 한 번 정도만 실제로 발급받으면 됨.
+// KIS 접근토큰(OAuth) 캐시. 서버리스 인스턴스마다 메모리 캐시가 비어 토큰을 새로
+// 발급받게 되는데, KIS는 발급을 분당 1회로 제한한다(EGW00133). 토큰 유효기간이
+// 약 24시간이라 DB에 캐싱해 인스턴스 수와 관계없이 하루 한 번 정도만 발급받는다.
 model KisToken {
   id        Int      @id @default(1)
   token     String   @db.Text
@@ -85,29 +69,20 @@ model KisToken {
   updatedAt DateTime @updatedAt
 }
 
-// 2026-08-20 세션: 직접 구현했던 scrypt+HMAC 세션 방식(auth.ts)을
-// better-auth 라이브러리로 교체하면서, User/Session/Account/Verification
-// 4개 모델 구성을 better-auth의 Prisma 어댑터가 기대하는 표준 스키마
-// 그대로 맞췄습니다(필드명/타입 임의로 바꾸면 어댑터가 못 찾음).
-// 비밀번호 해시는 이제 여기 User.passwordHash가 아니라 Account.password에
-// better-auth가 알아서 저장해요 — 그래서 기존 passwordHash 컬럼은 제거.
-// 주의: 이 스키마로 바뀌면서 예전 방식(scrypt:salt:hash)으로 저장돼 있던
-// 비밀번호는 호환이 안 돼서, 이미 가입했던 계정이 있다면 다시 가입해야 해요.
+// User/Session/Account/Verification은 better-auth Prisma 어댑터의 표준 스키마를
+// 그대로 따른다(필드명·타입을 바꾸면 어댑터가 인식하지 못한다).
+// 비밀번호 해시는 Account.password에 저장된다.
 model User {
   id            String    @id @default(cuid())
   name          String
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  // "유니버스 새로고침"처럼 KIS API 배치를 실제로 트리거하는 관리자 전용
-  // 기능을 가릴 때 씀 (2026-08-23 세션). 지금은 관리 기능이 이거 하나뿐이라
-  // role 문자열 대신 boolean으로 충분 — 나중에 역할이 여러 개 필요해지면
-  // 그때 role 필드로 바꾸면 됨.
+  // 관리자 전용 기능(유니버스 새로고침, AI 추천 등) 접근 여부. 역할이 여러 개
+  // 필요해지면 role 필드로 바꾼다.
   isAdmin       Boolean   @default(false)
-  // DART 공시 → 관심종목 보유 유저 푸시 알림을 이 유저가 받을지(2026-08-31
-  // 세션, "알림" 탭 설정). 꺼두면 dart-poll.ts가 이 유저의 PushToken을
-  // 발송 대상에서 아예 빼요 — 토큰 자체는 지우지 않고 서버에서 걸러서
-  // 보내는 방식이라, 다시 켜면 바로 재개됨.
+  // 공시 푸시 알림 수신 여부("알림" 탭). 꺼두면 dart-poll.ts가 발송 대상에서 제외한다
+  // (토큰은 유지하므로 다시 켜면 바로 재개된다).
   notificationsEnabled Boolean @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -118,10 +93,8 @@ model User {
   pushTokens PushToken[]
 }
 
-// DART 공시 알림용 FCM 디바이스 토큰. 유저 한 명이 폰을 여러 대 쓸 수 있어서
-// User 1:N — token 자체가 기기를 식별하는 유니크 값이라 @unique로 재등록 시
-// upsert가 자연스럽게 됨(2026-08-31 세션, DART 공시 → 관심종목 보유 유저
-// 푸시 알림 기능).
+// 공시 알림용 FCM 디바이스 토큰. 유저 1:N(여러 기기), token이 기기를 식별하므로
+// @unique로 두어 재등록 시 upsert한다.
 model PushToken {
   id        String   @id @default(cuid())
   userId    String
@@ -143,10 +116,8 @@ model DartPollLock {
   updatedAt DateTime @updatedAt
 }
 
-// AI 추천 탭(관리자 전용, 2026-09-13 세션)의 마지막 생성 결과 캐시. 관리자가
-// "다시 생성하기"를 누를 때만 Claude를 호출하고(비용/속도 때문에 방문할
-// 때마다 자동 호출은 안 함), 결과를 싱글턴 row(id=1)에 덮어써서 다음 방문 때
-// 그대로 보여줍니다 — RefreshLock/DartPollLock과 같은 싱글턴 관례.
+// AI 추천 탭(관리자 전용)의 마지막 생성 결과. 비용과 속도 때문에 "다시 생성하기"를
+// 누를 때만 Claude를 호출하고, 결과를 싱글턴 row(id=1)에 덮어쓴다.
 model AiPickBatch {
   id          Int      @id @default(1)
   generatedAt DateTime @default(now())
@@ -205,11 +176,8 @@ model Account {
   id                    String    @id @default(cuid())
   accountId             String
   providerId            String
-  // 2026-08-20 세션: better-auth 1.7에서 새로 추가된 필드(설치된 버전이
-  // 1.7.1이라 바로 이 스키마를 요구함). "이 계정이 어떤 방식/기관으로
-  // 인증됐는지" 식별자 — 이메일+비밀번호 로그인은 better-auth가 자동으로
-  // "local:credential"을 넣어줍니다. 우리는 신규 프로젝트라 기존 row
-  // 백필 걱정 없이 그냥 필수 컬럼으로 추가하면 됨.
+  // better-auth 1.7에서 추가된 필드. 계정의 인증 방식 식별자로, 이메일+비밀번호
+  // 로그인은 "local:credential"이 자동으로 들어간다.
   issuer                String
   userId                String
   accessToken           String?

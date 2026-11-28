@@ -1,15 +1,9 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 로그아웃 버튼 + 확인 모달 (2026-08-14 세션 추가, 옵션 B: 별도 버튼 + 확인
-// 모달). `LogoutConfirmModal`을 따로 export해서 마이페이지 버튼(`LogoutButton`)
-// 이랑 GNB 프로필 드롭다운(`UserMenu`, user-menu.tsx)이 같은 모달을 재사용해요
-// — 로그아웃 확인 UX가 앱 안에서 한 군데(이 파일)에만 있으면 되니까요.
-//
-// 2026-08-18 세션: /api/auth/logout을 호출해서 세션 쿠키를 실제로 지웁니다
-// (그전엔 localStorage만 지우고 끝이었음). 2026-08-20 세션: better-auth
-// 도입하면서 authClient.signOut()으로 교체 — 내부적으로
-// /api/auth/sign-out을 호출해요.
+// 로그아웃 버튼 + 확인 모달. LogoutConfirmModal을 export해 마이페이지 버튼과
+// GNB 프로필 드롭다운(user-menu.tsx)이 같은 모달을 쓴다.
+// 로그아웃은 authClient.signOut()(/api/auth/sign-out)으로 처리한다.
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
@@ -62,9 +56,8 @@ export function LogoutConfirmModal({
                 // 만료" 안내가 뜨면 안 됨 — 마커도 같이 지움.
                 clearReturningUserMark();
                 queryClient.setQueryData(SESSION_QUERY_KEY, null);
-                // push가 아니라 replace: 마이페이지 같은 로그아웃 전 화면이
-                // 기록에 남으면, 로그인 화면에서 뒤로가기를 눌렀을 때 그 화면이
-                // 다시 나타났어요(2026-11-22 모바일 확인).
+                // replace로 이동: 로그아웃 전 화면이 기록에 남으면 로그인 화면에서 뒤로가기 시
+                // 다시 나타난다.
                 router.replace("/login");
               }
             }}

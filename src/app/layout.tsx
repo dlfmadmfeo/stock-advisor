@@ -23,12 +23,10 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <head>
-        {/* 한글 글꼴 Pretendard Variable(동적 서브셋 92개)은 우리 서버에서 직접
-            내려줍니다(public/fonts/pretendard, 캐시 1년 — next.config.ts).
-            예전엔 jsDelivr CDN에서 받았는데, 다른 도메인이라 연결 비용이 더 들고
-            캐시 기간도 제어할 수 없었어요(2026-11-21). 글꼴 CSS는 첫 화면을 막지
-            않도록 FontLoader가 로드 후에 붙입니다(시험해 보니 <head>에 직접 넣거나
-            번들 CSS에 합치면 FCP가 0.8s → 2.6s로 늘었어요). */}
+        {/* Pretendard Variable(동적 서브셋 92개)은 자체 호스팅한다
+            (public/fonts/pretendard, 캐시 1년 — next.config.ts). 글꼴 CSS는 첫 화면을
+            막지 않도록 FontLoader가 로드 후에 붙인다(<head>나 번들 CSS에 넣으면
+            FCP가 0.8s → 2.6s로 늘어난다). */}
       </head>
       <body className="min-h-full flex flex-col">
         <FontLoader />

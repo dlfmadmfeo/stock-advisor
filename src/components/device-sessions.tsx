@@ -1,15 +1,11 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 마이페이지 "활성 기기" 화면의 실제 콘텐츠 (2026-09-13 세션). better-auth가
-// 기본 제공하는 세션 관리 엔드포인트(list-sessions/revoke-session/
-// revoke-other-sessions)를 authClient로 그대로 호출합니다 — 서버 쪽에
-// 새 API 라우트를 안 만들어도 /api/auth/[...all]이 이미 처리해줘요.
+// 마이페이지 "활성 기기" 화면. better-auth의 세션 관리 엔드포인트(list-sessions,
+// revoke-session, revoke-other-sessions)를 authClient로 호출한다.
 //
-// "이 기기"(현재 세션) 판별은 getSession()이 돌려주는 세션의 token과
-// listSessions() 각 항목의 token을 비교해서 합니다. 현재 기기는 로그아웃
-// 버튼을 안 보여줘요 — 그건 이미 마이페이지의 "로그아웃" 버튼이 하는
-// 일이라 여기서 또 만들 필요가 없어서예요.
+// 현재 기기는 getSession()의 token과 listSessions() 항목의 token을 비교해 판별하고,
+// 현재 기기에는 로그아웃 버튼을 두지 않는다(마이페이지의 로그아웃이 담당).
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useState } from "react";
@@ -24,10 +20,8 @@ type SessionRow = {
   ipAddress?: string | null;
 };
 
-// User-Agent에서 브라우저 종류를 추출 — MAC 주소 같은 진짜 기기 식별값은
-// 브라우저가 서버로 아예 안 보내주는 값이라(로컬 네트워크 밖으로 안 나감)
-// 얻을 방법이 없어요. 대신 User-Agent에 이미 실려있는 정보(기기 모델명,
-// 브라우저 종류)를 더 자세히 뽑아서 보여줍니다(2026-09-13 세션).
+// User-Agent에서 기기 모델명과 브라우저 종류를 추출한다(브라우저는 그 외 기기 식별값을
+// 서버로 보내지 않는다).
 function describeBrowser(ua: string): string {
   if (/SamsungBrowser/i.test(ua)) return "삼성 인터넷";
   if (/EdgA?\//i.test(ua)) return "Edge";

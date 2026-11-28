@@ -1,33 +1,38 @@
 // ---------------------------------------------------------------------------
-// 2026-09-10 세션: "관심종목에 담은 것만" 알림이 오던 걸 "관심종목 여부와
-// 무관하게 전체 종목 대상, 대신 중요한 유형만"으로 바꿨습니다. 필터링
-// 기준은 dart.ts의 isImportantDisclosure(report_nm 키워드 매칭) — 실적/
-// 자본변동/자사주/배당/M&A/리스크 계열만 걸러서 노이즈를 줄입니다.
-// 수신 대상도 "그 종목을 담은 유저"가 아니라 "알림을 켜둔 전체 유저"로
-// 바뀌었습니다(enqueueDisclosures/processDisclosureQueue 참고).
+// DART 공시 알림. 관심종목 여부와 관계없이 중요한 유형(실적·자본변동·자사주·
+// 배당·M&A·리스크, dart.ts의 isImportantDisclosure)만 골라, 알림을 켠 전체
+// 유저에게 보낸다.
 //
-// 2026-10-06 세션: 대상 종목을 "앱이 종목 화면을 보여줄 수 있는 종목"으로
-// 한정했습니다(DB Stock 테이블 = 유니버스, 코스피 시총 상위 200). DART는
-// 코스피+코스닥 전체를 주는데 앱엔 그중 일부만 있어서, 알림을 눌러도
-// "종목을 찾을 수 없어요"가 뜨는 알림이 대부분이었어요(9/28~10/6 실측: 대상
-// 428건 중 코스닥이 331건).
+// 대상 종목은 앱에 종목 화면이 있는 유니버스(DB Stock 테이블, 코스피 시총 상위
+// 200)로 한정한다. DART는 코스닥까지 주기 때문에, 한정하지 않으면 눌러도 종목을
+// 찾을 수 없는 알림이 대부분을 차지한다.
 // ---------------------------------------------------------------------------
 
 import { prisma } from "./db";
-import { dartConfigured, fetchTodayDisclosures, isImportantDisclosure, type DartFiling } from "./dart";
+import {
+  dartConfigured,
+  fetchTodayDisclosures,
+  isImportantDisclosure,
+  type DartFiling,
+} from "./dart";
 import { fcmConfigured, sendPush } from "./fcm";
 
 const STALE_LOCK_MS = 10 * 60 * 1000;
 
 async function acquireDartPollLock(): Promise<Date | null> {
   await prisma.dartPollLock.upsert({
-    where: { id: 1 }, create: { id: 1, isRunning: false }, update: {},
+    where: { id: 1 },
+    create: { id: 1, isRunning: false },
+    update: {},
   });
   const lease = new Date();
   const result = await prisma.dartPollLock.updateMany({
     where: {
       id: 1,
-      OR: [{ isRunning: false }, { updatedAt: { lt: new Date(lease.getTime() - STALE_LOCK_MS) } }],
+      OR: [
+        { isRunning: false },
+        { updatedAt: { lt: new Date(lease.getTime() - STALE_LOCK_MS) } },
+      ],
     },
     data: { isRunning: true, updatedAt: lease },
   });
@@ -43,21 +48,31 @@ export type DartPollResult = {
   pushesSent: number;
 };
 
-export async function enqueueDisclosures(filings: DartFiling[]): Promise<number> {
+export async function enqueueDisclosures(
+  filings: DartFiling[],
+): Promise<number> {
   const important = filings.filter((f) => isImportantDisclosure(f.report_nm));
   // 후보 종목코드만 골라서 조회 — 유니버스 전체(200개)를 매번 읽을 필요가 없어요.
   // 유니버스가 갱신되며 순위권에서 빠진 종목은 그 시점부터 알림도 안 갑니다.
   const inApp = new Set(
-    (await prisma.stock.findMany({
-      where: { ticker: { in: [...new Set(important.map((f) => f.stock_code))] } },
-      select: { ticker: true },
-    })).map((s) => s.ticker),
+    (
+      await prisma.stock.findMany({
+        where: {
+          ticker: { in: [...new Set(important.map((f) => f.stock_code))] },
+        },
+        select: { ticker: true },
+      })
+    ).map((s) => s.ticker),
   );
   const matched = important.filter((f) => inApp.has(f.stock_code));
-  const already = new Set((await prisma.notifiedDisclosure.findMany({
-    where: { rcept_no: { in: matched.map((f) => f.rcept_no) } },
-    select: { rcept_no: true },
-  })).map((r) => r.rcept_no));
+  const already = new Set(
+    (
+      await prisma.notifiedDisclosure.findMany({
+        where: { rcept_no: { in: matched.map((f) => f.rcept_no) } },
+        select: { rcept_no: true },
+      })
+    ).map((r) => r.rcept_no),
+  );
 
   // 관심종목 여부와 무관하게 전체 종목 대상이라, 종목마다 다시 조회하지
   // 않고 알림을 켜둔 전체 유저의 토큰을 한 번만 조회해서 재사용합니다.
@@ -73,9 +88,16 @@ export async function enqueueDisclosures(filings: DartFiling[]): Promise<number>
       where: { rceptNo: filing.rcept_no },
       update: {},
       create: {
-        rceptNo: filing.rcept_no, ticker: filing.stock_code,
-        corpName: filing.corp_name, reportName: filing.report_nm,
-        deliveries: { create: recipients.map((r) => ({ pushTokenId: r.id, userId: r.userId })) },
+        rceptNo: filing.rcept_no,
+        ticker: filing.stock_code,
+        corpName: filing.corp_name,
+        reportName: filing.report_nm,
+        deliveries: {
+          create: recipients.map((r) => ({
+            pushTokenId: r.id,
+            userId: r.userId,
+          })),
+        },
       },
     });
   }
@@ -93,7 +115,11 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
     include: {
       deliveries: {
         where: { status: "pending" },
-        include: { pushToken: { include: { user: { select: { notificationsEnabled: true } } } } },
+        include: {
+          pushToken: {
+            include: { user: { select: { notificationsEnabled: true } } },
+          },
+        },
       },
     },
   });
@@ -101,14 +127,24 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
   for (const notification of notifications) {
     // 반복 실패한 오래된 공시가 뒤에 대기 중인 공시를 계속 막지 않게 순환합니다.
     await prisma.disclosureNotification.update({
-      where: { rceptNo: notification.rceptNo }, data: { lastAttemptAt: new Date() },
+      where: { rceptNo: notification.rceptNo },
+      data: { lastAttemptAt: new Date() },
     });
-    const eligible = notification.deliveries.filter((d) =>
-      d.userId === d.pushToken.userId && d.pushToken.user.notificationsEnabled);
-    const skippedIds = notification.deliveries.filter((d) => !eligible.includes(d)).map((d) => d.pushTokenId);
+    const eligible = notification.deliveries.filter(
+      (d) =>
+        d.userId === d.pushToken.userId &&
+        d.pushToken.user.notificationsEnabled,
+    );
+    const skippedIds = notification.deliveries
+      .filter((d) => !eligible.includes(d))
+      .map((d) => d.pushTokenId);
     if (skippedIds.length) {
       await prisma.disclosureDelivery.updateMany({
-        where: { rceptNo: notification.rceptNo, pushTokenId: { in: skippedIds }, status: "pending" },
+        where: {
+          rceptNo: notification.rceptNo,
+          pushTokenId: { in: skippedIds },
+          status: "pending",
+        },
         data: { status: "skipped" },
       });
     }
@@ -117,9 +153,12 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
       const batch = eligible.slice(i, i + 500);
       let result;
       try {
-        result = await push(batch.map((d) => d.pushToken.token),
-          `${notification.corpName} 공시 등록`, notification.reportName,
-          { ticker: notification.ticker, rcept_no: notification.rceptNo });
+        result = await push(
+          batch.map((d) => d.pushToken.token),
+          `${notification.corpName} 공시 등록`,
+          notification.reportName,
+          { ticker: notification.ticker, rcept_no: notification.rceptNo },
+        );
       } catch {
         console.error(`[DART] 공시 ${notification.rceptNo} 발송 실패`);
         continue;
@@ -127,17 +166,28 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
       pushesSent += result.successCount;
       const successful = new Set(result.successfulTokens);
       const invalid = new Set(result.invalidTokens);
-      for (const [status, tokens] of [["sent", successful], ["skipped", invalid]] as const) {
-        const ids = batch.filter((d) => tokens.has(d.pushToken.token)).map((d) => d.pushTokenId);
+      for (const [status, tokens] of [
+        ["sent", successful],
+        ["skipped", invalid],
+      ] as const) {
+        const ids = batch
+          .filter((d) => tokens.has(d.pushToken.token))
+          .map((d) => d.pushTokenId);
         if (ids.length) {
           await prisma.disclosureDelivery.updateMany({
-            where: { rceptNo: notification.rceptNo, pushTokenId: { in: ids }, status: "pending" },
+            where: {
+              rceptNo: notification.rceptNo,
+              pushTokenId: { in: ids },
+              status: "pending",
+            },
             data: { status },
           });
         }
       }
       if (invalid.size) {
-        await prisma.pushToken.deleteMany({ where: { token: { in: [...invalid] } } });
+        await prisma.pushToken.deleteMany({
+          where: { token: { in: [...invalid] } },
+        });
       }
     }
 
@@ -150,43 +200,60 @@ export async function processDisclosureQueue(push: typeof sendPush = sendPush) {
       });
       await prisma.$transaction([
         prisma.disclosureNotification.update({
-          where: { rceptNo: notification.rceptNo }, data: { completedAt: new Date() },
+          where: { rceptNo: notification.rceptNo },
+          data: { completedAt: new Date() },
         }),
         prisma.notifiedDisclosure.upsert({
           where: { rcept_no: notification.rceptNo },
-          create: { rcept_no: notification.rceptNo }, update: {},
+          create: { rcept_no: notification.rceptNo },
+          update: {},
         }),
       ]);
       if (sent > 0) notified++;
     }
   }
-  const pending = await prisma.disclosureNotification.count({ where: { completedAt: null } });
+  const pending = await prisma.disclosureNotification.count({
+    where: { completedAt: null },
+  });
   return { pushesSent, notified, pending };
 }
 
 export async function pollDartDisclosures(): Promise<DartPollResult> {
   const empty = { checked: 0, matched: 0, notified: 0, pushesSent: 0 };
   const lease = await acquireDartPollLock();
-  if (!lease) return { ...empty, ok: false, message: "이미 폴링이 진행 중이에요." };
+  if (!lease)
+    return { ...empty, ok: false, message: "이미 폴링이 진행 중이에요." };
   try {
     const filings = dartConfigured() ? await fetchTodayDisclosures() : null;
     const matched = filings ? await enqueueDisclosures(filings) : 0;
     if (!fcmConfigured()) {
-      return { ...empty, checked: filings?.length ?? 0, matched, ok: false,
-        message: "FCM 설정이 없어 알림 발송을 보류했어요." };
+      return {
+        ...empty,
+        checked: filings?.length ?? 0,
+        matched,
+        ok: false,
+        message: "FCM 설정이 없어 알림 발송을 보류했어요.",
+      };
     }
     const result = await processDisclosureQueue();
     return {
       ok: filings !== null && result.pending === 0,
-      checked: filings?.length ?? 0, matched,
-      notified: result.notified, pushesSent: result.pushesSent,
-      message: filings === null ? "DART 조회 실패. 저장된 알림은 재시도했어요."
-        : result.pending > 0 ? `미완료 공시 ${result.pending}건은 다음 실행에서 재시도합니다.` : "완료",
+      checked: filings?.length ?? 0,
+      matched,
+      notified: result.notified,
+      pushesSent: result.pushesSent,
+      message:
+        filings === null
+          ? "DART 조회 실패. 저장된 알림은 재시도했어요."
+          : result.pending > 0
+            ? `미완료 공시 ${result.pending}건은 다음 실행에서 재시도합니다.`
+            : "완료",
     };
   } finally {
     // 이전 실행이 만료 후 새 실행의 락을 해제하지 않도록 확인합니다.
     await prisma.dartPollLock.updateMany({
-      where: { id: 1, updatedAt: lease }, data: { isRunning: false },
+      where: { id: 1, updatedAt: lease },
+      data: { isRunning: false },
     });
   }
 }

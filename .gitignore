@@ -43,3 +43,11 @@ next-env.d.ts
 # prisma (sqlite local db)
 /prisma/*.db
 /prisma/*.db-journal
+
+# 로컬 작업용 파일
+CLAUDE.md
+AGENTS.md
+.claude/
+figma-design-preview.png
+preview-hero-chip.png
+stock-preview.html

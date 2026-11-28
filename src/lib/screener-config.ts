@@ -4,10 +4,10 @@
 // 여기만 고치면 됩니다 (screener.ts, refresh-universe.ts, /api/universe/paged,
 // 화면의 "N/4 통과" 문구까지 전부 이 파일의 값을 따라갑니다).
 //
-// ⚠️ stock-advisor-server(Spring)의 Screener.java는 언어가 달라서 이 파일을
+// 주의: stock-advisor-server(Spring)의 Screener.java는 언어가 달라서 이 파일을
 // 직접 공유하진 못합니다. 여기 값을 바꾸면 Screener.java의 같은 상수도 반드시
 // 같이 바꿔야 프론트(배치)와 백엔드(실시간)가 같은 기준으로 스크리너를
-// 계산합니다. (이 프로젝트 초기에 두 값이 이미 한 번 어긋난 적이 있었어요.)
+// 계산합니다.
 // ---------------------------------------------------------------------------
 
 export const SCREENER_THRESHOLDS = {

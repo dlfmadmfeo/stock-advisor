@@ -112,12 +112,8 @@ function usePortfolioTotals() {
   return { stocks, byTicker, total, cost, returnAmount, returnPct };
 }
 
-// 예전엔 업종명을 "반도체/플랫폼/2차전지" 같은 고정 태그로 미리 정해두고
-// 색을 매칭했는데, 실제 DB 유니버스는 KIS가 주는 업종명을 그대로 쓰기 때문에
-// (예: "반도체와반도체장비") 이 고정 태그랑 안 맞으면 전부 매칭 실패로
-// 회색(#d1d6db) 처리돼서 도넛이 온통 회색 한 덩어리로 보였어요 — 비중이
-// 바뀌어도 색 구분이 안 되니 "그래프에 반영이 안 된다"고 느껴진 원인.
-// 업종명이 뭐가 오든 항상 구분되는 색을 주도록 순서 기반 팔레트로 바꿨어요.
+// 업종명은 KIS가 주는 값을 그대로 쓰므로(예: "반도체와반도체장비") 고정 태그로
+// 색을 매칭하지 않고, 순서 기반 팔레트로 업종마다 구분되는 색을 준다.
 const CHART_PALETTE = [
   "#3182f6",
   "#ff7a00",
@@ -133,24 +129,17 @@ function chartColor(index: number) {
   return CHART_PALETTE[index % CHART_PALETTE.length];
 }
 
-// 2026-08-29 세션: "추천"(/category)·"자산"(/analysis) 탭을 하단 nav/데스크톱
-// 사이드바에서만 잠시 뺐어요 — 추천 탭은 업종 필터 4개 중 3개(반도체/바이오/
-// 플랫폼)가 실제 DB 업종명이랑 안 맞아서 항상 0개만 나오는 버그가 있고,
-// 자산 탭은 HOLDINGS(하단 stocks.ts)가 하드코딩된 예시 데이터라 로그인
-// 계정과 무관하게 다 똑같이 보여요. 완전히 지우기엔 아직 확신이 없어서
-// (계속 이 방향이 맞는지 논의 중) 화면/라우트/코드는 그대로 두고 nav
-// 진입점만 주석 처리 — 필요해지면 그냥 주석만 풀면 됩니다. URL로 직접
-// /category, /analysis에 들어가면 여전히 접근은 돼요(진입 경로만 숨김).
+// "추천"(/category)·"자산"(/analysis) 탭은 nav 진입점만 숨겨 둔 상태다.
+// 추천 탭은 업종 필터가 실제 업종명과 맞지 않고, 자산 탭은 예시 데이터라 정리 전까지
+// 노출하지 않는다. 화면과 라우트는 남아 있어 URL로는 접근할 수 있다.
 const navTabs = [
   { href: "/notifications", icon: Home, label: "홈" },
   // { href: "/category", icon: Star, label: "추천" },
   { href: "/watchlist", icon: Heart, label: "관심" },
   // { href: "/analysis", icon: AreaChart, label: "자산" },
   { href: "/alerts", icon: Bell, label: "알림" },
-  // 2026-09-13 세션: AI 추천 탭 추가 — 아직 관리자(junhee92kr@naver.com,
-  // User.isAdmin)만 실제로 쓸 수 있고, 권한 없는 유저는 탭엔 들어오되
-  // src/app/ai-picks/page.tsx에서 "권한 없음" 안내만 보여줍니다(탭 자체를
-  // 숨기지 않음 — 존재는 알리되 접근만 막는 방식).
+  // AI 추천 탭. 현재는 관리자(User.isAdmin)만 사용할 수 있고, 권한이 없으면
+  // ai-picks/page.tsx에서 안내만 보여준다(탭은 숨기지 않는다).
   { href: "/ai-picks", icon: Sparkle, label: "AI 추천" },
 ];
 
@@ -217,10 +206,6 @@ export function NotificationsScreen() {
         {/* 문장 대신 숫자 자체를 크게 보여줍니다(장식 대신 숫자로 위계를 줌).
             "200종목 중 스크리너 통과"를 작은 라벨로 먼저 읽고 큰 숫자가 따라오는
             구조라 "111/200" 같은 약식 표기보다 뜻이 바로 읽혀요. */}
-        {/* 색은 장식이 아니라 구조에 써요(2026-11-20 세션, "밋밋하다" 피드백):
-            페이지 배경은 연한 회청색, 그 위에 흰 시트, 맨 위 요약만 단색 파랑
-            면으로 둡니다. 그라데이션/글로우 없이 단색이라 안티슬롭 규칙과도
-            맞고, 글자는 흰색 대비 6:1 이상이 되도록 파랑을 약간 진하게 썼어요. */}
         <div className="rounded-lg bg-white p-5 ring-1 ring-[#e5e8eb]">
           <p className="text-[13px] font-medium text-[#6b7684]">
             {stocks.length > 0
@@ -235,8 +220,7 @@ export function NotificationsScreen() {
                   종목
                 </span>
               </p>
-              {/* 통과 비율을 얇은 막대 하나로만 보여줘요. 색 면 대신 정보 자체가
-                  시각 요소가 되게 한 것(2026-11-20 세션, "너무 파랗다" 피드백). */}
+              {/* 통과 비율은 얇은 막대 하나로 보여준다. */}
               <div
                 aria-label={`전체 ${stocks.length}종목 중 ${passed.length}종목`}
                 className="mt-4 h-1.5 overflow-hidden rounded-[2px] bg-[#e5e8eb]"
@@ -492,10 +476,8 @@ function buildDonutGradient(entries: [string, number][], total: number) {
 }
 
 // ---------------------------------------------------------------------------
-// BackTopBar: "뒤로가기"(useRouter 필요)만 담당하는 작은 클라이언트 조각.
-// 서버 컴포넌트인 page.tsx(예: src/app/devices/page.tsx)가 AppShell과 함께
-// 직접 조합해서 씁니다. ("시장 소식" 화면은 2026-08-14 세션에 아예
-// 제거했습니다 — 목업 데이터만 있던 화면이라 정리했어요.)
+// BackTopBar: 뒤로가기(useRouter)만 담당하는 작은 클라이언트 컴포넌트.
+// 서버 컴포넌트 page.tsx(예: src/app/devices/page.tsx)가 AppShell과 함께 조합한다.
 // ---------------------------------------------------------------------------
 export function BackTopBar({
   title,
@@ -518,11 +500,7 @@ export function BackTopBar({
   );
 }
 
-// MyPageScreen은 제거됨 (2026-08-14 세션, 서버 컴포넌트 분리 확장) —
-// src/app/mypage/page.tsx(서버 컴포넌트)가 직접 조립합니다. 목업이던
-// HistoryScreen(스크리너 이력)은 2026-09-24 세션에 화면 자체를 삭제했어요
-// (가짜 데이터였고, "추천가→수익률" 구조가 이 앱의 비추천/비수익률 표시
-// 원칙과 충돌해서).
+// 마이페이지는 서버 컴포넌트(src/app/mypage/page.tsx)에서 직접 조립한다.
 
 function HomeHeader() {
   const router = useRouter();
@@ -546,10 +524,8 @@ function HomeHeader() {
   );
 }
 
-// 예전 홈 상단은 다크 카드(이름 + 관리 중 개수 + 큰 버튼)였는데, 하단 탭의
-// "관심"과 역할이 겹치고 첫 화면을 다 차지해서 한 줄짜리 링크로 줄였어요.
-// 2026-09-13 세션 이후로 이름/개수는 실제 세션과 실제 관심종목 기준입니다
-// (HOLDINGS 예시 데이터는 쓰지 않음).
+// 홈 상단은 하단 "관심" 탭과 역할이 겹치지 않도록 한 줄 링크로 둔다.
+// 이름과 개수는 실제 세션과 관심종목 기준이다.
 function HomeWatchlistLink() {
   const { data: session } = useSession();
   const watchlistCount = useWatchlistCount();
@@ -718,16 +694,11 @@ function PagedStockList({
   const sectorAvgPbr = useSectorAvgPbr();
   const total = pages[0]?.total ?? 0;
 
-  // 정렬은 로딩/에러/빈 목록 상태에서도 계속 보여야 다른 정렬로 바로 바꿔볼
-  // 수 있어서 상태 분기와 별개로 항상 렌더링합니다. 항목 하나가 필드 하나:
-  // 안 눌렀으면 화살표 없음(=기본 순서), 누르면 자연방향 화살표, 한 번 더
-  // 누르면 반대방향, 한 번 더 누르면 다시 기본 순서로 돌아가요. 필터 토글과
-  // 모양이 달라야 역할이 구분돼서(필터=체크박스, 정렬=밑줄 탭) 칩 대신
-  // 가로 스크롤 탭으로 만들었어요. 탭 6개가 폰 폭(350px)에 딱 들어가도록
-  // 간격을 16px로 두고 "정렬" 라벨은 뺐어요(예전엔 마지막 "등급"이 반쯤
-  // 잘려서 버그처럼 보였음). 필터 스위치는 위 줄(종목 수 옆)로 합쳤습니다.
-  // 홈은 맨 위 큰 숫자가 이미 전체 통과 개수를 보여주니까, 여기 종목 수는
-  // 필터를 켰을 때(숫자가 달라질 때)와 스위치가 없는 화면(검색)에서만 보여요.
+  // 정렬 탭은 로딩·에러·빈 목록 상태에서도 항상 렌더링해 바로 바꿀 수 있게 한다.
+  // 탭을 누를 때마다 기본 순서 → 자연 방향 → 반대 방향 → 기본 순서로 순환한다.
+  // 필터(스위치)와 구분되도록 밑줄 탭 형태로 두고, 6개 탭이 폰 폭(350px)에 들어가도록
+  // 간격을 16px로 맞췄다. 홈은 상단 숫자가 전체 통과 개수를 보여주므로, 종목 수는
+  // 필터를 켰을 때와 스위치가 없는 화면(검색)에서만 표시한다.
   const showCount = total > 0 && (!onMacdReboundChange || !!macdReboundOnly);
   const filterRow = (
     <div className="flex h-11 items-center justify-between">
@@ -941,11 +912,9 @@ function HeaderText({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-// 스크리너 점수 막대(규칙 개수만큼 칸, 충족한 만큼 채움). 색이 곧 정보예요:
-// 기준(통과선) 미달은 회색 한 톤, 통과는 중간 초록, 전부 충족은 진한 초록.
-// 점수가 오를수록 단계적으로 진해지게 하면 미달인 1/4, 2/4도 "조금 좋은 것"처럼
-// 보여서(통과선이 흐려져서) 통과/미달만 색으로 가르고 만점만 한 단계 더 진하게
-// 했어요(2026-11-20 세션). 홈/검색/관심종목 행에서 공통으로 씁니다.
+// 스크리너 점수 막대(규칙 개수만큼 칸, 충족한 만큼 채움). 통과선 미달은 회색,
+// 통과는 초록, 만점은 진한 초록으로 통과/미달이 색으로 바로 구분되게 한다.
+// 홈·검색·관심종목 행에서 공통으로 쓴다.
 function ScoreMeter({ pass, score }: { pass: boolean; score: number }) {
   const full = score >= SCREENER_TOTAL_RULES;
   const fill = !pass
@@ -965,14 +934,11 @@ function ScoreMeter({ pass, score }: { pass: boolean; score: number }) {
   );
 }
 
-// stock 참조가 안 바뀌면(=이 종목 시세가 이번 틱에 안 바뀌었으면) 리렌더를
-// 건너뜁니다. 위쪽 useMergedStocksWithLive/useLiveStocks가 티커별로 참조를
-// 안정적으로 유지해주기 때문에 memo가 실제로 의미가 있어요.
+// stock 참조가 바뀌지 않으면(이번 틱에 시세 변화 없음) 리렌더를 건너뛴다.
+// useMergedStocksWithLive/useLiveStocks가 티커별 참조를 유지하므로 memo가 유효하다.
 //
-// 판정 라벨(완전충족/조건충족/보류/주의)은 색 배지로 칠하지 않고 글자로만
-// 보여줍니다. 예전엔 빨강/파랑 같은 색을 입혔는데 이 앱의 등락률 색 관례
-// (상승=빨강, 하락=파랑)와 겹쳐 매수/매도 방향을 은연중에 암시했고, 알약
-// 배지를 3개씩 나란히 두면 위계도 안 보였어요(2026-11-20 세션).
+// 판정 라벨은 색 배지 없이 글자로만 보여준다. 빨강/파랑은 등락률 색 관례와 겹쳐
+// 매수/매도 방향을 암시할 수 있기 때문이다.
 
 const StockRow = memo(function StockRow({
   stock,
@@ -1046,14 +1012,11 @@ function MacdReboundBadge({ className }: { className?: string }) {
   );
 }
 
-// 홈/검색 리스트 행에서 관심종목 여부만 보여주는 표시 전용 하트(2026-08-29
-// 세션 — 토글 기능은 종목 상세 화면에만 남기고 홈 리스트는 누를 수 없는
-// 상태 표시로 바꿈). 버튼이 아니라서 <Link> 안에 그냥 둬도 무효 HTML
-// 문제가 없음 — 그래서 StockRow도 다시 통짜 <Link> 하나로 되돌렸어요.
+// 홈·검색 리스트 행의 표시 전용 하트. 토글은 종목 상세에만 있고, 버튼이 아니므로
+// StockRow 전체를 감싼 <Link> 안에 둬도 된다.
 function WatchlistHeartIndicator({ ticker }: { ticker: string }) {
   const watched = useIsWatched(ticker);
-  // 담은 종목에만 채운 하트를 이름 옆에 보여줍니다. 예전엔 안 담은 종목에도
-  // 빈 하트가 행마다 붙어서 목록 전체가 지저분해 보였어요(2026-11-20 세션).
+  // 담은 종목에만 채운 하트를 이름 옆에 보여준다.
   if (!watched) return null;
   return (
     <Heart
@@ -1109,21 +1072,17 @@ function BottomNav() {
 }
 
 // ---------------------------------------------------------------------------
-// 종목별 뉴스 카드 (2026-08-14 세션 추가). /api/news?name=종목명 을 호출해서
-// 네이버 뉴스 검색 결과를 보여줍니다. 긍정/부정 배지는 키워드 포함 여부로
-// 대충 분류한 거라(진짜 감성분석 아님) 참고만 하시라는 안내 문구를 같이 둡니다.
-// 알고리즘(매매 판단)에는 아직 연결 안 함 — 화면 표시 전용.
+// 종목별 뉴스 카드. /api/news?name=종목명으로 네이버 뉴스 검색 결과를 보여준다.
+// 호재/악재 표시는 키워드 포함 여부로 단순 분류한 것이라 참고용 안내 문구를 함께 두고,
+// 매매 판단에는 사용하지 않는다.
 // ---------------------------------------------------------------------------
-// 뉴스 한 건마다 붙던 호재/악재 알약 배지는 글자 색만 남겼어요(정적 메타
-// 정보에 알약을 두르지 않는다는 안티슬롭 규칙, 2026-11-20 세션).
 const SENTIMENT_STYLE: Record<NewsArticle["sentiment"], string> = {
   positive: "font-semibold text-[#e03131]",
   negative: "font-semibold text-[#1b64da]",
   neutral: "text-[#6b7684]",
 };
 
-// 상세 화면의 보기 전환(뉴스 정렬, 차트/테이블, 기간)에 공통으로 쓰는 분할
-// 컨트롤. 예전엔 화면마다 알약 버튼이 제각각 모양이라 역할이 안 읽혔어요.
+// 상세 화면의 보기 전환(뉴스 정렬, 차트/테이블, 기간)에 공통으로 쓰는 분할 컨트롤.
 function Segmented<T extends string>({
   label,
   onChange,
@@ -1311,18 +1270,11 @@ function StockNewsCard({ name }: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// 주가 라인차트 + MACD — 종목 상세 화면. 둘 다 같은 일봉 데이터(useDailyBars)
-// 하나로 그려서 API 호출을 두 번 안 하게 묶었어요. StockNewsCard와 같은
-// Suspense 패턴(로딩/에러 처리는 그쪽 주석 참고).
+// 주가 라인차트 + MACD(종목 상세). 같은 일봉 데이터(useDailyBars)로 함께 그려
+// API 호출을 한 번으로 줄인다. 로딩·에러 처리는 StockNewsCard와 같은 Suspense 패턴.
 //
-// 2026-08-24 세션: MACD는 "5일선 > 20일선" 스크리너 규칙이랑 개념이 겹치는
-// 이동평균 교차 지표라, 화면에 매매 판단을 또 하나 얹는 게 아니라 — 지금
-// 있는 배지들처럼 완전충족/조건충족 같은 "판정"을 내리지 않고, 계산된 값을
-// 차트로 그대로 보여주기만 해요(스스로 해석하시라는 뜻). 투자자 매매동향
-// 카드처럼 일/주/월 기간 토글도 고려했는데, MACD는 원래 일봉 기준이 제일
-// 흔하고(주봉/월봉 MACD는 그 자체로 봉을 다시 만들어야 하는 별도 계산이라
-// 지금 범위 밖) 데이터도 하루 단위로만 있어서 토글 없이 일봉 고정으로
-// 갔습니다.
+// MACD는 판정을 내리지 않고 계산값만 차트로 보여준다. 주봉·월봉 MACD는 봉을
+// 다시 만들어야 하는 별도 계산이라, 기간 토글 없이 일봉으로 고정한다.
 function PriceLineChart({ bars }: { bars: DailyBar[] }) {
   const width = 340;
   const height = 110;
@@ -1340,8 +1292,7 @@ function PriceLineChart({ bars }: { bars: DailyBar[] }) {
     .join(" ");
   const areaPath = `${linePath} L${xAt(bars.length - 1).toFixed(1)},${height} L${xAt(0).toFixed(1)},${height} Z`;
   const gradientId = "price-fill-gradient";
-  // 한국 시세 색 관례: 기간 시작 대비 올랐으면 빨강, 내렸으면 파랑. 예전엔
-  // 항상 파랑이라 오른 종목도 "하락"처럼 보였어요(2026-11-20 세션).
+  // 한국 시세 색 관례: 기간 시작 대비 올랐으면 빨강, 내렸으면 파랑.
   const rising = closes.length < 2 || closes[closes.length - 1] >= closes[0];
   const lineColor = rising ? "#f04452" : "#3182f6";
 
@@ -1371,8 +1322,7 @@ function PriceLineChart({ bars }: { bars: DailyBar[] }) {
   );
 }
 
-// 2026-08-31 세션 추가: 일봉(DailyBar)에 원래 volume 필드가 있었는데 화면에
-// 안 쓰고 있었어요 — 새 API 호출 없이 이미 받아온 값 그대로 막대만 그림.
+// 일봉 데이터에 이미 있는 volume으로 거래량 막대를 그린다(추가 API 호출 없음).
 function VolumeChart({ bars }: { bars: DailyBar[] }) {
   const width = 340;
   const height = 46;
@@ -1485,9 +1435,8 @@ function MacdExplainer() {
   );
 }
 
-// 실제 카드(주가+거래량, MACD) 높이만큼 자리를 미리 잡아둡니다. 예전엔 작은 카드
-// 하나만 보여줘서, 일봉 데이터가 도착하면 아래 카드들이 한꺼번에 밀려 내려갔어요
-// (Lighthouse CLS 0.3대). 높이는 폰 폭(390px)에서 잰 값이에요.
+// 실제 카드(주가+거래량, MACD) 높이만큼 자리를 미리 잡아, 일봉 데이터가 도착해도
+// 아래 카드가 밀리지 않게 한다(CLS 방지). 높이는 폰 폭(390px) 기준.
 function StockChartsCardSkeleton() {
   return (
     <>
@@ -1583,11 +1532,9 @@ function StockChartsCard({ ticker }: { ticker: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// 업종 내 비교 — 종목 상세 화면 (2026-08-31 세션 추가). 새 API 호출 없이
-// 이미 로드된 useLiveStocks()를 업종으로만 필터링해서 씀 — 서버(getUniverse)
-// 가 이미 시가총액 내림차순으로 내려주기 때문에(universe.ts) 정렬을 다시
-// 안 해도 앞에서부터가 곧 시총 상위. 지금 보고 있는 종목이 업종 시총 5위
-// 밖이어도(작은 종목) 비교 대상에서 안 빠지게, 상위 4개 + 현재 종목으로 구성.
+// 업종 내 비교(종목 상세). 이미 로드된 useLiveStocks()를 업종으로 필터링한다.
+// 서버가 시가총액 내림차순으로 내려주므로 다시 정렬하지 않는다. 보고 있는 종목이
+// 업종 5위 밖이어도 빠지지 않게 상위 4개 + 현재 종목으로 구성한다.
 // ---------------------------------------------------------------------------
 function SectorPeersCard({ stock }: { stock: Stock }) {
   const allStocks = useLiveStocks();
@@ -1653,12 +1600,9 @@ function SectorPeersCard({ stock }: { stock: Stock }) {
 }
 
 // ---------------------------------------------------------------------------
-// 재무 정보(연도별 매출/영업이익/순이익 + ROE/부채비율 등) — 종목 상세 화면
-// (2026-08-31 세션 추가). StockNewsCard/InvestorTrendCard와 같은 Suspense
-// 패턴. 데이터는 DART 사업보고서 기반(dart-financials.ts)이라 완결된 회계연도만
-// 오기 때문에(진행 중인 연도는 사업보고서 자체가 없음) 여기선 그냥 최근 N개만
-// 자르면 됩니다. KIS 재무 API가 막혀서 2026-11에 DART로 옮겼어요. 다른 카드들처럼 계산된 숫자만
-// 보여주고 "저평가/고평가"·"매수 신호" 같은 해석은 넣지 않습니다.
+// 재무 정보(연도별 매출·영업이익·순이익, ROE·부채비율 등, 종목 상세).
+// DART 사업보고서 기반(dart-financials.ts)이라 완결된 회계연도만 오므로 최근 N개만
+// 자른다. 다른 카드처럼 계산된 숫자만 보여주고 저평가·매수 신호 같은 해석은 넣지 않는다.
 // ---------------------------------------------------------------------------
 const FINANCIALS_DISPLAY_YEARS = 5;
 
@@ -2235,9 +2179,8 @@ export function SearchScreen() {
           />
         </div>
 
-        {/* 업종이 25개 넘게 나와서 줄바꿈으로 깔면 결과 목록이 화면 아래로
-            400px쯤 밀렸어요(2026-11-20 세션). 한 줄 가로 스크롤로 바꾸고,
-            화면 가장자리까지 스크롤되게 -mx-5/px-5로 여백을 맞췄습니다. */}
+        {/* 업종이 25개가 넘어 한 줄 가로 스크롤로 두고(결과 목록이 밀리지 않게),
+            -mx-5/px-5로 화면 가장자리까지 스크롤되게 한다. */}
         <div
           aria-label="업종 필터"
           className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:flex-wrap lg:px-0"
@@ -2283,10 +2226,8 @@ function WatchlistBodySkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// "알림" 탭 — 공시 알림 온/오프 설정 (2026-08-31 세션). 값이 하나뿐이라
-// react-query 없이 간단히 useState+fetch로 처리 — 낙관적 업데이트는
-// useWatchlistHeart(use-watchlist.ts)와 같은 패턴(먼저 바꾸고, 실패하면
-// 되돌림)이라 토글이 즉시 반응합니다.
+// "알림" 탭: 공시 알림 켜기/끄기. 값이 하나라 useState + fetch로 처리하고,
+// useWatchlistHeart와 같은 방식(먼저 반영, 실패 시 되돌림)으로 토글이 바로 반응한다.
 // ---------------------------------------------------------------------------
 export function AlertSettingsScreen() {
   const router = useRouter();
@@ -2332,10 +2273,8 @@ export function AlertSettingsScreen() {
   const [testing, setTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
-  // DART 공시를 기다리지 않고 지금 바로 내 기기로 푸시가 오는지 확인하는
-  // 버튼 (2026-08-31 세션, "테스트 버튼 누르면 바로 알림 오게 안 되냐"는
-  // 요청). 실제 공시 감지 로직(dart-poll.ts)과는 무관하고, 순수하게
-  // "이 계정에 등록된 토큰으로 sendPush()가 도달하는지"만 확인해요.
+  // 공시를 기다리지 않고 이 계정의 기기로 푸시가 도달하는지 확인하는 테스트 버튼.
+  // 공시 감지 로직(dart-poll.ts)과는 무관하게 sendPush()만 호출한다.
   async function sendTestPush() {
     if (testing) return;
     setTesting(true);
@@ -2491,10 +2430,7 @@ function WatchlistBody({ initialItems }: { initialItems?: WatchlistItem[] }) {
   // focus만 하면 해당 풀의 상위 종목이 최대 20개, 검색어를 치면 그 풀 안에서
   // 이름/코드 일치하는 것만 최대 8개 보여줍니다.
   const trimmedQuery = query.trim();
-  // 홈 "종목 검색"(서버 Prisma `contains`)은 MySQL 기본 컬레이션 덕에
-  // 대소문자 구분 없이 검색되는데, 여긴 순수 JS .includes()라 원래
-  // 대소문자를 구분했음(예: "sk" 쳐도 "SK이노베이션"이 안 걸림) — 두 검색창
-  // 동작을 맞추려고 toLowerCase 비교로 통일 (2026-08-22 세션).
+  // 홈 검색(Prisma contains)과 동작을 맞추기 위해 대소문자 구분 없이 비교한다.
   const lowerQuery = trimmedQuery.toLowerCase();
   const notWatched = universeStocks.filter(
     (s) => !watchedTickers.has(s.ticker),
@@ -2704,10 +2640,8 @@ function WatchlistRow({
   // 푸시가 오면 이 컴포넌트도 자동으로 다시 렌더링됨.
   const stock = useLiveStock(item.ticker);
 
-  // 삭제 버튼을 카드 밖에 별도 원형 버튼으로 두면 카드 두 개가 붙어있는
-  // 것처럼 어색해 보여서, 카드 하나 안에 이름/시세와 나란히 배치하는
-  // 구조로 바꿨습니다. 평소엔 옅은 회색으로 있다가 누르기 전엔 눈에
-  // 띄지 않고, hover/press 시에만 빨갛게 반응하는 "고스트" 버튼 스타일.
+  // 삭제 버튼은 카드 안에 이름·시세와 나란히 두고, 평소엔 옅은 회색이다가
+  // hover/press 때만 빨갛게 표시한다.
   if (!stock) {
     return (
       <div className="flex items-center justify-between gap-2 border-b border-[#eef0f2] py-4">

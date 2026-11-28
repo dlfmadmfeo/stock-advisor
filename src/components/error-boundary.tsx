@@ -1,16 +1,11 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 범용 에러 바운더리 (2026-08-14 세션, Suspense 전환 작업에서 추가).
+// 범용 에러 바운더리. Suspense는 로딩만 처리하므로, useSuspenseQuery가 던진 에러를
+// 받기 위해 Suspense와 함께 쓴다. getDerivedStateFromError/componentDidCatch에
+// 대응하는 훅이 없어 클래스 컴포넌트로 작성했다.
 //
-// useSuspenseQuery는 요청이 실패하면 에러를 throw해서 가장 가까운 에러
-// 바운더리로 보냅니다 — Suspense가 로딩(pending)만 잡아주고 에러는 안
-// 잡아주기 때문에, Suspense랑 세트로 이 컴포넌트를 같이 씁니다. 클래스
-// 컴포넌트인 이유는 getDerivedStateFromError/componentDidCatch가 아직
-// 훅으로 대체가 안 돼서(리액트 공식 훅 버전이 없음).
-//
-// fallback은 노드를 직접 받거나, (error) => 노드 형태의 함수를 받아서 실패
-// 사유 메시지를 그대로 화면에 보여줄 수 있게 했습니다.
+// fallback은 노드 또는 (error) => 노드 함수로 받아 실패 사유를 보여줄 수 있다.
 // ---------------------------------------------------------------------------
 
 import { Component, type ReactNode } from "react";

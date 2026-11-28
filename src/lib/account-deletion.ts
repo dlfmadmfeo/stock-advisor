@@ -3,16 +3,13 @@ import { prisma } from "@/lib/db";
 import { DEMO_EMAIL } from "@/lib/demo-account";
 
 // ---------------------------------------------------------------------------
-// 회원 탈퇴(2026-09-25 세션) 보조 로직 — auth.ts의 user.deleteUser 훅이 씁니다.
-// Google Play는 계정 생성이 가능한 앱에 앱 안의 삭제 경로를 요구해서 추가.
+// 회원 탈퇴 보조 로직 — auth.ts의 user.deleteUser 훅이 쓴다
+// (Google Play는 계정을 만들 수 있는 앱에 앱 내 삭제 경로를 요구한다).
 //
-// DB 쪽 삭제 자체는 Prisma 스키마의 onDelete: Cascade가 처리해요(Session,
-// Account, Watchlist, PushToken 및 그에 딸린 DisclosureDelivery). 여기서
-// 따로 챙기는 건 두 가지:
-//  1) 지우면 안 되는 계정 막기 (데모, 관리자)
-//  2) 이 유저가 담아뒀던 종목 중 다른 아무도 안 담고 있는 종목의 실시간
-//     구독 해제 — 구독은 전체 유저가 공유하는 자원이라(api/watchlist/[ticker]
-//     DELETE 참고) 유저 row가 통째로 지워져도 같은 정리가 필요해요.
+// DB 삭제는 Prisma onDelete: Cascade가 처리하고(Session, Account, Watchlist,
+// PushToken, DisclosureDelivery), 여기서는 두 가지를 처리한다.
+//  1) 삭제하면 안 되는 계정(데모, 관리자) 차단
+//  2) 이 유저만 담고 있던 종목의 실시간 구독 해제(구독은 전체 유저가 공유)
 // ---------------------------------------------------------------------------
 
 const REALTIME_SERVER_URL = process.env.REALTIME_SERVER_URL ?? "http://localhost:8081";

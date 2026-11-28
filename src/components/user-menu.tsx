@@ -1,15 +1,9 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 우측 상단 프로필 드롭다운 (GNB, 2026-08-14 세션 추가). GitHub 우상단
-// 아바타 메뉴 참고 — 아바타 클릭 → 프로필 요약 + 메뉴 리스트 + 로그아웃이
-// 드롭다운으로 뜸.
-//
-// 홈 화면(HomeHeader, mobile-screens.tsx)에만 붙였어요. 하단 탭의 "관심"은
-// 원래 라벨(하트 아이콘)대로 /watchlist로 고치고, 마이페이지는 이제 이
-// 드롭다운을 통해서만 들어가는 구조로 바꿨습니다 — 하단 탭에 억지로 6번째
-// 탭을 추가하는 대신, GitHub류 앱들처럼 "내 계정" 관련 진입점은 우상단
-// 아바타로 모으는 편이 화면 낭비가 적어서요.
+// 우측 상단 프로필 드롭다운(GNB). 아바타를 누르면 프로필 요약, 메뉴, 로그아웃이 뜬다.
+// 홈 화면(HomeHeader)에만 두고, 마이페이지는 이 드롭다운으로만 진입한다
+// (하단 탭을 늘리지 않고 계정 관련 진입점을 한곳에 모으기 위해).
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState } from "react";
@@ -27,7 +21,7 @@ const MENU_ITEMS = [
 export function UserMenu() {
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // 2026-08-18 세션: localStorage 이메일 대신 실제 세션(/api/auth/me)을 읽음.
+  // 실제 세션을 읽는다.
   const { data: user } = useSession();
   const email = user?.email ?? "로그인이 필요해요";
   const rootRef = useRef<HTMLDivElement>(null);

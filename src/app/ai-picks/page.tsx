@@ -5,11 +5,8 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { AiPick } from "@/lib/ai-picks";
 
-// 2026-09-13 세션: 하단 nav에 새로 생긴 "AI 추천" 탭. 아직은 관리자 계정
-// (junhee92kr@naver.com, User.isAdmin) 한 명만 실제 기능을 쓸 수 있어요 —
-// 탭 자체는 누구나 보이고 눌러서 들어올 수 있지만, 권한이 없으면 로그인
-// 여부와 무관하게 "권한 없음" 안내만 보여주고 실제 콘텐츠는 렌더링하지
-// 않습니다(리다이렉트 없이 이 화면 안에서 안내).
+// "AI 추천" 탭. 탭은 누구나 볼 수 있지만 현재는 관리자(User.isAdmin)만 사용할 수 있고,
+// 권한이 없으면 리다이렉트 없이 이 화면에서 안내만 보여준다.
 export default async function AiPicksPage() {
   const user = await getSessionUser();
   const hasAccess = user?.isAdmin ?? false;

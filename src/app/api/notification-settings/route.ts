@@ -3,9 +3,8 @@ import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
-// "알림" 탭의 공시 알림 온/오프 설정 (2026-08-31 세션). User.notificationsEnabled
-// 하나뿐이라 GET/PATCH 둘 다 이 라우트 하나로 처리합니다. dart-poll.ts가
-// 발송 대상을 고를 때 이 값을 직접 조회해서 걸러요(push-token.ts 참고).
+// "알림" 탭의 공시 알림 켜기/끄기(User.notificationsEnabled, GET/PATCH).
+// dart-poll.ts가 발송 대상을 고를 때 이 값으로 거른다.
 // ---------------------------------------------------------------------------
 export async function GET() {
   const user = await getSessionUser();

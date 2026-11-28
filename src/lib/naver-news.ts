@@ -1,21 +1,15 @@
 // ---------------------------------------------------------------------------
-// 네이버 뉴스 검색 API 클라이언트 (서버 전용, 2026-08-14 세션 추가).
+// 네이버 뉴스 검색 API 클라이언트 (서버 전용).
 //
-// 종목명으로 최근 뉴스를 검색해서 화면에 보여주는 용도입니다. 알고리즘(매수/매도
-// 판정)에는 아직 연결하지 않았어요 — 키워드 태깅은 정확도가 낮아서(진짜 감성분석이
-// 아니라 단순 단어 포함 여부) 신호로 쓰기엔 위험하고, 일단 참고 정보로 노출해서
-// 사람이 직접 판단하는 데 도움을 주는 용도로만 씁니다.
+// 종목명으로 최근 뉴스를 검색해 화면에 보여준다. 키워드 태깅은 단순 단어 포함
+// 여부라 정확도가 낮아 매매 판정에는 쓰지 않는다.
 //
-// ⚠️ 처음엔 developers.naver.com의 옛날 "오픈API"(openapi.naver.com,
-// X-Naver-Client-Id/Secret 헤더) 기준으로 짰다가, 준희님이 실제 발급받은 키가
-// NAVER Cloud Platform의 "API GATEWAY(API HUB)" 상품이라는 걸 확인해서(401
-// NID AUTH Result Invalid로 계속 실패 → curl로 직접 검증해서 발견) 이 상품
-// 기준으로 다시 씀. 응답 바디 필드(title/originallink/link/description/pubDate)는
-// 동일해서 파싱 로직은 그대로 재사용 가능했음.
+// NAVER Cloud Platform API Gateway(API HUB) 상품 기준이다. developers.naver.com의
+// 오픈API(X-Naver-Client-Id/Secret)와 인증 방식이 다르고 응답 필드는 같다.
 //
 // 필요 환경변수 (.env.local):
 //   NCP_APIGW_API_KEY_ID, NCP_APIGW_API_KEY
-//   (console.ncloud.com → API Gateway → API HUB → "검색-뉴스" 상품 신청하면 발급)
+//   (console.ncloud.com → API Gateway → API HUB → "검색-뉴스" 상품)
 //
 // 참고 문서: https://api.ncloud-docs.com/docs/naver-api-hub-search-news
 // ---------------------------------------------------------------------------

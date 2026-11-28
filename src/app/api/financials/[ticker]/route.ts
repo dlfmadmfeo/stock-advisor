@@ -4,15 +4,11 @@ import { dartFinancialsConfigured, fetchFinancials } from "@/lib/dart-financials
 const TICKER_RE = /^\d{6}$/;
 
 // ---------------------------------------------------------------------------
-// 종목별 연도별 재무 정보(매출/영업이익/순이익/ROE/부채비율 등) 프록시.
-// 데이터 출처는 DART(dart-financials.ts) — KIS 재무 API가 2026-11부터 막혀서 옮김.
-// investor-trend route와 같은 패턴(TICKER_RE 검증, 설정 키 체크,
-// 실패는 항상 non-2xx + no-store — revalidate가 실패까지 캐시해버리는 걸
-// 막기 위해서, 2026-08-24 세션에 investor-trend에서 겪은 버그 참고).
+// 종목별 연도별 재무 정보(매출·영업이익·순이익·ROE·부채비율 등) 프록시. 출처는 DART
+// (dart-financials.ts). investor-trend 라우트와 같이 TICKER_RE 검증, 설정 키 확인,
+// 실패 시 non-2xx + no-store(실패 응답이 캐시되지 않도록)를 적용한다.
 //
-// revalidate는 investor-trend(300초)보다 훨씬 길게 뒀어요 — 재무제표는
-// 연 1회(결산)만 갱신되는 값이라 5분 캐시는 낭비. 6시간이면 하루 몇 번
-// KIS를 부르는 정도로 충분합니다.
+// 재무제표는 연 1회 갱신되므로 revalidate를 6시간으로 길게 둔다.
 // ---------------------------------------------------------------------------
 export const revalidate = 21600;
 

@@ -123,13 +123,9 @@ export function computeMacdSeries(bars: DailyBar[]): MacdPoint[] {
   return points;
 }
 
-// MACD 반등 조짐(2026-09-01 세션): 히스토그램이 아직 음수(하락 모멘텀)지만
-// 최근 lookbackDays 거래일 연속으로 0에 가까워지는 중인지 판정합니다.
-// "매수 신호"가 아니라 "하락 힘이 약해지는 상태"라는 사실만 알려주는
-// 거예요 — screener.ts의 규제 회피 관례(판단이 아니라 상태 표시)를 그대로
-// 따릅니다. 5번째 스크리너 규칙으로 합치지 않고 독립 신호로 둔 이유는
-// screenerChecks가 "지금 조건을 만족하냐"는 정적 상태 체크인 반면, 이건
-// "방향이 바뀌는 중이냐"는 추세 판단이라 성격이 달라서예요.
+// MACD 반등 조짐: 히스토그램이 음수(하락 모멘텀)지만 최근 lookbackDays 거래일 연속
+// 0에 가까워지는지 판정한다. 매수 신호가 아니라 하락 힘이 약해지는 상태 표시다.
+// 정적 조건 체크인 스크리너 규칙과 성격이 달라(추세 변화) 독립 신호로 둔다.
 export function isMacdReboundSignal(points: MacdPoint[], lookbackDays = 3): boolean {
   if (points.length < lookbackDays) return false;
   const recent = points.slice(-lookbackDays).map((p) => p.histogram);
@@ -183,28 +179,18 @@ export function computeScreenerInputs(dailyBars: DailyBar[], weeklyBars: DailyBa
 }
 
 // ---------------------------------------------------------------------------
-// 급락-안정화(드롭 리버설) 신호 (2026-08-14 세션 추가).
+// 급락-안정화(드롭 리버설) 신호.
 //
-// 기존 4개 지표는 "골든크로스 + 추세 확인" 계열이라 급락 직후 반등을 노리는
-// 전략과는 반대 성격입니다(급락 직후엔 보통 MA5<MA20, RSI 과매도라 기존
-// 스크리너를 통과 못 함). 그래서 완전히 별개의 판정 함수로 분리했습니다.
+// 기존 4개 지표(골든크로스 + 추세 확인)와 반대 성격이라 별도 판정 함수로 둔다.
 //
 // 정의: 최근 lookbackDays 거래일 안에서
-//   1) 고점(peak) 대비 저점(trough)까지 dropThresholdPct% 이상 하락(peak이
-//      trough보다 먼저 나와야 "하락"으로 인정 — 순서 무관하게 최고/최저만
-//      뽑으면 상승 구간을 하락으로 오인할 수 있어서 순서를 강제함).
-//   2) 저점 이후 minDaysSinceTrough~maxDaysSinceTrough 거래일이 지남
-//      (너무 이르면 "아직 하락 중"일 수 있고, 너무 늦으면 반등이 이미
-//      끝났을 수 있어서 타이밍 창을 둠).
-//   3) 저점 이후 신저점을 다시 갱신하지 않음(안정화 확인 — 여전히 떨어지고
-//      있으면 후보에서 제외, noNewLowTolerancePct만큼의 노이즈는 허용).
-//   4) 오늘 종가가 저점 대비 reboundToleranceFromTroughPct% 이내(이미 많이
-//      올라버렸으면 "놓친 반등"이라 진입 매력이 떨어져서 제외).
+//   1) 고점(peak) 대비 저점(trough)까지 dropThresholdPct% 이상 하락
+//      (peak이 trough보다 먼저 나와야 함 — 상승 구간을 하락으로 오인하지 않도록)
+//   2) 저점 이후 minDaysSinceTrough~maxDaysSinceTrough 거래일 경과
+//   3) 저점 이후 신저점 미갱신 (noNewLowTolerancePct만큼의 노이즈 허용)
+//   4) 오늘 종가가 저점 대비 reboundToleranceFromTroughPct% 이내 (이미 반등한 경우 제외)
 //
-// ⚠️ 뉴스/이벤트 원인은 전혀 안 봅니다 — 순수 가격 패턴으로만 "급락 후
-// 안정화 구간"을 근사한 것이라, 실적 쇼크처럼 하락이 정당한(펀더멘털이
-// 실제로 나빠진) 경우와 일시적 패닉/이벤트성 급락을 구분하지 못합니다.
-// 그 구분은 백테스트로 검증 불가능한 영역이라 별도(뉴스 연동) 과제로 남겨둠.
+// 가격 패턴만 보므로 실적 악화 같은 정당한 하락과 일시적 급락을 구분하지 못한다.
 // ---------------------------------------------------------------------------
 
 export type DropReversalThresholds = {

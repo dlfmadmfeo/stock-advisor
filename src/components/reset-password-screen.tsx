@@ -1,12 +1,9 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// 새 비밀번호 설정 화면 (2026-09-13 세션). forgot-password-screen.tsx가
-// 보낸 메일의 링크를 누르면 better-auth가 이 경로(/reset-password)로
-// 리다이렉트하면서 유효한 토큰이면 ?token=..., 만료/무효면 ?error=INVALID_TOKEN을
-// 붙여줍니다. useSearchParams 대신 window.location을 직접 읽는 이유는
-// login-screen.tsx의 ?expired=1 처리와 같아요 — Suspense 경계 없이 클라이언트
-// 마운트 시 한 번만 확인하면 되는 값이라서.
+// 새 비밀번호 설정 화면. 메일 링크를 누르면 better-auth가 유효한 토큰은 ?token=...,
+// 만료·무효는 ?error=INVALID_TOKEN을 붙여 이 경로로 보낸다. 마운트 시 한 번만 읽으면
+// 되는 값이라 useSearchParams 대신 window.location을 쓴다.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from "react";
